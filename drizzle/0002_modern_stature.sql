@@ -1,0 +1,2 @@
+ALTER TABLE "inventory_movements" DROP CONSTRAINT "inventory_movements_move_locations_required";--> statement-breakpoint
+ALTER TABLE "inventory_movements" ADD CONSTRAINT "inventory_movements_move_locations_required" CHECK ("inventory_movements"."type" <> 'MOVE' or "inventory_movements"."to_location_id" is not null);

@@ -1,0 +1,13 @@
+# Makes OpenNext load the development-mode Next.js env files during preview.
+NEXTJS_ENV=development
+
+# Server-only values for local Wrangler preview. Never commit .dev.vars.
+DATABASE_URL=
+BETTER_AUTH_SECRET=
+BETTER_AUTH_URL=
+NEXT_PUBLIC_SITE_URL=
+CLOUDFLARE_ACCOUNT_ID=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET_NAME=
+R2_PUBLIC_URL=
