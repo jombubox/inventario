@@ -26,6 +26,8 @@ Copia `.env.example` a `.env.local` y define valores reales. Nunca publiques ese
 | `NEXT_PUBLIC_SITE_URL` | Origen HTTPS de metadata, sitemap y enlaces |
 | `APP_ENV` | `development`, `preview` o `production` |
 | `ENABLE_IMPORTS` | Kill switch del importador |
+| `ADMIN_BOOTSTRAP_NAME` / `ADMIN_BOOTSTRAP_EMAIL` | Identidad server-only del ADMIN inicial |
+| `ADMIN_BOOTSTRAP_PASSWORD` | Contraseña server-only de al menos 16 caracteres; nunca se imprime |
 | `CLOUDFLARE_ACCOUNT_ID` | Identificador de la cuenta Cloudflare |
 | `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | Credenciales R2 server-only |
 | `R2_BUCKET_NAME` | Bucket canónico de imágenes |
@@ -43,6 +45,21 @@ pnpm dev
 ```
 
 No existe registro público. `pnpm admin:create` crea el primer ADMIN de forma interactiva; las cuentas siguientes se gestionan en `/admin/usuarios`.
+
+### Bootstrap explícito de producción
+
+Después de migrar la base y configurar las variables `ADMIN_BOOTSTRAP_*`, ejecuta manualmente:
+
+```bash
+pnpm production:bootstrap --confirm-production
+pnpm production:verify
+```
+
+El bootstrap sincroniza el ADMIN mediante Better Auth y asegura tres productos de muestra con inventario e imágenes R2. Es idempotente y no forma parte del inicio, build ni deploy de la aplicación. Para retirar solamente los productos de muestra y conservar el ADMIN:
+
+```bash
+pnpm production:remove-samples --confirm-production
+```
 
 ## Rutas
 
@@ -68,6 +85,9 @@ pnpm db:generate
 pnpm db:migrate
 pnpm db:seed
 pnpm admin:create
+pnpm production:bootstrap --confirm-production
+pnpm production:verify
+pnpm production:remove-samples --confirm-production
 
 pnpm preview
 pnpm upload

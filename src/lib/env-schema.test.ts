@@ -20,6 +20,20 @@ describe("server environment validation", () => {
     expect(parseServerEnv({ ...base, ENABLE_IMPORTS: "false" }).ENABLE_IMPORTS).toBe(false);
   });
 
+  it("keeps optional production bootstrap values server-side", () => {
+    expect(parseServerEnv({
+      ...base,
+      ADMIN_BOOTSTRAP_NAME: "JombuBox Admin",
+      ADMIN_BOOTSTRAP_EMAIL: "admin@example.com",
+      ADMIN_BOOTSTRAP_PASSWORD: "a-development-only-password",
+    })).toMatchObject({
+      ADMIN_BOOTSTRAP_NAME: "JombuBox Admin",
+      ADMIN_BOOTSTRAP_EMAIL: "admin@example.com",
+      ADMIN_BOOTSTRAP_PASSWORD: "a-development-only-password",
+    });
+    expect(parseServerEnv(base).ADMIN_BOOTSTRAP_PASSWORD).toBeUndefined();
+  });
+
   it("requires matching non-local HTTPS origins in production", () => {
     expect(() => parseServerEnv({ ...base, APP_ENV: "production" })).toThrow(/BETTER_AUTH_URL/u);
     expect(() => parseServerEnv({
