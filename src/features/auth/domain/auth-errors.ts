@@ -5,7 +5,3 @@ export class UnauthorizedError extends Error {
 export class ForbiddenError extends Error {
   override readonly name = "ForbiddenError";
 }
-
-export class LastActiveAdminError extends Error {
-  override readonly name = "LastActiveAdminError";
-}

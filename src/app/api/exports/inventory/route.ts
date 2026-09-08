@@ -1,5 +1,6 @@
 import { getDb } from "@/db";
 import { createAuditLog } from "@/features/audit/data/audit-log";
+import { ENV_ADMIN_AUDIT_ENTITY_ID } from "@/features/auth/domain/env-admin-session";
 import { requirePermissionFromHeaders } from "@/features/auth/server/authorization";
 import { buildInventoryExport } from "@/features/exports/server/inventory-export";
 import { consumeOperationalRateLimit } from "@/features/security/server/rate-limit";
@@ -27,7 +28,7 @@ export async function GET(request: Request) {
       userId: actor.id,
       action: "INVENTORY_EXPORTED",
       entityType: "USER",
-      entityId: actor.id,
+      entityId: ENV_ADMIN_AUDIT_ENTITY_ID,
       metadata: { counts: result.counts, requestId },
     });
     logServerEvent("info", "inventory_export_completed", {

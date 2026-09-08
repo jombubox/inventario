@@ -14,7 +14,7 @@ export const adminNavigation: readonly AdminNavigationItem[] = [
   { label: "Ubicaciones", short: "UB", href: "/admin/ubicaciones" },
   { label: "Importar", short: "IM", href: "/admin/importar" },
   { label: "Movimientos", short: "MV", href: "/admin/movimientos" },
-  { label: "Usuarios", short: "US", href: "/admin/usuarios", roles: ["ADMIN"] },
+  { label: "Administrador", short: "AD", href: "/admin/usuarios", roles: ["ADMIN"] },
   { label: "Auditoría", short: "AU", href: "/admin/auditoria", roles: ["ADMIN"] },
 ] as const;
 

@@ -6,7 +6,6 @@ import { pathToFileURL } from "node:url";
 
 import { createDatabaseClient, type Database } from "@/db/connection";
 import {
-  account,
   auditLogs,
   brands,
   componentTypes,
@@ -15,18 +14,12 @@ import {
   locations,
   productImages,
   products,
-  session,
-  user,
 } from "@/db/schema";
 import { listAdminProducts } from "@/features/products/data/admin-product-queries";
 import {
   getPublicProductBySlug,
   getPublicProducts,
 } from "@/features/catalog/data/public-catalog-queries";
-import {
-  permissionMatrix,
-  permissionValues,
-} from "@/features/auth/domain/permissions";
 import type { AuthenticatedUser } from "@/features/auth/server/authorization";
 import {
   createProductImage,
@@ -45,10 +38,8 @@ import {
 } from "@/features/inventory/server/inventory-service";
 import { createLocation } from "@/features/locations/server/location-service";
 import { createProduct, updateProduct } from "@/features/products/server/product-service";
-import { createJombuBoxAuth } from "@/lib/auth-factory";
 import { parseServerEnv, type ServerEnv } from "@/lib/env-schema";
 import { toBrandRecord, toComponentTypeRecord } from "@/validators/catalog";
-import { createUserInputSchema } from "@/validators/auth";
 
 const SAMPLE_PREFIX = "JombuBox Sample \u2014";
 const SAMPLE_LOCATION_MARKER = "JombuBox production sample location";
@@ -98,13 +89,6 @@ const SAMPLE_PRODUCTS = [
   },
 ] as const;
 
-type BootstrapAdminInput = {
-  name: string;
-  email: string;
-  password: string;
-  role: "ADMIN";
-};
-
 type SampleProductRow = {
   id: string;
   title: string;
@@ -113,6 +97,14 @@ type SampleProductRow = {
   stock: number;
   location: string | null;
   imageCount: number;
+};
+
+const SAMPLE_SEED_ACTOR: AuthenticatedUser = {
+  id: "system-production-sample-seed",
+  name: "JombuBox sample seeder",
+  email: "system@jombubox.invalid",
+  role: "ADMIN",
+  active: true,
 };
 
 function hasProductionConfirmation(): boolean {
@@ -124,113 +116,16 @@ function databaseName(databaseUrl: string): string {
   return name || "<default>";
 }
 
-function printWriteContext(environment: ServerEnv, adminEmail: string, action: "bootstrap" | "remove-samples") {
+function printWriteContext(environment: ServerEnv, action: "seed-samples" | "remove-samples") {
   console.info(`Environment: ${environment.APP_ENV}`);
   console.info(`Database: ${databaseName(environment.DATABASE_URL)}`);
-  console.info(`Admin email: ${adminEmail}`);
-  console.info(`Products to ${action === "bootstrap" ? "ensure" : "remove"}: 3`);
+  console.info(`Products to ${action === "seed-samples" ? "ensure" : "remove"}: 3`);
 }
 
 function requireProductionConfirmation(environment: ServerEnv): void {
   if (environment.APP_ENV === "production" && !hasProductionConfirmation()) {
     throw new Error("Production writes require --confirm-production.");
   }
-}
-
-function parseBootstrapAdmin(environment: ServerEnv): BootstrapAdminInput {
-  const input = createUserInputSchema.parse({
-    name: environment.ADMIN_BOOTSTRAP_NAME,
-    email: environment.ADMIN_BOOTSTRAP_EMAIL,
-    password: environment.ADMIN_BOOTSTRAP_PASSWORD,
-    role: "ADMIN",
-  });
-  if (input.password.length < 16) {
-    throw new Error("ADMIN_BOOTSTRAP_PASSWORD must contain at least 16 characters.");
-  }
-  return { ...input, role: "ADMIN" };
-}
-
-function parseBootstrapEmail(environment: ServerEnv): string {
-  return createUserInputSchema.shape.email.parse(environment.ADMIN_BOOTSTRAP_EMAIL);
-}
-
-function cookieHeader(responseHeaders: Headers): string {
-  const withGetSetCookie = responseHeaders as Headers & { getSetCookie?: () => string[] };
-  const values = withGetSetCookie.getSetCookie?.() ?? [responseHeaders.get("set-cookie") ?? ""];
-  return values.filter(Boolean).map((value) => value.split(";", 1)[0]).join("; ");
-}
-
-async function ensureBootstrapAdmin(
-  db: Database,
-  auth: ReturnType<typeof createJombuBoxAuth>,
-  input: BootstrapAdminInput,
-) {
-  let matching = await db
-    .select()
-    .from(user)
-    .where(sql`lower(${user.email}) = ${input.email}`);
-  if (matching.length > 1) throw new Error("Multiple users match ADMIN_BOOTSTRAP_EMAIL.");
-
-  const created = matching.length === 0;
-  if (created) {
-    await auth.api.createUser({ body: input });
-    matching = await db
-      .select()
-      .from(user)
-      .where(sql`lower(${user.email}) = ${input.email}`);
-  }
-
-  let admin = matching[0];
-  if (!admin || admin.role !== "ADMIN" || !admin.active || admin.banned) {
-    throw new Error("The configured bootstrap user must be an active, unbanned ADMIN.");
-  }
-
-  let signInResult: Awaited<ReturnType<typeof auth.api.signInEmail>>;
-  let authHeaders: Headers;
-  try {
-    const result = await auth.api.signInEmail({
-      body: { email: input.email, password: input.password },
-      headers: new Headers({ "user-agent": "JombuBox production bootstrap" }),
-      returnHeaders: true,
-    });
-    signInResult = result.response;
-    authHeaders = new Headers({
-      cookie: cookieHeader(result.headers),
-      "user-agent": "JombuBox production bootstrap",
-    });
-  } catch {
-    throw new Error(
-      "The existing ADMIN password does not match ADMIN_BOOTSTRAP_PASSWORD; use an authenticated Better Auth administrator to reset it safely.",
-    );
-  }
-
-  if (admin.name !== input.name) {
-    await auth.api.updateUser({ body: { name: input.name }, headers: authHeaders });
-  }
-  await auth.api.setUserPassword({
-    body: { userId: admin.id, newPassword: input.password },
-    headers: authHeaders,
-  });
-
-  const credential = await db.query.account.findFirst({
-    where: and(eq(account.userId, admin.id), eq(account.providerId, "credential")),
-  });
-  if (!credential?.password || credential.password === input.password) {
-    throw new Error("Better Auth did not store a secure credential for the bootstrap ADMIN.");
-  }
-
-  if (signInResult.token) {
-    await db.delete(session).where(eq(session.token, signInResult.token));
-  }
-  admin = await db.query.user.findFirst({ where: eq(user.id, admin.id) });
-  if (!admin || admin.name !== input.name || admin.role !== "ADMIN") {
-    throw new Error("Bootstrap ADMIN synchronization failed.");
-  }
-  if (permissionMatrix.ADMIN.length !== permissionValues.length) {
-    throw new Error("ADMIN does not have the complete application permission set.");
-  }
-
-  return { admin, created, loginVerified: true };
 }
 
 async function ensureBrand(db: Database, definition: { name: string; code: string }) {
@@ -463,7 +358,7 @@ async function ensureSampleProducts(
         condition: definition.condition,
         status: "AVAILABLE",
         acquiredAt: null,
-        acquisitionSource: "Production catalog bootstrap",
+        acquisitionSource: "Production sample seed",
         purchaseCost: definition.purchaseCost,
         notes: "JombuBox production sample",
         legacyBagNumber: null,
@@ -475,7 +370,7 @@ async function ensureSampleProducts(
         expectedUpdatedAt: inventory.updatedAt,
         condition: definition.condition,
         acquiredAt: null,
-        acquisitionSource: "Production catalog bootstrap",
+        acquisitionSource: "Production sample seed",
         purchaseCost: definition.purchaseCost,
         notes: "JombuBox production sample",
         legacyBagNumber: null,
@@ -485,7 +380,7 @@ async function ensureSampleProducts(
         inventory = await moveInventoryItem(db, actor, {
           id: inventory.id,
           toLocationId: location.id,
-          reason: "Production sample bootstrap synchronization",
+          reason: "Production sample seed synchronization",
         });
       }
       if (inventory.quantity === definition.stock && inventory.status !== "AVAILABLE") {
@@ -493,7 +388,7 @@ async function ensureSampleProducts(
           id: inventory.id,
           newQuantity: definition.stock + 1,
           newStatus: "AVAILABLE",
-          reason: "Production sample bootstrap status repair",
+          reason: "Production sample seed status repair",
         });
       }
       if (inventory.quantity !== definition.stock || inventory.status !== "AVAILABLE") {
@@ -501,7 +396,7 @@ async function ensureSampleProducts(
           id: inventory.id,
           newQuantity: definition.stock,
           newStatus: "AVAILABLE",
-          reason: "Production sample bootstrap synchronization",
+          reason: "Production sample seed synchronization",
         });
       }
     }
@@ -563,7 +458,7 @@ function createReadOnlyR2Client(environment: ServerEnv) {
     publicUrl: environment.R2_PUBLIC_URL,
   };
   if (Object.values(required).some((value) => !value)) {
-    throw new Error("Cloudflare R2 bootstrap configuration is incomplete.");
+    throw new Error("Cloudflare R2 sample-seed configuration is incomplete.");
   }
   const endpoint = /^https?:\/\//u.test(required.accountId!)
     ? required.accountId!.replace(/\/+$/u, "")
@@ -631,11 +526,7 @@ async function loadSampleRows(db: Database): Promise<SampleProductRow[]> {
   }));
 }
 
-async function verifyBootstrapState(db: Database, environment: ServerEnv, adminEmail: string) {
-  const adminRows = await db
-    .select({ id: user.id, name: user.name, email: user.email, role: user.role, active: user.active, banned: user.banned })
-    .from(user)
-    .where(sql`lower(${user.email}) = ${adminEmail}`);
+async function verifySampleState(db: Database, environment: ServerEnv) {
   const sampleRows = await loadSampleRows(db);
   const expectedNames = new Set<string>(SAMPLE_PRODUCTS.map(({ title }) => title));
   const imageRows = sampleRows.length === 0
@@ -705,12 +596,7 @@ async function verifyBootstrapState(db: Database, environment: ServerEnv, adminE
   r2.client.destroy();
   const orphanObjects = [...objectKeys].filter((key) => !databaseKeys.has(key));
 
-  const admin = adminRows[0];
   const ready =
-    adminRows.length === 1 &&
-    admin?.role === "ADMIN" &&
-    admin.active &&
-    !admin.banned &&
     sampleRows.length === 3 &&
     sampleRows.every(({ title, imageCount, stock }) => expectedNames.has(title) && imageCount === 1 && stock > 0) &&
     imageRows.length === 3 &&
@@ -723,34 +609,21 @@ async function verifyBootstrapState(db: Database, environment: ServerEnv, adminE
     objectKeys.size === 3 &&
     deliveredImages === 3 &&
     orphanObjects.length === 0;
-  if (!ready) throw new Error("Production bootstrap verification failed.");
+  if (!ready) throw new Error("Production sample verification failed.");
 
   return {
-    admin: { name: admin.name, email: admin.email, role: admin.role },
     products: sampleRows,
     images: { rows: imageRows.length, objects: objectKeys.size, delivered: deliveredImages, orphanObjects: orphanObjects.length },
     catalog: { admin: adminCatalog.rows.length, public: publicCatalog.products.length, details: details.length, compatibilitySearches: compatibilitySearches.length },
-    duplicates: { admin: adminRows.length - 1, products: sampleRows.length - expectedNames.size, images: imageRows.length - sampleRows.length },
+    duplicates: { products: sampleRows.length - expectedNames.size, images: imageRows.length - sampleRows.length },
   };
 }
 
 async function removeSampleProducts(
   db: Database,
   environment: ServerEnv,
-  adminEmail: string,
   storage: ImageStorage,
 ) {
-  const admin = await db.query.user.findFirst({
-    where: and(sql`lower(${user.email}) = ${adminEmail}`, eq(user.role, "ADMIN"), eq(user.active, true)),
-  });
-  if (!admin) throw new Error("The configured active ADMIN is required for sample cleanup.");
-  const actor: AuthenticatedUser = {
-    id: admin.id,
-    name: admin.name,
-    email: admin.email,
-    role: "ADMIN",
-    active: true,
-  };
   const sampleRows = await loadSampleRows(db);
   const productIds = sampleRows.map(({ id }) => id);
   const images = productIds.length === 0
@@ -769,7 +642,7 @@ async function removeSampleProducts(
   r2.client.destroy();
 
   for (const image of images) {
-    await deleteProductImage(db, actor, storage, image.id);
+    await deleteProductImage(db, SAMPLE_SEED_ACTOR, storage, image.id);
     if (image.storageKey) allObjectKeys.delete(image.storageKey);
   }
   for (const orphanKey of allObjectKeys) await storage.deleteObject(orphanKey);
@@ -791,8 +664,6 @@ async function removeSampleProducts(
     const references = await db.select({ value: count() }).from(inventoryItems).where(eq(inventoryItems.locationId, location.id));
     if ((references[0]?.value ?? 0) === 0) await db.delete(locations).where(eq(locations.id, location.id));
   }
-  const remainingAdmin = await db.query.user.findFirst({ where: eq(user.id, admin.id) });
-  if (!remainingAdmin) throw new Error("Sample cleanup unexpectedly removed the production ADMIN.");
   return { productsRemoved: sampleRows.length, imagesRemoved: images.length, orphanObjectsRemoved: allObjectKeys.size };
 }
 
@@ -803,21 +674,12 @@ async function main(): Promise<void> {
   const command = process.argv[2];
 
   if (command === "verify") {
-    const adminEmail = parseBootstrapEmail(environment);
     const db = createDatabaseClient(environment.DATABASE_URL);
     const result = await db.transaction(async (tx) => {
       await tx.execute(sql`set transaction read only`);
-      return verifyBootstrapState(
-        tx as unknown as Database,
-        environment,
-        adminEmail,
-      );
+      return verifySampleState(tx as unknown as Database, environment);
     });
-    console.info("Production bootstrap:");
-    console.info("Admin:");
-    console.info(`Email: ${result.admin.email}`);
-    console.info(`Exists: yes`);
-    console.info(`Role: ${result.admin.role}`);
+    console.info("Production sample seed:");
     console.info("Sample products:");
     console.info("Expected: 3");
     console.info(`Found: ${result.products.length}`);
@@ -829,29 +691,13 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (command === "bootstrap") {
-    const adminInput = parseBootstrapAdmin(environment);
-    printWriteContext(environment, adminInput.email, "bootstrap");
+  if (command === "seed-samples") {
+    printWriteContext(environment, "seed-samples");
     requireProductionConfirmation(environment);
     const db = createDatabaseClient(environment.DATABASE_URL);
-    const auth = createJombuBoxAuth(db, {
-      secret: environment.BETTER_AUTH_SECRET,
-      baseURL: environment.BETTER_AUTH_URL,
-      siteURL: environment.NEXT_PUBLIC_SITE_URL,
-      secureCookies: environment.APP_ENV === "production",
-    });
     const storage = createR2Storage(environment);
-    const adminResult = await ensureBootstrapAdmin(db, auth, adminInput);
-    const productResult = await ensureSampleProducts(db, {
-      id: adminResult.admin.id,
-      name: adminResult.admin.name,
-      email: adminResult.admin.email,
-      role: "ADMIN",
-      active: true,
-    }, storage);
-    const verified = await verifyBootstrapState(db, environment, adminInput.email);
-    console.info(`Admin: ${adminResult.created ? "created" : "already exists and is valid"}.`);
-    console.info(`Better Auth login: ${adminResult.loginVerified ? "PASS" : "FAIL"}`);
+    const productResult = await ensureSampleProducts(db, SAMPLE_SEED_ACTOR, storage);
+    const verified = await verifySampleState(db, environment);
     console.info(`Products: ${verified.products.length}; images uploaded this run: ${productResult.imagesUploaded}.`);
     for (const product of verified.products) console.info(`${product.title}: ${product.sku}`);
     console.info("Status: READY");
@@ -859,19 +705,17 @@ async function main(): Promise<void> {
   }
 
   if (command === "remove-samples") {
-    const adminEmail = parseBootstrapEmail(environment);
-    printWriteContext(environment, adminEmail, "remove-samples");
+    printWriteContext(environment, "remove-samples");
     requireProductionConfirmation(environment);
     const db = createDatabaseClient(environment.DATABASE_URL);
-    const removed = await removeSampleProducts(db, environment, adminEmail, createR2Storage(environment));
+    const removed = await removeSampleProducts(db, environment, createR2Storage(environment));
     console.info(`Sample products removed: ${removed.productsRemoved}`);
     console.info(`Sample images removed: ${removed.imagesRemoved}`);
     console.info(`Orphan sample objects removed: ${removed.orphanObjectsRemoved}`);
-    console.info("Production ADMIN: preserved");
     return;
   }
 
-  throw new Error("Usage: production-bootstrap.ts bootstrap|verify|remove-samples");
+  throw new Error("Usage: production-samples.ts seed-samples|verify|remove-samples");
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

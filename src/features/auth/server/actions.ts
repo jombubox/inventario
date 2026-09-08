@@ -1,10 +1,21 @@
 "use server";
 
-import { APIError } from "better-auth/api";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { auth } from "@/lib/auth";
+import {
+  createAdminSession,
+  deleteAdminSession,
+} from "@/features/auth/server/admin-session";
+import {
+  InvalidEnvAdminConfigurationError,
+  validateAdminCredentials,
+} from "@/features/auth/server/env-admin";
+import {
+  clearLoginFailures,
+  isLoginAttemptAllowed,
+  recordLoginFailure,
+} from "@/features/auth/server/login-rate-limit";
 import { loginInputSchema } from "@/validators/auth";
 
 export type AuthActionState = {
@@ -25,21 +36,25 @@ export async function loginAction(
     return { fieldErrors: parsed.error.flatten().fieldErrors };
   }
 
+  const requestHeaders = await headers();
+  if (!isLoginAttemptAllowed(requestHeaders)) {
+    return { error: "Demasiados intentos. Espera un minuto antes de volver a intentar." };
+  }
+
   try {
-    const response = await auth.api.signInEmail({
-      body: parsed.data,
-      headers: await headers(),
-    });
-
-    if (!response.user.active) {
-      await auth.api.signOut({ headers: await headers() });
-      return { error: "Tu cuenta está desactivada. Contacta a un administrador." };
+    if (!validateAdminCredentials(parsed.data.email, parsed.data.password)) {
+      recordLoginFailure(requestHeaders);
+      return { error: "Correo o contraseña incorrectos." };
     }
+
+    await createAdminSession();
+    clearLoginFailures(requestHeaders);
   } catch (error) {
-    if (error instanceof APIError && error.status === "TOO_MANY_REQUESTS") {
-      return { error: "Demasiados intentos. Espera un minuto antes de volver a intentar." };
+    if (error instanceof InvalidEnvAdminConfigurationError) {
+      console.error("ENV admin authentication is not configured.", {
+        fields: error.fields,
+      });
     }
-
     return { error: "Correo o contraseña incorrectos." };
   }
 
@@ -47,6 +62,6 @@ export async function loginAction(
 }
 
 export async function logoutAction(): Promise<void> {
-  await auth.api.signOut({ headers: await headers() });
+  await deleteAdminSession();
   redirect("/login");
 }

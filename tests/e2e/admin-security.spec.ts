@@ -4,15 +4,14 @@ import { createReadStream } from "node:fs";
 import { writeFile } from "node:fs/promises";
 
 const credentials = {
-  ADMIN: { email: "admin@e2e.local", password: "JombuBox-E2E-Admin-123!" },
-  EDITOR: { email: "editor@e2e.local", password: "JombuBox-E2E-Editor-123!" },
-  VIEWER: { email: "viewer@e2e.local", password: "JombuBox-E2E-Viewer-123!" },
+  email: "admin@e2e.local",
+  password: "JombuBox-E2E-Admin-123!",
 } as const;
 
-async function login(page: Page, role: keyof typeof credentials) {
+async function login(page: Page) {
   await page.goto("/login");
-  await page.getByLabel("Correo electrónico").fill(credentials[role].email);
-  await page.getByLabel("Contraseña").fill(credentials[role].password);
+  await page.getByLabel("Correo electrónico").fill(credentials.email);
+  await page.getByLabel("Contraseña").fill(credentials.password);
   await page.getByRole("button", { name: "Iniciar sesión" }).click();
   await expect(page).toHaveURL(/\/admin$/u);
 }
@@ -22,25 +21,28 @@ test("unauthenticated admin access redirects to login", async ({ page }) => {
   await expect(page).toHaveURL(/\/login\?next=%2Fadmin%2Finventario/u);
 });
 
-test("VIEWER sees read-only UI and cannot bypass permissions", async ({ page }) => {
-  await login(page, "VIEWER");
-  await expect(page.getByRole("link", { name: "Nuevo producto" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Usuarios" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Auditoría" })).toHaveCount(0);
+test("wrong email and password do not create an admin session", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByLabel("Correo electrónico").fill("wrong@e2e.local");
+  await page.getByLabel("Contraseña").fill(credentials.password);
+  await page.getByRole("button", { name: "Iniciar sesión" }).click();
+  await expect(page.getByRole("alert")).toHaveText("Correo o contraseña incorrectos.");
+  await page.goto("/admin");
+  await expect(page).toHaveURL(/\/login\?next=%2Fadmin/u);
 
-  await page.goto("/admin/inventario");
-  await expect(page.getByRole("link", { name: "Exportar inventario" })).toHaveCount(0);
+  await page.getByLabel("Correo electrónico").fill(credentials.email);
+  await page.getByLabel("Contraseña").fill("wrong-password");
+  await page.getByRole("button", { name: "Iniciar sesión" }).click();
+  await expect(page.getByRole("alert")).toHaveText("Correo o contraseña incorrectos.");
+
   const exportResponse = await page.request.get("/api/exports/inventory");
-  expect(exportResponse.status()).toBe(403);
-
-  await page.goto("/admin/usuarios");
-  await expect(page).toHaveURL(/\/admin\/forbidden/u);
+  expect(exportResponse.status()).toBe(401);
 });
 
-test("EDITOR exports inventory and completes the legacy import workflow", async ({ page }, testInfo) => {
+test("ENV ADMIN exports inventory and completes the legacy import workflow", async ({ page }, testInfo) => {
   test.setTimeout(60_000);
   test.skip(testInfo.project.name.startsWith("mobile"), "State-changing workflow runs once against the shared E2E database.");
-  await login(page, "EDITOR");
+  await login(page);
   const exportResponse = await page.request.get("/api/exports/inventory");
   expect(exportResponse.status()).toBe(200);
   expect(exportResponse.headers()["content-disposition"]).toContain("JombuBox_Inventario_");
@@ -83,9 +85,9 @@ test("EDITOR exports inventory and completes the legacy import workflow", async 
   await expect(page.getByText("COMPLETED", { exact: true }).first()).toBeVisible();
 });
 
-test("EDITOR uploads an image through the server-side fake R2 boundary", async ({ page }, testInfo) => {
+test("ENV ADMIN uploads an image through the server-side fake R2 boundary", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name.startsWith("mobile"), "State-changing workflow runs once against the shared E2E database.");
-  await login(page, "EDITOR");
+  await login(page);
   await page.goto("/admin/productos");
   const editLink = page.getByRole("row").filter({ hasText: "Mainboard Samsung BN94-07820F" }).getByRole("link", { name: "Editar" });
   const editHref = await editLink.getAttribute("href");
@@ -115,7 +117,7 @@ test("EDITOR uploads an image through the server-side fake R2 boundary", async (
 test("ADMIN completes product, stock, location, movement, image and publication", async ({ page }, testInfo) => {
   test.setTimeout(150_000);
   test.skip(testInfo.project.name.startsWith("mobile"), "The stateful acceptance flow runs once; responsive admin behavior is covered separately.");
-  await login(page, "ADMIN");
+  await login(page);
 
   await page.goto("/admin/productos/nuevo");
   await page.getByLabel("Número de parte").fill("E2E-FULL-001");
@@ -192,4 +194,6 @@ test("ADMIN completes product, stock, location, movement, image and publication"
   await page.goto("/admin");
   await page.getByRole("button", { name: "Salir" }).click();
   await expect(page).toHaveURL(/\/login/u);
+  await page.goto("/admin");
+  await expect(page).toHaveURL(/\/login\?next=%2Fadmin/u);
 });

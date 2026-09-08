@@ -1,6 +1,3 @@
-import { createAccessControl } from "better-auth/plugins/access";
-import { adminAc, defaultStatements } from "better-auth/plugins/admin/access";
-
 import { ForbiddenError } from "@/features/auth/domain/auth-errors";
 
 export const userRoleValues = ["ADMIN", "EDITOR", "VIEWER"] as const;
@@ -83,21 +80,3 @@ export function assertPermission(role: UserRole, permission: Permission): void {
     throw new ForbiddenError("The current role does not have this permission.");
   }
 }
-
-// Better Auth's Admin plugin controls only authentication-user administration.
-// Application permissions remain in the explicit matrix above.
-export const authAccessControl = createAccessControl(defaultStatements);
-
-export const authAdminRole = authAccessControl.newRole({
-  ...adminAc.statements,
-});
-
-export const authEditorRole = authAccessControl.newRole({
-  user: [],
-  session: [],
-});
-
-export const authViewerRole = authAccessControl.newRole({
-  user: [],
-  session: [],
-});

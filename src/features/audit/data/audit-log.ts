@@ -1,5 +1,6 @@
 import type { DatabaseExecutor } from "@/db/executor";
 import { auditLogs } from "@/db/schema";
+import { databaseUserIdForActor } from "@/features/auth/server/actor-attribution";
 import { redactRecord } from "@/lib/redaction";
 
 export const auditActionValues = [
@@ -51,13 +52,17 @@ export function createAuditLog(
     metadata?: Record<string, unknown> | null;
   },
 ) {
+  const databaseUserId = databaseUserIdForActor(input.userId);
   return db.insert(auditLogs).values({
-    userId: input.userId,
+    userId: databaseUserId,
     action: input.action,
     entityType: input.entityType,
     entityId: input.entityId,
     before: redactRecord(input.before),
     after: redactRecord(input.after),
-    metadata: redactRecord(input.metadata),
+    metadata: redactRecord({
+      ...(input.metadata ?? {}),
+      ...(databaseUserId ? {} : { actorId: input.userId }),
+    }),
   });
 }

@@ -2,7 +2,7 @@
 
 ## Acceso y roles
 
-Entra por `/login`. ADMIN administra usuarios y auditoría; EDITOR opera productos, inventario, importaciones, imágenes y exportes; VIEWER solo consulta dashboard, productos, inventario, ubicaciones, movimientos e historial de importación. Si una pantalla o acción no corresponde al rol, el servidor la rechaza aunque se invoque fuera de la UI.
+Entra por `/login` con la identidad administrativa configurada en el entorno del servidor. La sesión siempre tiene rol ADMIN y conserva todos los permisos de productos, inventario, ubicaciones, importaciones, imágenes, exportes y auditoría. El servidor vuelve a validar sesión y permiso aunque una acción se invoque fuera de la UI.
 
 ## Flujo recomendado
 
@@ -30,7 +30,7 @@ ADMIN y EDITOR descargan **Exportar inventario** desde Inventario. El archivo co
 - Stock incorrecto: no borres filas; registra un ajuste con motivo.
 - Ubicación incorrecta: usa movimiento para conservar trazabilidad.
 - Imagen defectuosa: retírala desde el producto y comprueba la entrega pública.
-- Usuario comprometido: ADMIN lo desactiva, lo que revoca sesiones; después rota secretos si aplica.
+- Credencial comprometida: rota `ADMIN_BOOTSTRAP_PASSWORD` en la plataforma y vuelve a desplegar; el cambio invalida las sesiones anteriores.
 - Importación problemática: desactiva `ENABLE_IMPORTS`, conserva job/CSV y sigue `disaster-recovery.md`.
 - Error de plataforma: registra el `X-Request-Id`, hora UTC y acción, sin copiar cookies, tokens ni `DATABASE_URL`.
 

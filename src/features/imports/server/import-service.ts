@@ -11,6 +11,7 @@ import {
 } from "@/db/schema";
 import { createAuditLog } from "@/features/audit/data/audit-log";
 import { assertPermission } from "@/features/auth/domain/permissions";
+import { databaseUserIdForActor } from "@/features/auth/server/actor-attribution";
 import type { AuthenticatedUser } from "@/features/auth/server/authorization";
 import type {
   AnalyzedImportRow,
@@ -146,7 +147,7 @@ export async function analyzeImportFile(
         successfulRows: summary.validRows,
         warningRows: summary.warningRows,
         failedRows: summary.errorRows,
-        createdBy: actor.id,
+        createdBy: databaseUserIdForActor(actor.id),
         errors: rows
           .filter((row) => row.status === "ERROR")
           .slice(0, 200)

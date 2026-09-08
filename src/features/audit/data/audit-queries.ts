@@ -4,6 +4,7 @@ import { and, asc, count, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm
 
 import type { Database } from "@/db/connection";
 import { auditLogs, user } from "@/db/schema";
+import { ENV_ADMIN_ID } from "@/features/auth/domain/env-admin-session";
 import type { AuditListQuery } from "@/validators/admin-query";
 
 export async function listAuditLogs(db: Database, query: AuditListQuery) {
@@ -20,7 +21,7 @@ export async function listAuditLogs(db: Database, query: AuditListQuery) {
   const where = conditions.length ? and(...conditions) : undefined;
   const offset = (query.page - 1) * query.pageSize;
   const [rows, totalResult, users] = await Promise.all([
-    db.select({ id: auditLogs.id, action: auditLogs.action, entityType: auditLogs.entityType, entityId: auditLogs.entityId, before: auditLogs.before, after: auditLogs.after, metadata: auditLogs.metadata, createdAt: auditLogs.createdAt, userName: user.name, userEmail: user.email }).from(auditLogs).leftJoin(user, eq(auditLogs.userId, user.id)).where(where).orderBy(desc(auditLogs.createdAt)).limit(query.pageSize).offset(offset),
+    db.select({ id: auditLogs.id, action: auditLogs.action, entityType: auditLogs.entityType, entityId: auditLogs.entityId, before: auditLogs.before, after: auditLogs.after, metadata: auditLogs.metadata, createdAt: auditLogs.createdAt, userName: sql<string | null>`case when ${auditLogs.metadata}->>'actorId' = ${ENV_ADMIN_ID} then 'Administrador ENV' else ${user.name} end`, userEmail: user.email }).from(auditLogs).leftJoin(user, eq(auditLogs.userId, user.id)).where(where).orderBy(desc(auditLogs.createdAt)).limit(query.pageSize).offset(offset),
     db.select({ value: count() }).from(auditLogs).leftJoin(user, eq(auditLogs.userId, user.id)).where(where),
     db.select({ id: user.id, name: user.name, email: user.email }).from(user).orderBy(asc(user.name)),
   ]);

@@ -4,15 +4,13 @@ Este documento describe la administración cerrada del MVP. Las reglas del model
 
 ## Autenticación y sesiones
 
-JombuBox usa Better Auth 1.6.26 con su adaptador oficial de Drizzle para PostgreSQL. El handler vive en `/api/auth/[...all]`; las tablas `user`, `session`, `account`, `verification` y `rate_limit` están integradas en el schema Drizzle. Las contraseñas pertenecen a la cuenta `credential` de Better Auth y nunca se guardan en una tabla custom ni en texto plano.
+JombuBox tiene un único administrador canónico definido por `ADMIN_BOOTSTRAP_NAME`, `ADMIN_BOOTSTRAP_EMAIL` y `ADMIN_BOOTSTRAP_PASSWORD`. La comparación ocurre exclusivamente dentro de la Server Action de login. No existe registro público, endpoint de Better Auth ni credencial administrativa en PostgreSQL.
 
-No existe registro público. `emailAndPassword.disableSignUp` está habilitado y las cuentas se crean mediante el bootstrap seguro o desde `/admin/usuarios`. La contraseña debe tener entre 12 y 128 caracteres.
+Al autenticar, el servidor emite una sesión HMAC firmada con una clave derivada de `BETTER_AUTH_SECRET` y la contraseña configurada. El payload contiene únicamente versión, ID virtual `env-admin`, rol y tiempos; no contiene nombre, correo ni contraseña. La cookie expira a las 12 horas, es `HttpOnly`, `SameSite=Lax`, `Path=/` y `Secure` con prefijo `__Host-` en producción. Cambiar la contraseña o `BETTER_AUTH_SECRET` invalida las sesiones existentes. Logout expira la cookie.
 
-Las sesiones se persisten en PostgreSQL, expiran a los siete días y pueden renovarse después de un día. Better Auth entrega la cookie de sesión HttpOnly, SameSite apropiado y Secure en producción. El logout invalida la sesión y elimina la cookie. Desactivar un usuario también marca la cuenta como bloqueada y elimina todas sus sesiones. Ningún token, hash o dato interno de sesión se envía a los componentes de cliente.
+`middleware.ts` hace una redirección optimista de visitantes sin cookie. Se conserva deliberadamente esta convención Edge —aunque Next.js 16 la depreca— porque OpenNext 1.20 todavía no admite el runtime Node obligatorio de `proxy.ts`. No es una frontera de seguridad: el DAL de autorización valida firma, expiración e identidad ENV en el layout, páginas, Server Actions y Route Handlers.
 
-`middleware.ts` hace una redirección optimista de visitantes sin cookie. Se conserva deliberadamente esta convención Edge —aunque Next.js 16 la depreca— porque OpenNext 1.20 todavía no admite el runtime Node obligatorio de `proxy.ts`. No se considera una frontera de seguridad: el layout `/admin` siempre valida la sesión completa con Better Auth y comprueba que el usuario continúe activo. Las Server Actions y servicios vuelven a comprobar el permiso concreto.
-
-El rate limiting vive en PostgreSQL, por lo que funciona entre instancias distribuidas de Workers: 100 solicitudes por minuto como límite general y 5 intentos por minuto para `/sign-in/email`. Cloudflare `CF-Connecting-IP` se usa como cabecera de IP confiable en el despliegue.
+El login limita fallos por IP a cinco por minuto dentro de cada instancia. En producción debe complementarse con el rate limiting distribuido de Vercel/Cloudflare WAF.
 
 ## Roles y permisos
 
@@ -43,25 +41,20 @@ La matriz está centralizada en `src/features/auth/domain/permissions.ts`.
 | IMPORT_EXECUTE | Sí | Sí | No |
 | IMAGE_MANAGE | Sí | Sí | No |
 
-La navegación oculta acciones no disponibles, pero esto es únicamente UX. `requirePermission()` protege Server Actions y páginas específicas; `assertPermission()` vuelve a aplicar la política dentro de cada servicio mutable. La ruta de usuarios es ADMIN-only.
+La navegación oculta acciones no disponibles, pero esto es únicamente UX. `requirePermission()` protege Server Actions y páginas específicas; `assertPermission()` vuelve a aplicar la política dentro de cada servicio mutable. La sesión ENV siempre representa `ADMIN`, por lo que satisface toda la matriz sin excepciones dispersas.
 
-## Primer ADMIN
+## Administrador ENV
 
-Ejecuta las migraciones y luego:
-
-```bash
-pnpm admin:create
-```
-
-El script pide nombre y correo de forma visible y contraseña mediante entrada oculta. En ejecución no interactiva acepta:
+Configura en el entorno de ejecución:
 
 ```text
-JOMBUBOX_ADMIN_NAME
-JOMBUBOX_ADMIN_EMAIL
-JOMBUBOX_ADMIN_PASSWORD
+ADMIN_BOOTSTRAP_NAME
+ADMIN_BOOTSTRAP_EMAIL
+ADMIN_BOOTSTRAP_PASSWORD
+BETTER_AUTH_SECRET
 ```
 
-La contraseña no se imprime. El script se niega a crear otro usuario si ya existe un ADMIN; los usuarios posteriores se crean desde `/admin/usuarios`.
+No se ejecuta un bootstrap. Después del despliegue, `/login` usa esas variables directamente. La contraseña exige entre 16 y 128 caracteres y nunca debe tener prefijo `NEXT_PUBLIC_`.
 
 ## Mutaciones y concurrencia
 
@@ -100,11 +93,9 @@ Las ubicaciones admiten jerarquía arbitraria con nombre, código único, tipo, 
 
 El selector MVP carga hasta 1,000 ubicaciones activas y muestra el breadcrumb. Esta frontera está aislada en la consulta de opciones para sustituirla más adelante por búsqueda server-side sin cambiar los servicios.
 
-## Usuarios
+## Identidad administrativa
 
-ADMIN puede crear cuentas con Better Auth, elegir ADMIN/EDITOR/VIEWER, cambiar roles y desactivar usuarios. Better Auth crea el hash de credencial; la contraseña no se audita ni se registra. Los cambios de rol y desactivaciones bloquean las filas de todos los administradores activos dentro de la transacción, evitando carreras que puedan dejar a JombuBox sin un ADMIN activo.
-
-La creación de credencial usa la transacción interna de Better Auth y la auditoría se escribe inmediatamente después; no se intenta envolver la librería con una transacción incompatible. Cambios de rol, desactivación, revocación de sesiones y su auditoría sí son atómicos.
+`/admin/usuarios` muestra la identidad ENV en modo lectura. Los cambios de nombre, correo o contraseña se realizan en la plataforma de despliegue y requieren redeploy. Las tablas históricas `user`, `account`, `session` y `verification` se conservan solo por compatibilidad de migraciones; el runtime administrativo no las consulta.
 
 ## Auditoría
 
@@ -124,7 +115,7 @@ Cada registro contiene actor, entidad, `before`, `after`, metadata limitada y fe
 ## Seguridad web
 
 - Las páginas administrativas son dinámicas y no usan caché pública; mutaciones revalidan las rutas afectadas.
-- Better Auth valida origen en sus endpoints y usa cookies SameSite. Las mutaciones de negocio usan Server Actions de Next.js, que comprueban el origen frente al host. No se añadió un token CSRF paralelo.
+- El login usa una Server Action de Next.js, que comprueba el origen frente al host, y la cookie usa `SameSite=Lax`. Las demás mutaciones conservan sus comprobaciones de origen. No se añadió un token CSRF paralelo.
 - Los headers incluyen CSP restringiendo objetos, base URI, framing y destinos de formulario; también `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` y `X-Frame-Options`.
 - Las consultas seleccionan solo los campos necesarios; los listados nunca exponen tablas internas de auth.
 - IDs, precios, cantidades, roles, catálogos y relaciones se validan server-side. Los servicios verifican existencia antes de producir errores de FK cuando se necesita una UX clara.
@@ -132,6 +123,6 @@ Cada registro contiene actor, entidad, `before`, `after`, metadata limitada y fe
 
 ## Cloudflare y secretos
 
-En producción define `DATABASE_URL`, `BETTER_AUTH_SECRET` y `BETTER_AUTH_URL` mediante secretos/variables del Worker. Usa una URL HTTPS pública en `BETTER_AUTH_URL`. Neon atiende consultas simples del Pool por fetch; inventario, SKU, importación y auditoría adquieren WebSocket solo durante la transacción y el cliente se elimina al liberarse. El driver `pg` queda reservado a migraciones, seed y pruebas locales.
+En producción define `DATABASE_URL`, `BETTER_AUTH_SECRET`, `ADMIN_BOOTSTRAP_NAME`, `ADMIN_BOOTSTRAP_EMAIL` y `ADMIN_BOOTSTRAP_PASSWORD` mediante secretos/variables de la plataforma. Neon atiende consultas simples del Pool por fetch; inventario, SKU, importación y auditoría adquieren WebSocket solo durante la transacción y el cliente se elimina al liberarse. El login no consulta Neon.
 
 No subas `.env.local` ni `.dev.vars`. Rota inmediatamente cualquier secreto que haya aparecido en código, logs o historial.

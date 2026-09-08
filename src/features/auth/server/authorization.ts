@@ -9,11 +9,10 @@ import {
 } from "@/features/auth/domain/auth-errors";
 import {
   hasPermission,
-  isUserRole,
   type Permission,
   type UserRole,
 } from "@/features/auth/domain/permissions";
-import { auth } from "@/lib/auth";
+import { getAdminSessionFromHeaders } from "@/features/auth/server/admin-session";
 
 export type AuthenticatedUser = {
   id: string;
@@ -26,19 +25,7 @@ export type AuthenticatedUser = {
 export async function getAuthenticatedUserFromHeaders(
   requestHeaders: Headers,
 ): Promise<AuthenticatedUser | null> {
-  const session = await auth.api.getSession({ headers: requestHeaders });
-
-  if (!session || !session.user.active || !isUserRole(session.user.role)) {
-    return null;
-  }
-
-  return {
-    id: session.user.id,
-    name: session.user.name,
-    email: session.user.email,
-    role: session.user.role,
-    active: session.user.active,
-  };
+  return getAdminSessionFromHeaders(requestHeaders);
 }
 
 export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> {

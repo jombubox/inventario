@@ -26,8 +26,8 @@ Copia `.env.example` a `.env.local` y define valores reales. Nunca publiques ese
 | `NEXT_PUBLIC_SITE_URL` | Origen HTTPS de metadata, sitemap y enlaces |
 | `APP_ENV` | `development`, `preview` o `production` |
 | `ENABLE_IMPORTS` | Kill switch del importador |
-| `ADMIN_BOOTSTRAP_NAME` / `ADMIN_BOOTSTRAP_EMAIL` | Identidad server-only del ADMIN inicial |
-| `ADMIN_BOOTSTRAP_PASSWORD` | Contraseña server-only de al menos 16 caracteres; nunca se imprime |
+| `ADMIN_BOOTSTRAP_NAME` / `ADMIN_BOOTSTRAP_EMAIL` | Identidad canónica server-only del único ADMIN |
+| `ADMIN_BOOTSTRAP_PASSWORD` | Credencial canónica server-only de al menos 16 caracteres; nunca se imprime ni persiste |
 | `CLOUDFLARE_ACCOUNT_ID` | Identificador de la cuenta Cloudflare |
 | `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | Credenciales R2 server-only |
 | `R2_BUCKET_NAME` | Bucket canónico de imágenes |
@@ -40,22 +40,21 @@ Copia `.env.example` a `.env.local` y define valores reales. Nunca publiques ese
 ```bash
 pnpm db:migrate
 pnpm db:seed
-pnpm admin:create
 pnpm dev
 ```
 
-No existe registro público. `pnpm admin:create` crea el primer ADMIN de forma interactiva; las cuentas siguientes se gestionan en `/admin/usuarios`.
+No existe registro público ni usuarios administrativos en PostgreSQL. `/login` compara las credenciales exclusivamente en el servidor con `ADMIN_BOOTSTRAP_*` y emite una sesión firmada, `HttpOnly`, `SameSite=Lax` y `Secure` en producción. `BETTER_AUTH_SECRET` firma la sesión y la contraseña nunca forma parte de la cookie.
 
-### Bootstrap explícito de producción
+### Productos de muestra de producción
 
-Después de migrar la base y configurar las variables `ADMIN_BOOTSTRAP_*`, ejecuta manualmente:
+El login funciona inmediatamente después del despliegue; no requiere ningún bootstrap. Para asegurar manualmente los tres productos de muestra con inventario e imágenes R2, ejecuta:
 
 ```bash
-pnpm production:bootstrap --confirm-production
+pnpm production:seed-samples --confirm-production
 pnpm production:verify
 ```
 
-El bootstrap sincroniza el ADMIN mediante Better Auth y asegura tres productos de muestra con inventario e imágenes R2. Es idempotente y no forma parte del inicio, build ni deploy de la aplicación. Para retirar solamente los productos de muestra y conservar el ADMIN:
+El seed es idempotente, no crea usuarios y no forma parte del inicio, build ni deploy de la aplicación. Para retirar solamente los productos de muestra:
 
 ```bash
 pnpm production:remove-samples --confirm-production
@@ -66,7 +65,7 @@ pnpm production:remove-samples --confirm-production
 - `/`, `/catalogo`, `/catalogo/[slug]`: catálogo público.
 - `/sitemap.xml`, `/robots.txt`: descubrimiento SEO.
 - `/login`: acceso interno.
-- `/admin`: productos, inventario, ubicaciones, importación, imágenes, movimientos, auditoría y usuarios.
+- `/admin`: productos, inventario, ubicaciones, importación, imágenes, movimientos, auditoría y configuración del administrador.
 - `/api/health`: liveness sin consulta a DB ni secretos.
 - `/api/exports/inventory`: exportación protegida ADMIN/EDITOR.
 
@@ -84,8 +83,7 @@ pnpm test:e2e
 pnpm db:generate
 pnpm db:migrate
 pnpm db:seed
-pnpm admin:create
-pnpm production:bootstrap --confirm-production
+pnpm production:seed-samples --confirm-production
 pnpm production:verify
 pnpm production:remove-samples --confirm-production
 

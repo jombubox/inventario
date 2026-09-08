@@ -8,9 +8,15 @@ config({ path: ".env" });
 
 const QA_EMAIL = "admin.test@jombubox.local";
 const QA_NAME = "JombuBox Test Admin";
-const QA_PASSWORD = "JombuQA!2026-Ready";
 const QA_PREFIX = "JombuBox QA \u2014";
 const QA_LOCATION_CODES = ["QA-A-01", "QA-B-02", "QA-C-03"] as const;
+const QA_ACTOR = {
+  id: "system-qa-fixture",
+  name: QA_NAME,
+  email: QA_EMAIL,
+  role: "ADMIN" as const,
+  active: true as const,
+};
 
 const PRODUCT_FIXTURES = [
   {
@@ -76,7 +82,7 @@ function refuseProduction(environment: {
 
   if (environment.APP_ENV !== "development" || productionMarker || nonLocalAppUrl) {
     throw new Error(
-      "Refusing to create test users/products because the configured environment appears to be production.",
+      "Refusing to create test products because the configured environment appears to be production.",
     );
   }
 }
@@ -195,15 +201,14 @@ function makeQaPng(
 async function main() {
   if (process.env.APP_ENV === "production") {
     throw new Error(
-      "Refusing to create test users/products because the configured environment appears to be production.",
+      "Refusing to create test products because the configured environment appears to be production.",
     );
   }
-  const [{ parseServerEnv }, { createDatabaseClient }, schema, seedModule, authModule, productService, locationService, inventoryService, imageService, r2Module, catalogQueries, adminQueries] = await Promise.all([
+  const [{ parseServerEnv }, { createDatabaseClient }, schema, seedModule, productService, locationService, inventoryService, imageService, r2Module, catalogQueries, adminQueries] = await Promise.all([
     import("@/lib/env-schema"),
     import("@/db/connection"),
     import("@/db/schema"),
     import("@/db/seed"),
-    import("@/lib/auth"),
     import("@/features/products/server/product-service"),
     import("@/features/locations/server/location-service"),
     import("@/features/inventory/server/inventory-service"),
@@ -220,17 +225,9 @@ async function main() {
 
   if (action === "cleanup") {
     const qaProducts = await db.select({ id: schema.products.id }).from(schema.products).where(ilike(schema.products.title, `${QA_PREFIX}%`));
-    const cleanupAdmin = await db.query.user.findFirst({ where: eq(schema.user.email, QA_EMAIL) });
-    if (qaProducts.length > 0 && (!cleanupAdmin || cleanupAdmin.role !== "ADMIN")) {
-      throw new Error("QA ADMIN is required to clean up QA R2 images safely.");
-    }
-    const cleanupActor = cleanupAdmin
-      ? { id: cleanupAdmin.id, name: cleanupAdmin.name, email: cleanupAdmin.email, role: "ADMIN" as const, active: true }
-      : null;
     for (const product of qaProducts) {
       const images = await db.select({ id: schema.productImages.id }).from(schema.productImages).where(eq(schema.productImages.productId, product.id));
-      if (!cleanupActor) throw new Error("QA ADMIN is required to clean up QA R2 images safely.");
-      for (const image of images) await imageService.deleteProductImage(db, cleanupActor, storage, image.id);
+      for (const image of images) await imageService.deleteProductImage(db, QA_ACTOR, storage, image.id);
       const items = await db.select({ id: schema.inventoryItems.id }).from(schema.inventoryItems).where(eq(schema.inventoryItems.productId, product.id));
       if (items.length > 0) {
         await db.delete(schema.inventoryMovements).where(inArray(schema.inventoryMovements.inventoryItemId, items.map((item) => item.id)));
@@ -239,10 +236,6 @@ async function main() {
       await db.delete(schema.products).where(eq(schema.products.id, product.id));
     }
     await db.delete(schema.locations).where(inArray(schema.locations.code, [...QA_LOCATION_CODES]));
-    if (cleanupAdmin) {
-      await db.delete(schema.auditLogs).where(eq(schema.auditLogs.userId, cleanupAdmin.id));
-    }
-    await db.delete(schema.user).where(eq(schema.user.email, QA_EMAIL));
     console.info("JombuBox QA data removed.");
     return;
   }
@@ -253,15 +246,7 @@ async function main() {
     db as unknown as Parameters<typeof seedModule.seedDatabase>[0],
   );
 
-  let qaAdmin = await db.query.user.findFirst({ where: eq(schema.user.email, QA_EMAIL) });
-  if (!qaAdmin) {
-    await authModule.auth.api.createUser({ body: { name: QA_NAME, email: QA_EMAIL, password: QA_PASSWORD, role: "ADMIN" } });
-    qaAdmin = await db.query.user.findFirst({ where: eq(schema.user.email, QA_EMAIL) });
-  }
-  if (!qaAdmin || qaAdmin.role !== "ADMIN" || !qaAdmin.active || qaAdmin.banned) {
-    throw new Error("The QA account exists but is not an active ADMIN; update it through the supported user-management flow.");
-  }
-  const actor = { id: qaAdmin.id, name: qaAdmin.name, email: qaAdmin.email, role: "ADMIN" as const, active: true };
+  const actor = QA_ACTOR;
 
   const locationDefinitions = [
     { code: "QA-A-01", name: "Caja A-01" },
@@ -374,16 +359,15 @@ async function main() {
   const adminList = await adminQueries.listAdminProducts(db, { q: "JombuBox QA", page: 1, pageSize: 20, sort: "title", direction: "asc" });
   const publicList = await catalogQueries.getPublicProducts(db, { q: "JombuBox QA", sort: "nombre-asc", page: 1 });
   const details = await Promise.all(completed.map(({ product }) => catalogQueries.getPublicProductBySlug(db, product.slug)));
-  const [{ value: qaAdmins = 0 } = { value: 0 }] = await db.select({ value: count() }).from(schema.user).where(eq(schema.user.email, QA_EMAIL));
   const [{ value: qaProducts = 0 } = { value: 0 }] = await db.select({ value: count() }).from(schema.products).where(and(ilike(schema.products.title, `${QA_PREFIX}%`), isNull(schema.products.deletedAt)));
   const duplicateSkus = await db.select({ sku: schema.products.sku, value: count() }).from(schema.products).where(ilike(schema.products.title, `${QA_PREFIX}%`)).groupBy(schema.products.sku).having(sql`count(*) > 1`);
   const [{ value: orphanImages = 0 } = { value: 0 }] = await db.select({ value: count() }).from(schema.productImages).leftJoin(schema.products, eq(schema.productImages.productId, schema.products.id)).where(isNull(schema.products.id));
-  if (qaAdmins !== 1 || qaProducts !== 3 || imageRows.length !== 6 || duplicateSkus.length !== 0 || orphanImages !== 0 || adminList.rows.length !== 3 || publicList.products.length !== 3 || details.some((detail) => !detail || detail.images.length !== 2)) {
+  if (qaProducts !== 3 || imageRows.length !== 6 || duplicateSkus.length !== 0 || orphanImages !== 0 || adminList.rows.length !== 3 || publicList.products.length !== 3 || details.some((detail) => !detail || detail.images.length !== 2)) {
     throw new Error("QA fixture validation failed.");
   }
   console.info(JSON.stringify({
     products: completed.map(({ product, fixture }) => ({ title: product.title, sku: product.sku, slug: product.slug, stock: fixture.stock, location: locationDefinitions.find((location) => location.code === fixture.locationCode)?.name, imageCount: 2 })),
-    database: { qaAdmins, qaProducts, qaImageRows: imageRows.length, duplicateSkus: duplicateSkus.length, orphanImages },
+    database: { qaProducts, qaImageRows: imageRows.length, duplicateSkus: duplicateSkus.length, orphanImages },
     services: { adminProducts: adminList.rows.length, publicProducts: publicList.products.length, productDetails: details.filter(Boolean).length, publicImageResponses: delivery.length },
   }, null, 2));
 }

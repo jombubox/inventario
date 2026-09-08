@@ -11,6 +11,7 @@ import {
 } from "@/db/schema";
 import { createAuditLog } from "@/features/audit/data/audit-log";
 import { assertPermission } from "@/features/auth/domain/permissions";
+import { databaseUserIdForActor } from "@/features/auth/server/actor-attribution";
 import type { AuthenticatedUser } from "@/features/auth/server/authorization";
 import {
   ConcurrentModificationError,
@@ -74,11 +75,12 @@ export async function createInventoryItemInTransaction(
       type: "INITIAL",
       quantity: item.quantity,
       toLocationId: item.locationId,
-      userId: actor.id,
+      userId: databaseUserIdForActor(actor.id),
       reason: "Registro inicial de inventario",
       metadata: {
         initialQuantity: item.quantity,
         initialStatus: item.status,
+        actorId: actor.id,
       },
     });
     await createAuditLog(tx, {
@@ -203,9 +205,9 @@ export async function moveInventoryItem(
       quantity: item.quantity,
       fromLocationId: item.locationId,
       toLocationId: input.toLocationId,
-      userId: actor.id,
+      userId: databaseUserIdForActor(actor.id),
       reason: input.reason,
-      metadata: { status: item.status },
+      metadata: { status: item.status, actorId: actor.id },
     });
     await createAuditLog(tx, {
       userId: actor.id,
@@ -255,7 +257,7 @@ export async function adjustInventoryQuantity(
       inventoryItemId: item.id,
       type: "ADJUSTMENT",
       quantity: Math.abs(delta),
-      userId: actor.id,
+      userId: databaseUserIdForActor(actor.id),
       reason: input.reason,
       metadata: {
         fromQuantity: item.quantity,
@@ -263,6 +265,7 @@ export async function adjustInventoryQuantity(
         delta,
         fromStatus: item.status,
         toStatus: input.newStatus,
+        actorId: actor.id,
       },
     });
     await createAuditLog(tx, {
@@ -342,13 +345,14 @@ export async function recordStockMovement(
       quantity: input.quantity,
       fromLocationId: increasing ? null : updated.locationId,
       toLocationId: increasing ? updated.locationId : null,
-      userId: actor.id,
+      userId: databaseUserIdForActor(actor.id),
       reason: input.reason,
       metadata: {
         direction: increasing ? "IN" : "OUT",
         fromQuantity: before.quantity,
         toQuantity: updated.quantity,
         resultingStatus: updated.status,
+        actorId: actor.id,
       },
     });
     const action = {

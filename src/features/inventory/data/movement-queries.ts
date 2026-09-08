@@ -5,6 +5,7 @@ import { alias } from "drizzle-orm/pg-core";
 
 import type { Database } from "@/db/connection";
 import { inventoryItems, inventoryMovements, locations, products, user } from "@/db/schema";
+import { ENV_ADMIN_ID } from "@/features/auth/domain/env-admin-session";
 import { buildLocationBreadcrumb } from "@/features/locations/domain/location-hierarchy";
 import type { MovementListQuery } from "@/validators/admin-query";
 
@@ -40,7 +41,7 @@ export async function listInventoryMovements(db: Database, query: MovementListQu
       fromLocationCode: fromLocation.code,
       toLocationId: toLocation.id,
       toLocationCode: toLocation.code,
-      userName: user.name,
+      userName: sql<string | null>`case when ${inventoryMovements.metadata}->>'actorId' = ${ENV_ADMIN_ID} then 'Administrador ENV' else ${user.name} end`,
       userEmail: user.email,
     })
     .from(inventoryMovements)

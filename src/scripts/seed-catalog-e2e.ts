@@ -11,7 +11,6 @@ import {
   productCompatibilities,
   products,
 } from "@/db/schema";
-import { createJombuBoxAuth } from "@/lib/auth-factory";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 if (!databaseUrl) throw new Error("TEST_DATABASE_URL is required for E2E fixtures.");
@@ -38,16 +37,6 @@ try {
   `);
   await pool.query("alter sequence inventory_code_seq restart with 1");
   await seedDatabase(db);
-
-  const testAuth = createJombuBoxAuth(db, {
-    secret: process.env.BETTER_AUTH_SECRET ?? "jombubox-e2e-secret-at-least-32-characters",
-    baseURL: process.env.BETTER_AUTH_URL ?? "http://127.0.0.1:3000",
-  });
-  await Promise.all([
-    testAuth.api.createUser({ body: { name: "Admin E2E", email: "admin@e2e.local", password: "JombuBox-E2E-Admin-123!", role: "ADMIN" } }),
-    testAuth.api.createUser({ body: { name: "Editor E2E", email: "editor@e2e.local", password: "JombuBox-E2E-Editor-123!", role: "EDITOR" } }),
-    testAuth.api.createUser({ body: { name: "Viewer E2E", email: "viewer@e2e.local", password: "JombuBox-E2E-Viewer-123!", role: "VIEWER" } }),
-  ]);
 
   const [samsung, lg, mainboard, powerSupply] = await Promise.all([
     db.query.brands.findFirst({ where: eq(brands.code, "SAM") }),

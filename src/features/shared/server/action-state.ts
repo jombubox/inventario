@@ -1,6 +1,5 @@
 import { ZodError } from "zod";
 
-import { LastActiveAdminError } from "@/features/auth/domain/auth-errors";
 import {
   ConcurrentModificationError,
   DuplicateEntityError,
@@ -36,14 +35,6 @@ export function errorState(error: unknown): MutationState {
   if (error instanceof InvalidOperationError) {
     return { status: "error", message: error.message };
   }
-  if (error instanceof LastActiveAdminError) {
-    return {
-      status: "error",
-      message: "Debe permanecer al menos un administrador activo en JombuBox.",
-    };
-  }
-
-
   if (error instanceof Error) {
     logServerError("server_action_failed", error);
   } else {

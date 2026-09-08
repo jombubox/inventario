@@ -8,7 +8,6 @@ import type { Database } from "@/db/connection";
 import { seedDatabase } from "@/db/seed";
 import * as schema from "@/db/schema";
 import {
-  account,
   auditLogs,
   brands,
   componentTypes,
@@ -18,10 +17,8 @@ import {
   importJobRows,
   operationalRateLimits,
   productImages,
-  session,
-  user,
 } from "@/db/schema";
-import { LastActiveAdminError } from "@/features/auth/domain/auth-errors";
+import { ENV_ADMIN_ID } from "@/features/auth/domain/env-admin-session";
 import type { AuthenticatedUser } from "@/features/auth/server/authorization";
 import {
   adjustInventoryQuantity,
@@ -56,12 +53,6 @@ import {
 } from "@/features/shared/domain/service-errors";
 import { buildInventoryExport } from "@/features/exports/server/inventory-export";
 import { consumeOperationalRateLimit } from "@/features/security/server/rate-limit";
-import {
-  createAdministrativeUser,
-  deactivateUser,
-  updateUserRole,
-} from "@/features/users/server/user-service";
-import { createJombuBoxAuth } from "@/lib/auth-factory";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const safeLocalDatabase = (() => {
@@ -93,15 +84,10 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     `);
     await pool.query("alter sequence inventory_code_seq restart with 1");
     await seedDatabase(nodeDb);
-    const [admin] = await nodeDb
-      .insert(user)
-      .values({ name: "Admin Test", email: "admin@test.local", role: "ADMIN", active: true })
-      .returning();
-    if (!admin) throw new Error("Test admin was not created.");
     actor = {
-      id: admin.id,
-      name: admin.name,
-      email: admin.email,
+      id: ENV_ADMIN_ID,
+      name: "Admin Test",
+      email: "admin@test.local",
       role: "ADMIN",
       active: true,
     };
@@ -188,6 +174,15 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     expect(actions.map(({ action }) => action)).toEqual(
       expect.arrayContaining(["PRODUCT_CREATED", "PRODUCT_UPDATED", "PRODUCT_ARCHIVED"]),
     );
+    expect(await nodeDb.select().from(schema.user)).toHaveLength(0);
+    const attribution = await nodeDb
+      .select({ userId: auditLogs.userId, metadata: auditLogs.metadata })
+      .from(auditLogs);
+    expect(attribution).not.toHaveLength(0);
+    expect(attribution.every(({ userId }) => userId === null)).toBe(true);
+    expect(
+      attribution.every(({ metadata }) => metadata?.actorId === ENV_ADMIN_ID),
+    ).toBe(true);
   });
 
   it("serializes concurrent product identity allocation", async () => {
@@ -515,52 +510,4 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     ).rejects.toThrow(/cycle/u);
   });
 
-  it("creates users securely, enforces roles and preserves the last active ADMIN", async () => {
-    const testAuth = createJombuBoxAuth(nodeDb, {
-      secret: "integration-test-secret-at-least-32-characters",
-      baseURL: "http://localhost:3000",
-    });
-    const created = await createAdministrativeUser(
-      db,
-      actor,
-      {
-        name: "Usuario Viewer",
-        email: "viewer@test.local",
-        password: "A-strong-test-password-123",
-        role: "VIEWER",
-      },
-      testAuth,
-    );
-    expect(created).toMatchObject({ role: "VIEWER", active: true });
-    const credential = await nodeDb.query.account.findFirst({
-      where: and(eq(account.userId, created.id), eq(account.providerId, "credential")),
-    });
-    expect(credential?.password).toBeTruthy();
-    expect(credential?.password).not.toBe("A-strong-test-password-123");
-
-    const promoted = await updateUserRole(db, actor, { userId: created.id, role: "EDITOR" });
-    expect(promoted.role).toBe("EDITOR");
-
-    await nodeDb.insert(session).values({
-      token: "test-session-token",
-      userId: created.id,
-      expiresAt: new Date(Date.now() + 60_000),
-      updatedAt: new Date(),
-    });
-    const deactivated = await deactivateUser(db, actor, created.id);
-    expect(deactivated).toMatchObject({ active: false, banned: true });
-    expect(await nodeDb.query.session.findFirst({ where: eq(session.userId, created.id) })).toBeUndefined();
-    await expect(
-      testAuth.api.signInEmail({
-        body: {
-          email: "viewer@test.local",
-          password: "A-strong-test-password-123",
-        },
-      }),
-    ).rejects.toBeTruthy();
-
-    await expect(
-      updateUserRole(db, actor, { userId: actor.id, role: "VIEWER" }),
-    ).rejects.toBeInstanceOf(LastActiveAdminError);
-  });
 });

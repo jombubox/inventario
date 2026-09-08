@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { Brand } from "@/components/layout/brand";
 import { Card, CardContent } from "@/components/ui/card";
 import { LoginForm } from "@/features/auth/components/login-form";
-import { auth } from "@/lib/auth";
+import { getAuthenticatedUser } from "@/features/auth/server/authorization";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +15,7 @@ export const metadata: Metadata = {
 };
 
 export default async function LoginPage() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (session?.user.active) redirect("/admin");
+  if (await getAuthenticatedUser()) redirect("/admin");
 
   return (
     <main className="relative grid min-h-dvh place-items-center overflow-hidden bg-navy px-5 py-10">

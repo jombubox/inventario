@@ -20,7 +20,7 @@ describe("server environment validation", () => {
     expect(parseServerEnv({ ...base, ENABLE_IMPORTS: "false" }).ENABLE_IMPORTS).toBe(false);
   });
 
-  it("keeps optional production bootstrap values server-side", () => {
+  it("keeps runtime ENV-admin values optional during general environment parsing", () => {
     expect(parseServerEnv({
       ...base,
       ADMIN_BOOTSTRAP_NAME: "JombuBox Admin",
