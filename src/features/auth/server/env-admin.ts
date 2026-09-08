@@ -7,7 +7,11 @@ import { ENV_ADMIN_ID, ENV_ADMIN_ROLE } from "@/features/auth/domain/env-admin-s
 
 const adminIdentitySchema = z.object({
   ADMIN_BOOTSTRAP_NAME: z.string().trim().min(1).max(120),
-  ADMIN_BOOTSTRAP_EMAIL: z.email().transform((value) => value.trim().toLowerCase()),
+  ADMIN_BOOTSTRAP_EMAIL: z
+    .string()
+    .trim()
+    .pipe(z.email())
+    .transform((value) => value.toLowerCase()),
   ADMIN_BOOTSTRAP_PASSWORD: z.string().min(16).max(128),
 });
 

@@ -10,6 +10,21 @@ const optionalUrl = z.preprocess(
   z.url().optional(),
 );
 
+const optionalAdminName = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z.string().trim().min(1).max(120).optional(),
+);
+
+const optionalAdminEmail = z.preprocess(
+  (value) => (typeof value === "string" ? value.trim() || undefined : value),
+  z.email().transform((value) => value.toLowerCase()).optional(),
+);
+
+const optionalAdminPassword = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z.string().min(16).max(128).optional(),
+);
+
 const booleanEnvironmentValue = z.preprocess(
   (value) => {
     if (value === undefined || value === "") return true;
@@ -36,9 +51,9 @@ const serverEnvironmentShape = databaseEnvSchema.extend({
   BETTER_AUTH_URL: optionalUrl,
   NEXT_PUBLIC_SITE_URL: optionalUrl,
   ENABLE_IMPORTS: booleanEnvironmentValue,
-  ADMIN_BOOTSTRAP_NAME: optionalSecret,
-  ADMIN_BOOTSTRAP_EMAIL: optionalSecret,
-  ADMIN_BOOTSTRAP_PASSWORD: optionalSecret,
+  ADMIN_BOOTSTRAP_NAME: optionalAdminName,
+  ADMIN_BOOTSTRAP_EMAIL: optionalAdminEmail,
+  ADMIN_BOOTSTRAP_PASSWORD: optionalAdminPassword,
   CLOUDFLARE_ACCOUNT_ID: optionalSecret,
   R2_ACCESS_KEY_ID: optionalSecret,
   R2_SECRET_ACCESS_KEY: optionalSecret,
@@ -48,6 +63,20 @@ const serverEnvironmentShape = databaseEnvSchema.extend({
 
 export const serverEnvSchema = serverEnvironmentShape.superRefine((environment, context) => {
   if (environment.APP_ENV !== "production") return;
+
+  for (const [key, value] of [
+    ["ADMIN_BOOTSTRAP_NAME", environment.ADMIN_BOOTSTRAP_NAME],
+    ["ADMIN_BOOTSTRAP_EMAIL", environment.ADMIN_BOOTSTRAP_EMAIL],
+    ["ADMIN_BOOTSTRAP_PASSWORD", environment.ADMIN_BOOTSTRAP_PASSWORD],
+  ] as const) {
+    if (!value) {
+      context.addIssue({
+        code: "custom",
+        path: [key],
+        message: `${key} is required in production`,
+      });
+    }
+  }
 
   for (const [key, value] of [
     ["BETTER_AUTH_URL", environment.BETTER_AUTH_URL],

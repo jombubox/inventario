@@ -24,7 +24,7 @@ describe("server environment validation", () => {
     expect(parseServerEnv({
       ...base,
       ADMIN_BOOTSTRAP_NAME: "JombuBox Admin",
-      ADMIN_BOOTSTRAP_EMAIL: "admin@example.com",
+      ADMIN_BOOTSTRAP_EMAIL: "  ADMIN@example.com  ",
       ADMIN_BOOTSTRAP_PASSWORD: "a-development-only-password",
     })).toMatchObject({
       ADMIN_BOOTSTRAP_NAME: "JombuBox Admin",
@@ -32,6 +32,20 @@ describe("server environment validation", () => {
       ADMIN_BOOTSTRAP_PASSWORD: "a-development-only-password",
     });
     expect(parseServerEnv(base).ADMIN_BOOTSTRAP_PASSWORD).toBeUndefined();
+  });
+
+  it("requires the runtime ENV-admin identity in production", () => {
+    expect(() => parseServerEnv({
+      ...base,
+      APP_ENV: "production",
+      BETTER_AUTH_URL: "https://jombubox.example",
+      NEXT_PUBLIC_SITE_URL: "https://jombubox.example",
+      CLOUDFLARE_ACCOUNT_ID: "account-id",
+      R2_ACCESS_KEY_ID: "access-key",
+      R2_SECRET_ACCESS_KEY: "secret-key",
+      R2_BUCKET_NAME: "jombubox-products",
+      R2_PUBLIC_URL: "https://images.jombubox.example",
+    })).toThrow(/ADMIN_BOOTSTRAP_NAME/u);
   });
 
   it("requires matching non-local HTTPS origins in production", () => {
@@ -53,6 +67,9 @@ describe("server environment validation", () => {
       APP_ENV: "production",
       BETTER_AUTH_URL: "https://jombubox.example",
       NEXT_PUBLIC_SITE_URL: "https://jombubox.example",
+      ADMIN_BOOTSTRAP_NAME: "JombuBox Admin",
+      ADMIN_BOOTSTRAP_EMAIL: "admin@example.com",
+      ADMIN_BOOTSTRAP_PASSWORD: "a-production-password",
       CLOUDFLARE_ACCOUNT_ID: "account-id",
       R2_ACCESS_KEY_ID: "access-key",
       R2_SECRET_ACCESS_KEY: "secret-key",

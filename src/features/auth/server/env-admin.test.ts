@@ -28,8 +28,20 @@ afterEach(() => {
 });
 
 describe("environment administrator", () => {
+  it("fails closed when the runtime credentials are missing", () => {
+    expect(() => validateAdminCredentials(
+      "admin@example.test",
+      "Never-Use-This-Test-Password-123!",
+      {
+        NODE_ENV: "test",
+        BETTER_AUTH_SECRET: "test-session-secret-that-is-longer-than-32-characters",
+      },
+    )).toThrow(/ADMIN_BOOTSTRAP_EMAIL/u);
+  });
+
   it("returns a safe virtual ADMIN identity", () => {
     configureAdmin();
+    process.env.ADMIN_BOOTSTRAP_EMAIL = "  ADMIN@example.test  ";
     expect(getConfiguredAdmin()).toEqual({
       id: ENV_ADMIN_ID,
       name: "ENV Admin",
@@ -43,7 +55,7 @@ describe("environment administrator", () => {
   it("validates both credentials without disclosing which one failed", () => {
     configureAdmin();
     expect(validateAdminCredentials(
-      "ADMIN@example.test",
+      "  ADMIN@example.test  ",
       "Never-Use-This-Test-Password-123!",
     )).toBe(true);
     expect(validateAdminCredentials(

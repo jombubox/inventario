@@ -14,7 +14,7 @@
 
 - [ ] Cloudflare preview ejecutado con base no productiva y smoke test aprobado.
 - [ ] Dominio final confirmado en ambas URLs públicas.
-- [ ] Secretos creados/rotados y no compartidos por chat.
+- [ ] `BETTER_AUTH_SECRET` y los tres bindings runtime `ADMIN_BOOTSTRAP_*` creados/rotados y no compartidos por chat.
 - [ ] Retención PITR/restore de Neon confirmada contractualmente.
 - [ ] Objetos de imágenes respaldados o versionados en Cloudflare R2.
 - [ ] Workers Logs, alertas, WAF rate limits y health monitor activos.
@@ -24,8 +24,9 @@
 
 - [ ] `/api/health` devuelve 200 y un `X-Request-Id`.
 - [ ] Home, búsqueda, filtros, detalle, 404 privada y sitemap.
-- [ ] Login ADMIN/EDITOR/VIEWER y logout.
-- [ ] VIEWER no ve ni ejecuta mutaciones/export.
+- [ ] Login ENV ADMIN con credencial correcta; refresh y navegación conservan la sesión.
+- [ ] Correo incorrecto y contraseña incorrecta se rechazan sin crear cookie.
+- [ ] Logout elimina la sesión y `/admin` vuelve a redirigir a `/login`.
 - [ ] Crear producto, existencia, movimiento y ubicación de prueba.
 - [ ] Exportar XLSX y abrir las cuatro hojas.
 - [ ] Importar un archivo controlado; desactivar `ENABLE_IMPORTS` después si la migración terminó.
