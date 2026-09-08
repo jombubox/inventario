@@ -2,11 +2,10 @@ import "server-only";
 
 import { assertProductImageObjectKey } from "@/features/images/domain/image-policy";
 import { R2ConfigurationError } from "@/features/images/server/r2-errors";
-import { getServerEnv } from "@/lib/env";
 
 export function getR2PublicUrl(
   objectKey: string,
-  publicBaseUrl: string | undefined = getServerEnv().R2_PUBLIC_URL,
+  publicBaseUrl: string | undefined = process.env.R2_PUBLIC_URL,
 ): string {
   assertProductImageObjectKey(objectKey);
   if (!publicBaseUrl) {

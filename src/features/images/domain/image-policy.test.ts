@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   assertProductImageObjectKey,
@@ -6,6 +6,10 @@ import {
   createProductImageObjectKey,
 } from "@/features/images/domain/image-policy";
 import { getR2PublicUrl } from "@/features/images/server/r2-public-url";
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("image upload policy", () => {
   it("accepts matching JPEG, PNG and WEBP declarations", () => {
@@ -30,5 +34,15 @@ describe("image upload policy", () => {
     expect(getR2PublicUrl(first, "https://images.example.com/")).toBe(
       `https://images.example.com/${first}`,
     );
+  });
+
+  it("reads only its own runtime binding when building a public image URL", () => {
+    vi.stubEnv("R2_PUBLIC_URL", "https://images.example.com");
+    vi.stubEnv("ADMIN_BOOTSTRAP_NAME", "");
+    vi.stubEnv("ADMIN_BOOTSTRAP_EMAIL", "");
+    vi.stubEnv("ADMIN_BOOTSTRAP_PASSWORD", "");
+
+    const objectKey = createProductImageObjectKey("JBX-CHAIR-000123", "image/webp");
+    expect(getR2PublicUrl(objectKey)).toBe(`https://images.example.com/${objectKey}`);
   });
 });

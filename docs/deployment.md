@@ -8,6 +8,10 @@ Producción exige `APP_ENV=production`, un mismo origen HTTPS no local para `BET
 
 Las credenciales del administrador deben existir como bindings del Worker en tiempo de ejecución. Definirlas solo en el shell/CI que ejecuta `pnpm cf:build` no las configura en Cloudflare. Verifica los nombres sin mostrar valores con `pnpm wrangler secret list`; crea o rota cada valor desde una terminal segura con `pnpm wrangler secret put <NOMBRE>` y vuelve a desplegar. Para `next dev`, define los mismos nombres en `.env.local`; para `pnpm preview`, defínelos en `.dev.vars`.
 
+`wrangler.jsonc` usa `keep_vars=true` porque las variables de configuración de producción se administran en Cloudflare y no se versionan. Sin esa opción, un deploy de Wrangler puede eliminar variables creadas desde el dashboard que no aparezcan en el archivo; los secretos se administran por separado con Wrangler/Cloudflare. Antes de redeploy, confirma en el Worker servido por el dominio final que `DATABASE_URL` y todos los nombres anteriores siguen presentes; restaurar una variable en otro Worker o environment no corrige producción.
+
+La validación está separada por capacidad: el catálogo valida `DATABASE_URL` al crear el cliente Neon y `R2_PUBLIC_URL` solo al construir una URL de imagen; la autenticación valida `ADMIN_BOOTSTRAP_*` y `BETTER_AUTH_SECRET` dentro de su propio límite. La ausencia de credenciales administrativas deshabilita el login de forma segura sin impedir las consultas públicas.
+
 ## Preparación
 
 ```bash

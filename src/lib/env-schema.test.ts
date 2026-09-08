@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseServerEnv } from "@/lib/env-schema";
+import { parseDatabaseEnv, parseServerEnv } from "@/lib/env-schema";
 
 const base = {
   NODE_ENV: "test" as const,
@@ -20,22 +20,30 @@ describe("server environment validation", () => {
     expect(parseServerEnv({ ...base, ENABLE_IMPORTS: "false" }).ENABLE_IMPORTS).toBe(false);
   });
 
-  it("keeps runtime ENV-admin values optional during general environment parsing", () => {
-    expect(parseServerEnv({
+  it("keeps ENV-admin configuration outside the general environment boundary", () => {
+    const parsed = parseServerEnv({
       ...base,
       ADMIN_BOOTSTRAP_NAME: "JombuBox Admin",
       ADMIN_BOOTSTRAP_EMAIL: "  ADMIN@example.com  ",
       ADMIN_BOOTSTRAP_PASSWORD: "a-development-only-password",
-    })).toMatchObject({
-      ADMIN_BOOTSTRAP_NAME: "JombuBox Admin",
-      ADMIN_BOOTSTRAP_EMAIL: "admin@example.com",
-      ADMIN_BOOTSTRAP_PASSWORD: "a-development-only-password",
     });
-    expect(parseServerEnv(base).ADMIN_BOOTSTRAP_PASSWORD).toBeUndefined();
+    expect(parsed).not.toHaveProperty("ADMIN_BOOTSTRAP_NAME");
+    expect(parsed).not.toHaveProperty("ADMIN_BOOTSTRAP_EMAIL");
+    expect(parsed).not.toHaveProperty("ADMIN_BOOTSTRAP_PASSWORD");
   });
 
-  it("requires the runtime ENV-admin identity in production", () => {
-    expect(() => parseServerEnv({
+  it("validates database configuration without unrelated runtime settings", () => {
+    expect(parseDatabaseEnv({
+      NODE_ENV: "production",
+      DATABASE_URL: base.DATABASE_URL,
+    })).toEqual({ DATABASE_URL: base.DATABASE_URL });
+    expect(() => parseDatabaseEnv({ NODE_ENV: "production" })).toThrow(
+      /DATABASE_URL is required/u,
+    );
+  });
+
+  it("does not make production runtime validation depend on ENV-admin settings", () => {
+    expect(parseServerEnv({
       ...base,
       APP_ENV: "production",
       BETTER_AUTH_URL: "https://jombubox.example",
@@ -45,7 +53,7 @@ describe("server environment validation", () => {
       R2_SECRET_ACCESS_KEY: "secret-key",
       R2_BUCKET_NAME: "jombubox-products",
       R2_PUBLIC_URL: "https://images.jombubox.example",
-    })).toThrow(/ADMIN_BOOTSTRAP_NAME/u);
+    }).APP_ENV).toBe("production");
   });
 
   it("requires matching non-local HTTPS origins in production", () => {
@@ -67,9 +75,6 @@ describe("server environment validation", () => {
       APP_ENV: "production",
       BETTER_AUTH_URL: "https://jombubox.example",
       NEXT_PUBLIC_SITE_URL: "https://jombubox.example",
-      ADMIN_BOOTSTRAP_NAME: "JombuBox Admin",
-      ADMIN_BOOTSTRAP_EMAIL: "admin@example.com",
-      ADMIN_BOOTSTRAP_PASSWORD: "a-production-password",
       CLOUDFLARE_ACCOUNT_ID: "account-id",
       R2_ACCESS_KEY_ID: "access-key",
       R2_SECRET_ACCESS_KEY: "secret-key",
