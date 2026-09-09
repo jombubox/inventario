@@ -1,21 +1,12 @@
 "use server";
 
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import {
   createAdminSession,
-  deleteAdminSession,
-} from "@/features/auth/server/admin-session";
-import {
-  InvalidEnvAdminConfigurationError,
+  logout,
   validateAdminCredentials,
-} from "@/features/auth/server/env-admin";
-import {
-  clearLoginFailures,
-  isLoginAttemptAllowed,
-  recordLoginFailure,
-} from "@/features/auth/server/login-rate-limit";
+} from "@/features/auth/server/admin-auth";
 import { loginInputSchema } from "@/validators/auth";
 
 export type AuthActionState = {
@@ -36,25 +27,13 @@ export async function loginAction(
     return { fieldErrors: parsed.error.flatten().fieldErrors };
   }
 
-  const requestHeaders = await headers();
-  if (!isLoginAttemptAllowed(requestHeaders)) {
-    return { error: "Demasiados intentos. Espera un minuto antes de volver a intentar." };
-  }
-
   try {
-    if (!validateAdminCredentials(parsed.data.email, parsed.data.password)) {
-      recordLoginFailure(requestHeaders);
+    if (!await validateAdminCredentials(parsed.data.email, parsed.data.password)) {
       return { error: "Correo o contraseña incorrectos." };
     }
 
     await createAdminSession();
-    clearLoginFailures(requestHeaders);
-  } catch (error) {
-    if (error instanceof InvalidEnvAdminConfigurationError) {
-      console.error("ENV admin authentication is not configured.", {
-        fields: error.fields,
-      });
-    }
+  } catch {
     return { error: "Correo o contraseña incorrectos." };
   }
 
@@ -62,6 +41,5 @@ export async function loginAction(
 }
 
 export async function logoutAction(): Promise<void> {
-  await deleteAdminSession();
-  redirect("/login");
+  await logout();
 }

@@ -1,11 +1,10 @@
 import "server-only";
 
-import { and, asc, count, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import type { Database } from "@/db/connection";
-import { inventoryItems, inventoryMovements, locations, products, user } from "@/db/schema";
-import { ENV_ADMIN_ID } from "@/features/auth/domain/env-admin-session";
+import { inventoryItems, inventoryMovements, locations, products } from "@/db/schema";
 import { buildLocationBreadcrumb } from "@/features/locations/domain/location-hierarchy";
 import type { MovementListQuery } from "@/validators/admin-query";
 
@@ -18,7 +17,6 @@ export async function listInventoryMovements(db: Database, query: MovementListQu
     conditions.push(or(ilike(inventoryItems.inventoryCode, pattern), ilike(products.sku, pattern), ilike(products.title, pattern), ilike(inventoryMovements.reason, pattern))!);
   }
   if (query.type) conditions.push(eq(inventoryMovements.type, query.type));
-  if (query.userId) conditions.push(eq(inventoryMovements.userId, query.userId));
   if (query.location) conditions.push(or(eq(fromLocation.code, query.location), eq(toLocation.code, query.location))!);
   if (query.from) conditions.push(sql`${inventoryMovements.createdAt} >= (${query.from}::date::timestamp at time zone 'America/Mexico_City')`);
   if (query.to) conditions.push(sql`${inventoryMovements.createdAt} < ((${query.to}::date + 1)::timestamp at time zone 'America/Mexico_City')`);
@@ -41,21 +39,17 @@ export async function listInventoryMovements(db: Database, query: MovementListQu
       fromLocationCode: fromLocation.code,
       toLocationId: toLocation.id,
       toLocationCode: toLocation.code,
-      userName: sql<string | null>`case when ${inventoryMovements.metadata}->>'actorId' = ${ENV_ADMIN_ID} then 'Administrador ENV' else ${user.name} end`,
-      userEmail: user.email,
     })
     .from(inventoryMovements)
     .innerJoin(inventoryItems, eq(inventoryMovements.inventoryItemId, inventoryItems.id))
     .innerJoin(products, eq(inventoryItems.productId, products.id))
     .leftJoin(fromLocation, eq(inventoryMovements.fromLocationId, fromLocation.id))
-    .leftJoin(toLocation, eq(inventoryMovements.toLocationId, toLocation.id))
-    .leftJoin(user, eq(inventoryMovements.userId, user.id));
+    .leftJoin(toLocation, eq(inventoryMovements.toLocationId, toLocation.id));
 
-  const [rows, totalResult, locationNodes, users] = await Promise.all([
+  const [rows, totalResult, locationNodes] = await Promise.all([
     base.where(where).orderBy(desc(inventoryMovements.createdAt)).limit(query.pageSize).offset(offset),
-    db.select({ value: count() }).from(inventoryMovements).innerJoin(inventoryItems, eq(inventoryMovements.inventoryItemId, inventoryItems.id)).innerJoin(products, eq(inventoryItems.productId, products.id)).leftJoin(fromLocation, eq(inventoryMovements.fromLocationId, fromLocation.id)).leftJoin(toLocation, eq(inventoryMovements.toLocationId, toLocation.id)).leftJoin(user, eq(inventoryMovements.userId, user.id)).where(where),
+    db.select({ value: count() }).from(inventoryMovements).innerJoin(inventoryItems, eq(inventoryMovements.inventoryItemId, inventoryItems.id)).innerJoin(products, eq(inventoryItems.productId, products.id)).leftJoin(fromLocation, eq(inventoryMovements.fromLocationId, fromLocation.id)).leftJoin(toLocation, eq(inventoryMovements.toLocationId, toLocation.id)).where(where),
     db.select({ id: locations.id, code: locations.code, name: locations.name, parentId: locations.parentId }).from(locations),
-    db.select({ id: user.id, name: user.name, email: user.email }).from(user).orderBy(asc(user.name)),
   ]);
   const locationById = new Map(locationNodes.map((node) => [node.id, node]));
   const decorated = rows.map((row) => ({
@@ -68,6 +62,6 @@ export async function listInventoryMovements(db: Database, query: MovementListQu
     rows: decorated,
     total,
     pageCount: Math.max(1, Math.ceil(total / query.pageSize)),
-    options: { locations: locationNodes, users },
+    options: { locations: locationNodes },
   };
 }

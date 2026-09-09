@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getDb } from "@/db";
-import { requirePermissionFromHeaders } from "@/features/auth/server/authorization";
+import { requireAdmin } from "@/features/auth/server/admin-auth";
 import { revalidatePublicCatalog } from "@/features/catalog/server/revalidation";
 import { importErrorResponse, readImportMultipart } from "@/features/imports/server/import-http";
 import { confirmImportFile } from "@/features/imports/server/import-service";
@@ -16,23 +16,21 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   const requestId = getRequestId(request);
-  let userId: string | undefined;
   try {
     assertSameOriginMutation(request);
-    const actor = await requirePermissionFromHeaders(request.headers, "IMPORT_EXECUTE");
-    userId = actor.id;
+    await requireAdmin(request.headers);
     if (!getServerEnv().ENABLE_IMPORTS) {
       throw new FeatureDisabledError("Las importaciones están deshabilitadas temporalmente.");
     }
     const db = getDb();
-    await consumeOperationalRateLimit(db, { scope: "import-confirm", identity: actor.id, limit: 5, windowSeconds: 3_600 });
+    await consumeOperationalRateLimit(db, { scope: "import-confirm", identity: "admin", limit: 5, windowSeconds: 3_600 });
     const { file, parsedOptions } = await readImportMultipart(request);
     const options = confirmImportOptionsSchema.parse(parsedOptions);
-    const result = await confirmImportFile(db, actor, { file, ...options });
+    const result = await confirmImportFile(db, { file, ...options });
     revalidatePublicCatalog();
-    logServerEvent("info", "import_confirmed", { requestId, userId: actor.id });
+    logServerEvent("info", "import_confirmed", { requestId });
     return NextResponse.json(result, { headers: requestIdHeaders(requestId) });
   } catch (error) {
-    return importErrorResponse(error, { requestId, event: "import_confirm_failed", userId });
+    return importErrorResponse(error, { requestId, event: "import_confirm_failed" });
   }
 }

@@ -5,7 +5,6 @@ import { parseDatabaseEnv, parseServerEnv } from "@/lib/env-schema";
 const base = {
   NODE_ENV: "test" as const,
   DATABASE_URL: "postgresql://user:password@localhost/jombubox",
-  BETTER_AUTH_SECRET: "a-secure-secret-with-at-least-32-characters",
 };
 
 describe("server environment validation", () => {
@@ -20,16 +19,16 @@ describe("server environment validation", () => {
     expect(parseServerEnv({ ...base, ENABLE_IMPORTS: "false" }).ENABLE_IMPORTS).toBe(false);
   });
 
-  it("keeps ENV-admin configuration outside the general environment boundary", () => {
+  it("keeps admin authentication outside the general environment boundary", () => {
     const parsed = parseServerEnv({
       ...base,
-      ADMIN_BOOTSTRAP_NAME: "JombuBox Admin",
-      ADMIN_BOOTSTRAP_EMAIL: "  ADMIN@example.com  ",
-      ADMIN_BOOTSTRAP_PASSWORD: "a-development-only-password",
+      ADMIN_EMAIL: "admin@example.com",
+      ADMIN_PASSWORD: "a-development-only-password",
+      AUTH_SECRET: "a-secure-secret-with-at-least-32-characters",
     });
-    expect(parsed).not.toHaveProperty("ADMIN_BOOTSTRAP_NAME");
-    expect(parsed).not.toHaveProperty("ADMIN_BOOTSTRAP_EMAIL");
-    expect(parsed).not.toHaveProperty("ADMIN_BOOTSTRAP_PASSWORD");
+    expect(parsed).not.toHaveProperty("ADMIN_EMAIL");
+    expect(parsed).not.toHaveProperty("ADMIN_PASSWORD");
+    expect(parsed).not.toHaveProperty("AUTH_SECRET");
   });
 
   it("validates database configuration without unrelated runtime settings", () => {
@@ -42,11 +41,10 @@ describe("server environment validation", () => {
     );
   });
 
-  it("does not make production runtime validation depend on ENV-admin settings", () => {
+  it("does not make production runtime validation depend on admin settings", () => {
     expect(parseServerEnv({
       ...base,
       APP_ENV: "production",
-      BETTER_AUTH_URL: "https://jombubox.example",
       NEXT_PUBLIC_SITE_URL: "https://jombubox.example",
       CLOUDFLARE_ACCOUNT_ID: "account-id",
       R2_ACCESS_KEY_ID: "access-key",
@@ -56,24 +54,16 @@ describe("server environment validation", () => {
     }).APP_ENV).toBe("production");
   });
 
-  it("requires matching non-local HTTPS origins in production", () => {
-    expect(() => parseServerEnv({ ...base, APP_ENV: "production" })).toThrow(/BETTER_AUTH_URL/u);
+  it("requires a non-local HTTPS site origin in production", () => {
+    expect(() => parseServerEnv({ ...base, APP_ENV: "production" })).toThrow(/NEXT_PUBLIC_SITE_URL/u);
     expect(() => parseServerEnv({
       ...base,
       APP_ENV: "production",
-      BETTER_AUTH_URL: "https://admin.example.com",
-      NEXT_PUBLIC_SITE_URL: "https://www.example.com",
-    })).toThrow(/share an origin/u);
-    expect(() => parseServerEnv({
-      ...base,
-      APP_ENV: "production",
-      BETTER_AUTH_URL: "https://jombubox.example",
       NEXT_PUBLIC_SITE_URL: "https://jombubox.example",
     })).toThrow(/R2_ACCESS_KEY_ID/u);
     expect(parseServerEnv({
       ...base,
       APP_ENV: "production",
-      BETTER_AUTH_URL: "https://jombubox.example",
       NEXT_PUBLIC_SITE_URL: "https://jombubox.example",
       CLOUDFLARE_ACCOUNT_ID: "account-id",
       R2_ACCESS_KEY_ID: "access-key",

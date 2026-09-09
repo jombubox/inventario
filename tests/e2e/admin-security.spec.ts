@@ -39,7 +39,7 @@ test("wrong email and password do not create an admin session", async ({ page })
   expect(exportResponse.status()).toBe(401);
 });
 
-test("ENV ADMIN exports inventory and completes the legacy import workflow", async ({ page }, testInfo) => {
+test("the administrator exports inventory and completes the legacy import workflow", async ({ page }, testInfo) => {
   test.setTimeout(60_000);
   test.skip(testInfo.project.name.startsWith("mobile"), "State-changing workflow runs once against the shared E2E database.");
   await login(page);
@@ -85,7 +85,7 @@ test("ENV ADMIN exports inventory and completes the legacy import workflow", asy
   await expect(page.getByText("COMPLETED", { exact: true }).first()).toBeVisible();
 });
 
-test("ENV ADMIN uploads an image through the server-side fake R2 boundary", async ({ page }, testInfo) => {
+test("the administrator uploads an image through the server-side fake R2 boundary", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name.startsWith("mobile"), "State-changing workflow runs once against the shared E2E database.");
   await login(page);
   await page.goto("/admin/productos");

@@ -28,8 +28,9 @@ jobs:
     env:
       TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54330/jumbobox_test
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54330/jumbobox_test
-      BETTER_AUTH_SECRET: ci-only-jombubox-secret-at-least-32-characters
-      BETTER_AUTH_URL: http://127.0.0.1:3000
+      ADMIN_EMAIL: admin@ci.local
+      ADMIN_PASSWORD: ci-only-admin-password
+      AUTH_SECRET: ci-only-jombubox-secret-at-least-32-characters
       NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
       APP_ENV: preview
       ENABLE_IMPORTS: "true"

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { ForbiddenError } from "@/features/auth/domain/auth-errors";
-import { assertSameOriginMutation } from "@/lib/request-security";
+import {
+  assertSameOriginMutation,
+  InvalidRequestOriginError,
+} from "@/lib/request-security";
 
 describe("same-origin mutation guard", () => {
   it("accepts a matching origin", () => {
@@ -32,7 +34,7 @@ describe("same-origin mutation guard", () => {
       expect(() => assertSameOriginMutation(new Request("https://jombubox.example/api/test", {
         method: "POST",
         headers,
-      }))).toThrow(ForbiddenError);
+      }))).toThrow(InvalidRequestOriginError);
     }
   });
 });

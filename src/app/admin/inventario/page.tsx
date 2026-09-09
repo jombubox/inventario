@@ -7,8 +7,7 @@ import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { getDb } from "@/db";
-import { hasPermission } from "@/features/auth/domain/permissions";
-import { requirePagePermission } from "@/features/auth/server/authorization";
+import { requireAdmin } from "@/features/auth/server/admin-auth";
 import { CreateInventoryForm, InventoryRowActions } from "@/features/inventory/components/inventory-forms";
 import {
   listAdminInventory,
@@ -24,7 +23,7 @@ export default async function InventoryPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const user = await requirePagePermission("INVENTORY_READ");
+  await requireAdmin();
   const raw = await searchParams;
   const query = inventoryListQuerySchema.parse(
     Object.fromEntries(
@@ -39,9 +38,6 @@ export default async function InventoryPage({
     listAdminInventory(db, query),
     listInventoryFormOptions(db),
   ]);
-  const canCreate = hasPermission(user.role, "INVENTORY_CREATE");
-  const canUpdate = hasPermission(user.role, "INVENTORY_UPDATE");
-  const canExport = hasPermission(user.role, "INVENTORY_EXPORT");
   const current = new URLSearchParams(
     Object.entries(raw).filter(
       (entry): entry is [string, string] => typeof entry[1] === "string",
@@ -59,18 +55,17 @@ export default async function InventoryPage({
         eyebrow="Existencia física"
         title="Inventario"
         description="Consulta lotes, registra entradas y conserva el historial de cada cambio."
-        actions={canExport ? (
+        actions={(
           <a
             href="/api/exports/inventory"
             className="inline-flex h-11 items-center rounded-xl border border-border bg-card px-4 text-small font-semibold text-navy transition-colors hover:border-primary/40 hover:text-primary"
           >
             Exportar inventario
           </a>
-        ) : undefined}
+        )}
       />
 
-      {canCreate ? (
-        <details className="rounded-2xl border border-border bg-card">
+      <details className="rounded-2xl border border-border bg-card">
           <summary className="cursor-pointer px-5 py-4 font-semibold text-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             Agregar existencia física
           </summary>
@@ -80,8 +75,7 @@ export default async function InventoryPage({
               locations={options.locations}
             />
           </div>
-        </details>
-      ) : null}
+      </details>
 
       <Card>
         <CardContent className="p-4 sm:p-5">
@@ -191,8 +185,7 @@ export default async function InventoryPage({
                     </div>
                   </div>
 
-                  {canUpdate ? (
-                    <details className="mt-4">
+                  <details className="mt-4">
                       <summary className="cursor-pointer rounded-lg bg-muted px-3 py-2 text-small font-semibold text-navy">
                         Mover, ajustar o editar este registro
                       </summary>
@@ -217,8 +210,7 @@ export default async function InventoryPage({
                           locations={options.locations}
                         />
                       </div>
-                    </details>
-                  ) : null}
+                  </details>
                 </article>
               ))}
             </div>

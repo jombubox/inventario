@@ -14,11 +14,11 @@ Cada cambio de cantidad crea un `inventory_movement` en la misma transacción qu
 | `SALE` | Resta y normalmente termina en `SOLD` al llegar a cero |
 | `RETURN` | Suma y reactiva `AVAILABLE`, `RESERVED` o `DAMAGED` |
 
-`IN`/`RETURN` requieren `INVENTORY_IN`; `OUT`/`SALE`, `INVENTORY_OUT`; `MOVE`, `INVENTORY_MOVE`; `ADJUSTMENT`, `INVENTORY_UPDATE`. ADMIN y EDITOR pueden operar; VIEWER solo consulta.
+Todas las operaciones requieren una sesión administrativa válida y vuelven a comprobarla en el servidor.
 
 La fila se bloquea con `SELECT FOR UPDATE`. Las restas usan además `quantity >= amount` en el `UPDATE`, por lo que una carrera no puede dejar cantidad negativa. PostgreSQL refuerza cantidad/estado: `AVAILABLE`, `RESERVED` y `DAMAGED` necesitan cantidad positiva; `SOLD` y `SCRAPPED`, cantidad cero. Si una actualización o movimiento fallan, toda la transacción se revierte.
 
-`/admin/movimientos` filtra por texto, tipo, usuario, ubicación y fechas, con paginación. Muestra origen/destino, actor, producto, cantidad y motivo.
+`/admin/movimientos` filtra por texto, tipo, ubicación y fechas, con paginación. Muestra origen/destino, producto, cantidad y motivo.
 
 ## Productos sin ubicación
 
@@ -26,6 +26,6 @@ El dashboard cuenta productos distintos que tienen al menos un `inventoryItem` f
 
 ## Auditoría
 
-`/admin/auditoria` requiere `AUDIT_READ`, exclusivo de ADMIN. Los filtros cubren acción, entidad, usuario, fechas y texto. Cada detalle muestra campos cambiados como Antes/Después y metadata legible.
+`/admin/auditoria` requiere una sesión administrativa. Los filtros cubren acción, entidad, fechas y texto. Cada detalle muestra campos cambiados como Antes/Después y metadata legible.
 
-Además de producto, ubicación y usuarios, se auditan preview/inicio/fin/fallo de importación, `IN/OUT/SALE/RETURN`, imágenes y movimientos existentes. Los snapshots son listas explícitas y no incluyen contraseñas, sesiones, tokens Cloudflare, archivos XLSX ni secretos.
+Se auditan productos, ubicaciones, preview/inicio/fin/fallo de importación, `IN/OUT/SALE/RETURN`, imágenes y movimientos existentes. La atribución de estas operaciones es de sistema (`userId` nulo). Los snapshots son listas explícitas y no incluyen contraseñas, sesiones, tokens Cloudflare, archivos XLSX ni secretos.

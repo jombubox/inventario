@@ -1,5 +1,5 @@
-// Generated from the Better Auth configuration with `auth generate`, then
-// aligned with JombuBox's single-role invariant and project formatting.
+// Legacy identity tables are retained for migration and nullable foreign-key
+// compatibility only. Runtime admin authentication never reads or writes them.
 import { sql } from "drizzle-orm";
 import {
   bigint,

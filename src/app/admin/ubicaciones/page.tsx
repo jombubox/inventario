@@ -3,8 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { getDb } from "@/db";
-import { hasPermission } from "@/features/auth/domain/permissions";
-import { requirePagePermission } from "@/features/auth/server/authorization";
+import { requireAdmin } from "@/features/auth/server/admin-auth";
 import {
   CreateLocationForm,
   EditLocationForm,
@@ -12,10 +11,8 @@ import {
 import { listAdminLocations } from "@/features/locations/data/admin-location-queries";
 
 export default async function LocationsPage() {
-  const user = await requirePagePermission("LOCATION_READ");
+  await requireAdmin();
   const rows = await listAdminLocations(getDb());
-  const canCreate = hasPermission(user.role, "LOCATION_CREATE");
-  const canUpdate = hasPermission(user.role, "LOCATION_UPDATE");
   const options = rows.map(({ id, breadcrumb }) => ({ id, breadcrumb }));
 
   return (
@@ -26,16 +23,14 @@ export default async function LocationsPage() {
         description="Organiza almacenes, estantes, cajas y bolsas con una jerarquía flexible."
       />
 
-      {canCreate ? (
-        <details className="rounded-2xl border border-border bg-card">
+      <details className="rounded-2xl border border-border bg-card">
           <summary className="cursor-pointer px-5 py-4 font-semibold text-navy">
             Crear ubicación
           </summary>
           <div className="border-t border-border p-5">
             <CreateLocationForm options={options} />
           </div>
-        </details>
-      ) : null}
+      </details>
 
       <Card>
         <CardContent className="p-0">
@@ -79,8 +74,7 @@ export default async function LocationsPage() {
                     </div>
                   </div>
 
-                  {canUpdate ? (
-                    <details className="mt-3">
+                  <details className="mt-3">
                       <summary className="cursor-pointer rounded-lg bg-muted px-3 py-2 text-small font-semibold">
                         Editar datos o cambiar ubicación padre
                       </summary>
@@ -99,8 +93,7 @@ export default async function LocationsPage() {
                           options={options}
                         />
                       </div>
-                    </details>
-                  ) : null}
+                  </details>
                 </article>
               ))}
             </div>

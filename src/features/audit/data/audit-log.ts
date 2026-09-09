@@ -1,6 +1,5 @@
 import type { DatabaseExecutor } from "@/db/executor";
 import { auditLogs } from "@/db/schema";
-import { databaseUserIdForActor } from "@/features/auth/server/actor-attribution";
 import { redactRecord } from "@/lib/redaction";
 
 export const auditActionValues = [
@@ -13,9 +12,6 @@ export const auditActionValues = [
   "INVENTORY_MOVED",
   "LOCATION_CREATED",
   "LOCATION_UPDATED",
-  "USER_CREATED",
-  "USER_ROLE_CHANGED",
-  "USER_DEACTIVATED",
   "IMPORT_PREVIEWED",
   "IMPORT_STARTED",
   "IMPORT_COMPLETED",
@@ -37,14 +33,12 @@ export type AuditAction = (typeof auditActionValues)[number];
 export function createAuditLog(
   db: DatabaseExecutor,
   input: {
-    userId: string;
     action: AuditAction;
     entityType:
       | "PRODUCT"
       | "PRODUCT_IMAGE"
       | "INVENTORY_ITEM"
       | "LOCATION"
-      | "USER"
       | "IMPORT_JOB";
     entityId: string;
     before?: Record<string, unknown> | null;
@@ -52,17 +46,13 @@ export function createAuditLog(
     metadata?: Record<string, unknown> | null;
   },
 ) {
-  const databaseUserId = databaseUserIdForActor(input.userId);
   return db.insert(auditLogs).values({
-    userId: databaseUserId,
+    userId: null,
     action: input.action,
     entityType: input.entityType,
     entityId: input.entityId,
     before: redactRecord(input.before),
     after: redactRecord(input.after),
-    metadata: redactRecord({
-      ...(input.metadata ?? {}),
-      ...(databaseUserId ? {} : { actorId: input.userId }),
-    }),
+    metadata: redactRecord(input.metadata),
   });
 }

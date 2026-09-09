@@ -7,8 +7,7 @@ import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { getDb } from "@/db";
-import { hasPermission } from "@/features/auth/domain/permissions";
-import { requirePagePermission } from "@/features/auth/server/authorization";
+import { requireAdmin } from "@/features/auth/server/admin-auth";
 import {
   listAdminProducts,
   listProductCatalogOptions,
@@ -31,7 +30,7 @@ function pageHref(current: URLSearchParams, page: number): string {
 }
 
 export default async function ProductsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const user = await requirePagePermission("PRODUCT_READ");
+  await requireAdmin();
   const rawParams = firstValues(await searchParams);
   const query = productListQuerySchema.parse(rawParams);
   const db = getDb();
@@ -45,7 +44,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="mx-auto w-full max-w-[96rem] space-y-6">
-      <PageHeader eyebrow="Catálogo interno" title="Productos" description="Busca, filtra y administra la identidad comercial de cada refacción." actions={hasPermission(user.role, "PRODUCT_CREATE") ? <Link href="/admin/productos/nuevo" className="inline-flex h-11 items-center rounded-xl bg-primary px-4 text-small font-semibold text-white hover:bg-primary-hover">Nuevo producto</Link> : undefined} />
+      <PageHeader eyebrow="Catálogo interno" title="Productos" description="Busca, filtra y administra la identidad comercial de cada refacción." actions={<Link href="/admin/productos/nuevo" className="inline-flex h-11 items-center rounded-xl bg-primary px-4 text-small font-semibold text-white hover:bg-primary-hover">Nuevo producto</Link>} />
 
       <Card><CardContent className="p-4 sm:p-5">
         <form className="grid gap-3 md:grid-cols-3 xl:grid-cols-7" method="get">

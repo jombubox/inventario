@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
-import { ForbiddenError, UnauthorizedError } from "@/features/auth/domain/auth-errors";
+import { UnauthorizedError } from "@/features/auth/domain/auth-errors";
 import { R2ConfigurationError, R2StorageError } from "@/features/images/server/r2-errors";
 import {
   EntityNotFoundError,
@@ -9,13 +9,14 @@ import {
   RateLimitExceededError,
 } from "@/features/shared/domain/service-errors";
 import { logServerError, requestIdHeaders } from "@/lib/observability";
+import { InvalidRequestOriginError } from "@/lib/request-security";
 
-type ImageErrorContext = { requestId: string; event: string; userId?: string };
+type ImageErrorContext = { requestId: string; event: string };
 
 export function imageErrorResponse(error: unknown, context: ImageErrorContext) {
   const headers = requestIdHeaders(context.requestId);
   if (error instanceof UnauthorizedError) return NextResponse.json({ error: "Inicia sesión para continuar.", code: "AUTH_REQUIRED", requestId: context.requestId }, { status: 401, headers });
-  if (error instanceof ForbiddenError) return NextResponse.json({ error: "No tienes permiso para administrar imágenes.", code: "FORBIDDEN", requestId: context.requestId }, { status: 403, headers });
+  if (error instanceof InvalidRequestOriginError) return NextResponse.json({ error: "La solicitud proviene de un origen no permitido.", code: "INVALID_REQUEST_ORIGIN", requestId: context.requestId }, { status: 403, headers });
   if (error instanceof EntityNotFoundError) return NextResponse.json({ error: error.message, code: "NOT_FOUND", requestId: context.requestId }, { status: 404, headers });
   if (error instanceof RateLimitExceededError) {
     return NextResponse.json(

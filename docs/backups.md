@@ -31,6 +31,6 @@ Probar restauración al menos mensualmente en una base nueva y registrar duraci�
 - [ ] Último dump custom existe, no está vacío y su SHA-256 coincide.
 - [ ] Copia cifrada reside fuera de Neon con acceso de mínimo privilegio.
 - [ ] Restauración mensual completada en una base aislada y RTO registrado.
-- [ ] Conteos y sumas de productos, inventario, movimientos, usuarios e importaciones reconciliados.
+- [ ] Conteos y sumas de productos, inventario, movimientos e importaciones reconciliados.
 - [ ] Objetos R2 y relación con `storage_key` recuperables.
 - [ ] Responsable y fecha de la próxima prueba asignados.

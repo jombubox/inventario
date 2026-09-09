@@ -3,17 +3,16 @@
 ## Límites de confianza
 
 - No existe registro público. El único ADMIN se valida contra variables server-only y recibe una cookie HMAC firmada, `HttpOnly`, `SameSite=Lax` y `Secure` en producción.
-- El middleware solo mejora la navegación. El límite real está en el layout, cada página, cada Server Action y cada Route Handler mediante permisos server-side.
-- La sesión de runtime solo emite `ADMIN`; la matriz histórica ADMIN/EDITOR/VIEWER permanece centralizada para los servicios.
+- El middleware solo mejora la navegación. El límite real está en el layout, cada página, cada Server Action y cada Route Handler mediante `requireAdmin()`.
 - Las mutaciones HTTP validan `Origin`/`Sec-Fetch-Site`; las Server Actions se benefician de las protecciones de origen de Next y siempre vuelven a autorizar en el servidor.
 - Los DTO públicos seleccionan campos explícitos y filtran en SQL `ACTIVE`, `is_public=true`, `deleted_at is null`. No incluyen costo, adquisición, notas, ubicación, legacy, usuarios, auditoría ni movimientos.
 
 ## Controles implementados
 
-- Zod con allowlists y límites server-side evita mass assignment; los identificadores enviados por el navegador nunca sustituyen al actor autenticado.
+- Zod con allowlists y límites server-side evita mass assignment; los identificadores enviados por el navegador no se usan como identidad administrativa.
 - React escapa texto. El único JSON-LD se serializa con escape seguro y no incorpora HTML arbitrario.
 - CSP, `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `nosniff`, Referrer Policy, Permissions Policy y COOP se sirven globalmente; HSTS se activa solo con `APP_ENV=production`.
-- El login limita fallos por IP dentro de cada instancia; Vercel/Cloudflare WAF debe aplicar el límite distribuido. Importación, exportación e imágenes conservan límites persistentes y devuelven `429` con `Retry-After`.
+- Cloudflare WAF debe aplicar rate limiting distribuido al login. Importación, exportación e imágenes conservan límites persistentes y devuelven `429` con `Retry-After`.
 - XLSX limita tamaño, hojas, columnas y filas; no ejecuta macros y normaliza celdas. El export antepone apóstrofo a valores que podrían iniciar fórmulas.
 - Imágenes: allowlist JPEG/PNG/WEBP, máximo 10 MB, firma binaria, máximo 10 por producto, subida directa y verificación de metadata/propiedad antes de registrar.
 - Logs JSON incluyen `requestId`, evento y contexto mínimo. Claves sensibles, tokens, contraseñas, cookies y URLs de base se redactan.
@@ -23,7 +22,7 @@
 
 1. Ante sospecha de abuso, preservar `requestId`, `cf-ray`, usuario, ruta y hora; no copiar secretos a tickets.
 2. Desactivar importaciones con `ENABLE_IMPORTS=false` si el incidente está relacionado con migración masiva.
-3. Revocar sesiones rotando `ADMIN_BOOTSTRAP_PASSWORD` o `BETTER_AUTH_SECRET` y desplegando de nuevo.
+3. Revocar sesiones rotando `AUTH_SECRET` y desplegando de nuevo; rotar también `ADMIN_PASSWORD` si la credencial se comprometió.
 4. Rotar cualquier token comprometido en Vercel/Cloudflare/Neon y volver a desplegar.
 5. Aplicar rate limiting adicional por IP en WAF a `/login`, `/api/imports/*`, `/api/products/images/*` y búsquedas abusivas. No confiar solo en IP dentro de la aplicación.
 

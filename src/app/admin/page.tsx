@@ -6,8 +6,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { getDb } from "@/db";
 import { getDashboardData } from "@/features/admin/data/dashboard-queries";
-import { hasPermission } from "@/features/auth/domain/permissions";
-import { requirePagePermission } from "@/features/auth/server/authorization";
+import { requireAdmin } from "@/features/auth/server/admin-auth";
 import { formatDateTime } from "@/lib/format";
 
 const metricLabels = {
@@ -22,7 +21,7 @@ const metricLabels = {
 } as const;
 
 export default async function AdminPage() {
-  const actor = await requirePagePermission("DASHBOARD_VIEW");
+  await requireAdmin();
   const data = await getDashboardData(getDb());
 
   return (
@@ -31,11 +30,11 @@ export default async function AdminPage() {
         eyebrow="Resumen operativo"
         title="Dashboard"
         description="Estado actual del catálogo y del inventario físico de JombuBox."
-        actions={hasPermission(actor.role, "PRODUCT_CREATE") ? (
+        actions={(
           <Link href="/admin/productos/nuevo" className="inline-flex h-11 items-center rounded-xl bg-primary px-4 text-small font-semibold text-white hover:bg-primary-hover">
             Nuevo producto
           </Link>
-        ) : undefined}
+        )}
       />
 
       <section aria-labelledby="metrics-title">

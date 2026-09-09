@@ -10,9 +10,6 @@ import {
   products,
 } from "@/db/schema";
 import { createAuditLog } from "@/features/audit/data/audit-log";
-import { assertPermission } from "@/features/auth/domain/permissions";
-import { databaseUserIdForActor } from "@/features/auth/server/actor-attribution";
-import type { AuthenticatedUser } from "@/features/auth/server/authorization";
 import type {
   AnalyzedImportRow,
   ImportCorrection,
@@ -79,22 +76,19 @@ async function fileBytesAndHash(file: File) {
 
 async function assertOwnedPreviewJob(
   db: Database,
-  actor: AuthenticatedUser,
   jobId: string,
 ) {
   const job = await db.query.importJobs.findFirst({ where: eq(importJobs.id, jobId) });
-  if (!job || (actor.role !== "ADMIN" && job.createdBy !== actor.id)) {
-    throw new InvalidOperationError("La importación no existe o pertenece a otro usuario.");
+  if (!job) {
+    throw new InvalidOperationError("La importación no existe.");
   }
   return job;
 }
 
 export async function analyzeImportFile(
   db: Database,
-  actor: AuthenticatedUser,
   input: AnalyzeImportInput,
 ): Promise<ImportPreview> {
-  assertPermission(actor.role, "IMPORT_EXECUTE");
   const { bytes, fileHash } = await fileBytesAndHash(input.file);
   const parsed = await parseXlsxWorkbook(bytes, input.mapping);
   const rows = await analyzeImportRows(db, parsed.rows, input.defaults, input.corrections);
@@ -106,7 +100,7 @@ export async function analyzeImportFile(
 
   let jobId = input.jobId;
   if (jobId) {
-    const existing = await assertOwnedPreviewJob(db, actor, jobId);
+    const existing = await assertOwnedPreviewJob(db, jobId);
     if (!["PENDING", "PREVIEWED", "FAILED"].includes(existing.status)) {
       throw new InvalidOperationError("Esta importación ya no puede volver a previsualizarse.");
     }
@@ -147,7 +141,7 @@ export async function analyzeImportFile(
         successfulRows: summary.validRows,
         warningRows: summary.warningRows,
         failedRows: summary.errorRows,
-        createdBy: databaseUserIdForActor(actor.id),
+        createdBy: null,
         errors: rows
           .filter((row) => row.status === "ERROR")
           .slice(0, 200)
@@ -167,7 +161,6 @@ export async function analyzeImportFile(
   }
 
   await createAuditLog(db, {
-    userId: actor.id,
     action: "IMPORT_PREVIEWED",
     entityType: "IMPORT_JOB",
     entityId: jobId,
@@ -199,7 +192,6 @@ function importProductKey(row: AnalyzedImportRow): string {
 
 async function resolveOrCreateProduct(
   tx: Transaction,
-  actor: AuthenticatedUser,
   row: AnalyzedImportRow,
   knownProductId?: string,
 ) {
@@ -242,7 +234,7 @@ async function resolveOrCreateProduct(
   if (!row.normalized.brandId || !row.normalized.componentTypeId || !row.normalized.title) {
     throw new InvalidOperationError("La fila no contiene datos suficientes para crear el producto.");
   }
-  const product = await createProductInTransaction(tx, actor, {
+  const product = await createProductInTransaction(tx, {
     brandId: row.normalized.brandId,
     componentTypeId: row.normalized.componentTypeId,
     partNumber: row.normalized.partNumber,
@@ -270,13 +262,12 @@ async function resolveOrCreateProduct(
 
 async function importOneRow(
   db: Database,
-  actor: AuthenticatedUser,
   jobId: string,
   row: AnalyzedImportRow,
   knownProductId?: string,
 ) {
   return db.transaction(async (tx) => {
-    const resolved = await resolveOrCreateProduct(tx, actor, row, knownProductId);
+    const resolved = await resolveOrCreateProduct(tx, row, knownProductId);
     let compatibilityAdded = false;
     if (
       !resolved.created &&
@@ -297,7 +288,7 @@ async function importOneRow(
         .returning({ id: productCompatibilities.id });
       compatibilityAdded = Boolean(compatibility);
     }
-    const inventory = await createInventoryItemInTransaction(tx, actor, {
+    const inventory = await createInventoryItemInTransaction(tx, {
       productId: resolved.product.id,
       locationId: row.normalized.locationId,
       quantity: row.normalized.quantity,
@@ -335,13 +326,9 @@ async function importOneRow(
 
 export async function confirmImportFile(
   db: Database,
-  actor: AuthenticatedUser,
   input: ConfirmImportInput,
 ) {
-  assertPermission(actor.role, "IMPORT_EXECUTE");
-  assertPermission(actor.role, "PRODUCT_CREATE");
-  assertPermission(actor.role, "INVENTORY_CREATE");
-  const previewJob = await assertOwnedPreviewJob(db, actor, input.jobId);
+  const previewJob = await assertOwnedPreviewJob(db, input.jobId);
   const { bytes, fileHash } = await fileBytesAndHash(input.file);
   if (previewJob.fileHash !== fileHash) {
     throw new InvalidOperationError("El archivo cambió desde la previsualización.");
@@ -353,8 +340,8 @@ export async function confirmImportFile(
       .where(eq(importJobs.id, input.jobId))
       .for("update")
       .limit(1);
-    if (!lockedJob || (actor.role !== "ADMIN" && lockedJob.createdBy !== actor.id)) {
-      throw new InvalidOperationError("La importación no existe o pertenece a otro usuario.");
+    if (!lockedJob) {
+      throw new InvalidOperationError("La importación no existe.");
     }
     if (!["PREVIEWED", "FAILED"].includes(lockedJob.status)) {
       throw new InvalidOperationError("La importación no está lista para confirmarse.");
@@ -387,7 +374,6 @@ export async function confirmImportFile(
     return lockedJob;
   });
   await createAuditLog(db, {
-    userId: actor.id,
     action: "IMPORT_STARTED",
     entityType: "IMPORT_JOB",
     entityId: job.id,
@@ -481,7 +467,6 @@ export async function confirmImportFile(
         const productKey = importProductKey(row);
         const imported = await importOneRow(
           db,
-          actor,
           job.id,
           row,
           knownProducts.get(productKey),
@@ -532,7 +517,6 @@ export async function confirmImportFile(
       })
       .where(eq(importJobs.id, job.id));
     await createAuditLog(db, {
-      userId: actor.id,
       action: "IMPORT_COMPLETED",
       entityType: "IMPORT_JOB",
       entityId: job.id,
@@ -566,7 +550,6 @@ export async function confirmImportFile(
       })
       .where(eq(importJobs.id, job.id));
     await createAuditLog(db, {
-      userId: actor.id,
       action: "IMPORT_FAILED",
       entityType: "IMPORT_JOB",
       entityId: job.id,

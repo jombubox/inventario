@@ -6,17 +6,8 @@ import { deflateSync } from "node:zlib";
 config({ path: ".env.local" });
 config({ path: ".env" });
 
-const QA_EMAIL = "admin.test@jombubox.local";
-const QA_NAME = "JombuBox Test Admin";
 const QA_PREFIX = "JombuBox QA \u2014";
 const QA_LOCATION_CODES = ["QA-A-01", "QA-B-02", "QA-C-03"] as const;
-const QA_ACTOR = {
-  id: "system-qa-fixture",
-  name: QA_NAME,
-  email: QA_EMAIL,
-  role: "ADMIN" as const,
-  active: true as const,
-};
 
 const PRODUCT_FIXTURES = [
   {
@@ -69,11 +60,10 @@ const PRODUCT_FIXTURES = [
 function refuseProduction(environment: {
   APP_ENV: string;
   DATABASE_URL: string;
-  BETTER_AUTH_URL?: string;
   NEXT_PUBLIC_SITE_URL?: string;
 }) {
   const localHosts = new Set(["localhost", "127.0.0.1", "::1"]);
-  const appUrls = [environment.BETTER_AUTH_URL, environment.NEXT_PUBLIC_SITE_URL].filter(
+  const appUrls = [environment.NEXT_PUBLIC_SITE_URL].filter(
     (value): value is string => Boolean(value),
   );
   const databaseLabel = decodeURIComponent(environment.DATABASE_URL).toLowerCase();
@@ -227,7 +217,7 @@ async function main() {
     const qaProducts = await db.select({ id: schema.products.id }).from(schema.products).where(ilike(schema.products.title, `${QA_PREFIX}%`));
     for (const product of qaProducts) {
       const images = await db.select({ id: schema.productImages.id }).from(schema.productImages).where(eq(schema.productImages.productId, product.id));
-      for (const image of images) await imageService.deleteProductImage(db, QA_ACTOR, storage, image.id);
+      for (const image of images) await imageService.deleteProductImage(db, storage, image.id);
       const items = await db.select({ id: schema.inventoryItems.id }).from(schema.inventoryItems).where(eq(schema.inventoryItems.productId, product.id));
       if (items.length > 0) {
         await db.delete(schema.inventoryMovements).where(inArray(schema.inventoryMovements.inventoryItemId, items.map((item) => item.id)));
@@ -246,8 +236,6 @@ async function main() {
     db as unknown as Parameters<typeof seedModule.seedDatabase>[0],
   );
 
-  const actor = QA_ACTOR;
-
   const locationDefinitions = [
     { code: "QA-A-01", name: "Caja A-01" },
     { code: "QA-B-02", name: "Caja B-02" },
@@ -257,7 +245,7 @@ async function main() {
   for (const definition of locationDefinitions) {
     let location = await db.query.locations.findFirst({ where: eq(schema.locations.code, definition.code) });
     if (!location) {
-      location = await locationService.createLocation(db, actor, {
+      location = await locationService.createLocation(db, {
         ...definition,
         type: "BOX",
         parentId: null,
@@ -293,14 +281,14 @@ async function main() {
       compatibilities: [{ brandId: brand.id, model: fixture.model, notes: "JombuBox QA fixture" }],
     };
     let product = await db.query.products.findFirst({ where: and(eq(schema.products.title, fixture.title), isNull(schema.products.deletedAt)) });
-    if (!product) product = await productService.createProduct(db, actor, productInput);
-    else product = await productService.updateProduct(db, actor, { ...productInput, id: product.id, expectedUpdatedAt: product.updatedAt });
+    if (!product) product = await productService.createProduct(db, productInput);
+    else product = await productService.updateProduct(db, { ...productInput, id: product.id, expectedUpdatedAt: product.updatedAt });
 
     const location = locationByCode.get(fixture.locationCode);
     if (!location) throw new Error(`QA location missing: ${fixture.locationCode}`);
     let inventory = await db.query.inventoryItems.findFirst({ where: eq(schema.inventoryItems.productId, product.id), orderBy: asc(schema.inventoryItems.createdAt) });
     if (!inventory) {
-      inventory = await inventoryService.createInventoryItem(db, actor, {
+      inventory = await inventoryService.createInventoryItem(db, {
         productId: product.id,
         locationId: location.id,
         quantity: fixture.stock === 0 ? 1 : fixture.stock,
@@ -315,18 +303,18 @@ async function main() {
       });
     }
     if (inventory.locationId !== location.id && inventory.quantity > 0) {
-      inventory = await inventoryService.moveInventoryItem(db, actor, { id: inventory.id, toLocationId: location.id, reason: "Sincronizaci\u00f3n de fixture QA" });
+      inventory = await inventoryService.moveInventoryItem(db, { id: inventory.id, toLocationId: location.id, reason: "Sincronizaci\u00f3n de fixture QA" });
     }
     const desiredStatus = fixture.stock === 0 ? "SOLD" as const : "AVAILABLE" as const;
     if (inventory.quantity !== fixture.stock || inventory.status !== desiredStatus) {
-      inventory = await inventoryService.adjustInventoryQuantity(db, actor, { id: inventory.id, newQuantity: fixture.stock, newStatus: desiredStatus, reason: "Sincronizaci\u00f3n de fixture QA" });
+      inventory = await inventoryService.adjustInventoryQuantity(db, { id: inventory.id, newQuantity: fixture.stock, newStatus: desiredStatus, reason: "Sincronizaci\u00f3n de fixture QA" });
     }
 
     let images = await db.select().from(schema.productImages).where(eq(schema.productImages.productId, product.id)).orderBy(asc(schema.productImages.sortOrder), asc(schema.productImages.createdAt));
-    for (const extra of images.slice(2)) await imageService.deleteProductImage(db, actor, storage, extra.id);
+    for (const extra of images.slice(2)) await imageService.deleteProductImage(db, storage, extra.id);
     images = images.slice(0, 2);
     for (let index = images.length; index < 2; index += 1) {
-      await imageService.createProductImage(db, actor, storage, {
+      await imageService.createProductImage(db, storage, {
         productId: product.id,
         filename: `${fixture.partNumber.toLowerCase()}-${index + 1}.png`,
         mimeType: "image/png",
@@ -335,8 +323,8 @@ async function main() {
       });
     }
     images = await db.select().from(schema.productImages).where(eq(schema.productImages.productId, product.id)).orderBy(asc(schema.productImages.sortOrder), asc(schema.productImages.createdAt));
-    await imageService.reorderProductImages(db, actor, product.id, images.map((image) => image.id));
-    if (!images[0]?.isPrimary) await imageService.updateProductImage(db, actor, { imageId: images[0]!.id, makePrimary: true });
+    await imageService.reorderProductImages(db, product.id, images.map((image) => image.id));
+    if (!images[0]?.isPrimary) await imageService.updateProductImage(db, { imageId: images[0]!.id, makePrimary: true });
     completed.push({ product, fixture });
   }
 

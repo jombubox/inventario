@@ -5,8 +5,6 @@ import { and, eq, ne } from "drizzle-orm";
 import type { Database } from "@/db/connection";
 import { locations } from "@/db/schema";
 import { createAuditLog } from "@/features/audit/data/audit-log";
-import { assertPermission } from "@/features/auth/domain/permissions";
-import type { AuthenticatedUser } from "@/features/auth/server/authorization";
 import { assertValidLocationParent } from "@/features/locations/domain/location-hierarchy";
 import {
   ConcurrentModificationError,
@@ -43,10 +41,8 @@ async function assertCodeAvailable(
 
 export async function createLocation(
   db: Database,
-  actor: AuthenticatedUser,
   input: CreateLocationMutationInput,
 ) {
-  assertPermission(actor.role, "LOCATION_CREATE");
   return db.transaction(async (tx) => {
     await assertCodeAvailable(tx, input.code);
     if (input.parentId) {
@@ -60,7 +56,6 @@ export async function createLocation(
     const [location] = await tx.insert(locations).values(input).returning();
     if (!location) throw new Error("Location insert did not return a row.");
     await createAuditLog(tx, {
-      userId: actor.id,
       action: "LOCATION_CREATED",
       entityType: "LOCATION",
       entityId: location.id,
@@ -78,10 +73,8 @@ export async function createLocation(
 
 export async function updateLocation(
   db: Database,
-  actor: AuthenticatedUser,
   input: UpdateLocationMutationInput,
 ) {
-  assertPermission(actor.role, "LOCATION_UPDATE");
   return db.transaction(async (tx) => {
     const existing = await tx.query.locations.findFirst({
       where: eq(locations.id, input.id),
@@ -111,11 +104,10 @@ export async function updateLocation(
       )
       .returning();
     if (!updated) {
-      throw new ConcurrentModificationError("Location was modified by another user.");
+      throw new ConcurrentModificationError("Location was modified by another operation.");
     }
 
     await createAuditLog(tx, {
-      userId: actor.id,
       action: "LOCATION_UPDATED",
       entityType: "LOCATION",
       entityId: input.id,

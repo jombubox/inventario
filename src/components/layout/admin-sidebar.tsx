@@ -1,12 +1,11 @@
 import Link from "next/link";
 
 import { AdminNavLink } from "@/components/layout/admin-nav-link";
-import { navigationForRole } from "@/components/layout/admin-navigation";
+import { adminNavigation } from "@/components/layout/admin-navigation";
 import { Brand } from "@/components/layout/brand";
 import { Badge } from "@/components/ui/badge";
-import type { UserRole } from "@/features/auth/domain/permissions";
 
-export function AdminSidebar({ role }: { role: UserRole }) {
+export function AdminSidebar() {
   return (
     <aside className="sticky top-0 hidden h-dvh flex-col border-r border-border bg-card md:flex">
       <div className="flex h-18 items-center border-b border-border px-6">
@@ -23,7 +22,7 @@ export function AdminSidebar({ role }: { role: UserRole }) {
           Espacio de trabajo
         </p>
         <ul className="space-y-1">
-          {navigationForRole(role).map((item) => (
+          {adminNavigation.map((item) => (
             <li key={item.label}>
               <AdminNavLink href={item.href} label={item.label} short={item.short} />
             </li>
@@ -35,7 +34,7 @@ export function AdminSidebar({ role }: { role: UserRole }) {
           <Badge variant="primary">MVP</Badge>
           <p className="mt-2 text-small font-semibold text-navy">Operación administrativa</p>
           <p className="mt-1 text-small text-muted-foreground">
-            Acceso, catálogo e inventario protegidos por rol.
+            Acceso, catálogo e inventario protegidos.
           </p>
         </div>
       </div>

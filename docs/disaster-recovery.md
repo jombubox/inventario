@@ -9,7 +9,7 @@ Objetivos iniciales del MVP: RPO de 24 horas para el dump lógico externo (menor
 3. Si el incidente está dentro de la ventana, usar la restauración temporal/PITR de Neon. Si no, usar el último dump verificado.
 4. Para dump custom: `pg_restore --clean --if-exists --no-owner --no-acl --dbname "$RESTORE_DATABASE_URL" archivo.dump`.
 5. Ejecutar migraciones solo si el dump precede a la versión desplegada.
-6. Validar usuarios activos, productos, inventario, sumas de stock, movimientos, auditoría, importaciones y restricciones; probar login, catálogo y una mutación controlada.
+6. Validar productos, inventario, sumas de stock, movimientos, auditoría, importaciones y restricciones; probar login, catálogo y una mutación controlada.
 7. Cambiar `DATABASE_URL`, desplegar una versión conocida y realizar smoke test. Reabrir importaciones al final.
 
 ## Restaurar imágenes
@@ -28,7 +28,7 @@ Objetivos iniciales del MVP: RPO de 24 horas para el dump lógico externo (menor
 
 1. Revocar el valor en Neon o Cloudflare y preservar logs/request IDs sin copiar el secreto.
 2. Crear una credencial nueva de mínimo privilegio, actualizar el secret del Worker y desplegar.
-3. Si fue `BETTER_AUTH_SECRET`, asumir invalidadas todas las sesiones y avisar a operadores; si fue DB, comprobar conexiones anómalas.
+3. Si fue `AUTH_SECRET`, asumir invalidadas todas las sesiones y avisar a operadores; si fue DB, comprobar conexiones anómalas.
 4. Verificar login, importación o imágenes según la credencial afectada y retirar definitivamente la credencial anterior.
 
 ## Importación incorrecta
@@ -38,11 +38,10 @@ Objetivos iniciales del MVP: RPO de 24 horas para el dump lógico externo (menor
 3. Comparar en una rama restaurada o clon; decidir correcciones auditadas, archivo de productos o restauración completa según impacto.
 4. Reconciliar stock y catálogo antes de reactivar importaciones.
 
-## ADMIN bloqueado
+## Acceso administrativo bloqueado
 
-1. Confirmar que el problema no sea URL/origen, cookie o secreto rotado.
-2. Un operador DB autorizado puede reactivar una cuenta ADMIN conocida dentro de una transacción: `active=true`, `banned=false`, limpiar razón/expiración y eliminar sus sesiones para forzar login nuevo.
-3. Registrar manualmente el incidente y la intervención. No cambiar roles masivamente ni editar hashes.
-4. Tras recuperar acceso, crear un segundo ADMIN nominal desde la UI, verificarlo y desactivar la cuenta comprometida para revocar sus sesiones.
+1. Confirmar que `ADMIN_EMAIL`, `ADMIN_PASSWORD` y `AUTH_SECRET` estén presentes en el Worker correcto y que el navegador acepte la cookie.
+2. Rotar la contraseña o el secreto desde la plataforma y volver a desplegar. El acceso administrativo no depende de PostgreSQL y no se recupera editando tablas.
+3. Registrar manualmente el incidente y la intervención sin copiar credenciales ni cookies.
 
 Después del incidente: cronología, causa raíz, datos afectados, RPO/RTO reales, controles nuevos y evidencia de recuperación.

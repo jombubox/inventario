@@ -5,8 +5,6 @@ import { and, asc, count, eq, isNull, max, ne, sql } from "drizzle-orm";
 import type { Database } from "@/db/connection";
 import { productImages, products } from "@/db/schema";
 import { createAuditLog } from "@/features/audit/data/audit-log";
-import { assertPermission } from "@/features/auth/domain/permissions";
-import type { AuthenticatedUser } from "@/features/auth/server/authorization";
 import {
   allowedImageMimeTypes,
   assertSafeImageDescription,
@@ -43,7 +41,6 @@ async function assertImageCapacity(db: Database, productId: string) {
 
 export async function createProductImage(
   db: Database,
-  actor: AuthenticatedUser,
   storage: ImageStorage,
   input: {
     productId: string;
@@ -53,7 +50,6 @@ export async function createProductImage(
     alt?: string | null;
   },
 ) {
-  assertPermission(actor.role, "IMAGE_MANAGE");
   assertSafeImageDescription({
     filename: input.filename,
     mimeType: input.mimeType,
@@ -101,14 +97,12 @@ export async function createProductImage(
             filename: safeImageFilename(input.filename),
             mimeType,
             size: input.bytes.byteLength,
-            uploadedBy: actor.id,
           },
         })
         .returning();
       if (!created) throw new Error("No fue posible registrar la imagen.");
 
       await createAuditLog(tx, {
-        userId: actor.id,
         action: "PRODUCT_IMAGE_ADDED",
         entityType: "PRODUCT_IMAGE",
         entityId: created.id,
@@ -137,10 +131,8 @@ export async function createProductImage(
 
 export async function updateProductImage(
   db: Database,
-  actor: AuthenticatedUser,
   input: { imageId: string; alt?: string | null; makePrimary?: boolean },
 ) {
-  assertPermission(actor.role, "IMAGE_MANAGE");
   return db.transaction(async (tx) => {
     const image = await tx.query.productImages.findFirst({ where: eq(productImages.id, input.imageId) });
     if (!image) throw new EntityNotFoundError("La imagen no existe.");
@@ -148,23 +140,21 @@ export async function updateProductImage(
     if (input.makePrimary) {
       await tx.update(productImages).set({ isPrimary: false, updatedAt: new Date() }).where(eq(productImages.productId, image.productId));
       await tx.update(productImages).set({ isPrimary: true, updatedAt: new Date() }).where(eq(productImages.id, image.id));
-      await createAuditLog(tx, { userId: actor.id, action: "PRODUCT_PRIMARY_IMAGE_CHANGED", entityType: "PRODUCT_IMAGE", entityId: image.id, before: { isPrimary: image.isPrimary }, after: { isPrimary: true, productId: image.productId } });
+      await createAuditLog(tx, { action: "PRODUCT_PRIMARY_IMAGE_CHANGED", entityType: "PRODUCT_IMAGE", entityId: image.id, before: { isPrimary: image.isPrimary }, after: { isPrimary: true, productId: image.productId } });
     }
     if (input.alt !== undefined) {
       const alt = input.alt?.trim() || null;
       await tx.update(productImages).set({ alt, updatedAt: new Date() }).where(eq(productImages.id, image.id));
-      await createAuditLog(tx, { userId: actor.id, action: "PRODUCT_IMAGE_ALT_UPDATED", entityType: "PRODUCT_IMAGE", entityId: image.id, before: { alt: image.alt }, after: { alt, productId: image.productId } });
+      await createAuditLog(tx, { action: "PRODUCT_IMAGE_ALT_UPDATED", entityType: "PRODUCT_IMAGE", entityId: image.id, before: { alt: image.alt }, after: { alt, productId: image.productId } });
     }
   });
 }
 
 export async function reorderProductImages(
   db: Database,
-  actor: AuthenticatedUser,
   productId: string,
   imageIds: string[],
 ) {
-  assertPermission(actor.role, "IMAGE_MANAGE");
   if (imageIds.length > MAX_PRODUCT_IMAGES || new Set(imageIds).size !== imageIds.length) {
     throw new InvalidOperationError("El orden de imágenes no es válido.");
   }
@@ -177,17 +167,15 @@ export async function reorderProductImages(
     for (const [sortOrder, imageId] of imageIds.entries()) {
       await tx.update(productImages).set({ sortOrder, updatedAt: new Date() }).where(and(eq(productImages.id, imageId), eq(productImages.productId, productId)));
     }
-    await createAuditLog(tx, { userId: actor.id, action: "PRODUCT_IMAGE_REORDERED", entityType: "PRODUCT", entityId: productId, after: { imageIds } });
+    await createAuditLog(tx, { action: "PRODUCT_IMAGE_REORDERED", entityType: "PRODUCT", entityId: productId, after: { imageIds } });
   });
 }
 
 export async function deleteProductImage(
   db: Database,
-  actor: AuthenticatedUser,
   storage: ImageStorage,
   imageId: string,
 ) {
-  assertPermission(actor.role, "IMAGE_MANAGE");
   const image = await db.query.productImages.findFirst({ where: eq(productImages.id, imageId) });
   if (!image) throw new EntityNotFoundError("La imagen no existe.");
   if (image.provider !== R2_IMAGE_PROVIDER || !image.storageKey) {
@@ -205,7 +193,6 @@ export async function deleteProductImage(
   const pendingMetadata = {
     ...(image.metadata ?? {}),
     deletionPending: true,
-    deletionRequestedBy: actor.id,
   };
   await db
     .update(productImages)
@@ -221,6 +208,6 @@ export async function deleteProductImage(
     for (const [sortOrder, item] of remaining.entries()) {
       await tx.update(productImages).set({ sortOrder, isPrimary: image.isPrimary ? sortOrder === 0 : item.isPrimary, updatedAt: new Date() }).where(eq(productImages.id, item.id));
     }
-    await createAuditLog(tx, { userId: actor.id, action: "PRODUCT_IMAGE_REMOVED", entityType: "PRODUCT_IMAGE", entityId: image.id, before: { productId: image.productId, objectKey: image.storageKey, isPrimary: image.isPrimary } });
+    await createAuditLog(tx, { action: "PRODUCT_IMAGE_REMOVED", entityType: "PRODUCT_IMAGE", entityId: image.id, before: { productId: image.productId, objectKey: image.storageKey, isPrimary: image.isPrimary } });
   });
 }

@@ -10,9 +10,6 @@ import {
   products,
 } from "@/db/schema";
 import { createAuditLog } from "@/features/audit/data/audit-log";
-import { assertPermission } from "@/features/auth/domain/permissions";
-import { databaseUserIdForActor } from "@/features/auth/server/actor-attribution";
-import type { AuthenticatedUser } from "@/features/auth/server/authorization";
 import {
   ConcurrentModificationError,
   EntityNotFoundError,
@@ -45,10 +42,8 @@ async function assertActiveLocation(tx: Transaction, locationId: string): Promis
 
 export async function createInventoryItemInTransaction(
   tx: Transaction,
-  actor: AuthenticatedUser,
   input: CreateInventoryMutationInput,
 ) {
-  assertPermission(actor.role, "INVENTORY_CREATE");
   await assertProductExists(tx, input.productId);
     if (input.locationId) await assertActiveLocation(tx, input.locationId);
 
@@ -75,16 +70,14 @@ export async function createInventoryItemInTransaction(
       type: "INITIAL",
       quantity: item.quantity,
       toLocationId: item.locationId,
-      userId: databaseUserIdForActor(actor.id),
+      userId: null,
       reason: "Registro inicial de inventario",
       metadata: {
         initialQuantity: item.quantity,
         initialStatus: item.status,
-        actorId: actor.id,
       },
     });
     await createAuditLog(tx, {
-      userId: actor.id,
       action: "INVENTORY_CREATED",
       entityType: "INVENTORY_ITEM",
       entityId: item.id,
@@ -103,19 +96,15 @@ export async function createInventoryItemInTransaction(
 
 export async function createInventoryItem(
   db: Database,
-  actor: AuthenticatedUser,
   input: CreateInventoryMutationInput,
 ) {
-  assertPermission(actor.role, "INVENTORY_CREATE");
-  return db.transaction((tx) => createInventoryItemInTransaction(tx, actor, input));
+  return db.transaction((tx) => createInventoryItemInTransaction(tx, input));
 }
 
 export async function updateInventoryDetails(
   db: Database,
-  actor: AuthenticatedUser,
   input: UpdateInventoryDetailsMutationInput,
 ) {
-  assertPermission(actor.role, "INVENTORY_UPDATE");
   return db.transaction(async (tx) => {
     const existing = await tx.query.inventoryItems.findFirst({
       where: eq(inventoryItems.id, input.id),
@@ -142,11 +131,10 @@ export async function updateInventoryDetails(
       )
       .returning();
     if (!updated) {
-      throw new ConcurrentModificationError("Inventory item was modified by another user.");
+      throw new ConcurrentModificationError("Inventory item was modified by another operation.");
     }
 
     await createAuditLog(tx, {
-      userId: actor.id,
       action: "INVENTORY_UPDATED",
       entityType: "INVENTORY_ITEM",
       entityId: input.id,
@@ -172,10 +160,8 @@ export async function updateInventoryDetails(
 
 export async function moveInventoryItem(
   db: Database,
-  actor: AuthenticatedUser,
   input: { id: string; toLocationId: string; reason: string },
 ) {
-  assertPermission(actor.role, "INVENTORY_MOVE");
   return db.transaction(async (tx) => {
     const [item] = await tx
       .select()
@@ -205,12 +191,11 @@ export async function moveInventoryItem(
       quantity: item.quantity,
       fromLocationId: item.locationId,
       toLocationId: input.toLocationId,
-      userId: databaseUserIdForActor(actor.id),
+      userId: null,
       reason: input.reason,
-      metadata: { status: item.status, actorId: actor.id },
+      metadata: { status: item.status },
     });
     await createAuditLog(tx, {
-      userId: actor.id,
       action: "INVENTORY_MOVED",
       entityType: "INVENTORY_ITEM",
       entityId: item.id,
@@ -225,10 +210,8 @@ export async function moveInventoryItem(
 
 export async function adjustInventoryQuantity(
   db: Database,
-  actor: AuthenticatedUser,
   input: AdjustInventoryMutationInput,
 ) {
-  assertPermission(actor.role, "INVENTORY_UPDATE");
   return db.transaction(async (tx) => {
     const [item] = await tx
       .select()
@@ -257,7 +240,7 @@ export async function adjustInventoryQuantity(
       inventoryItemId: item.id,
       type: "ADJUSTMENT",
       quantity: Math.abs(delta),
-      userId: databaseUserIdForActor(actor.id),
+      userId: null,
       reason: input.reason,
       metadata: {
         fromQuantity: item.quantity,
@@ -265,11 +248,9 @@ export async function adjustInventoryQuantity(
         delta,
         fromStatus: item.status,
         toStatus: input.newStatus,
-        actorId: actor.id,
       },
     });
     await createAuditLog(tx, {
-      userId: actor.id,
       action: "INVENTORY_ADJUSTED",
       entityType: "INVENTORY_ITEM",
       entityId: item.id,
@@ -284,11 +265,9 @@ export async function adjustInventoryQuantity(
 
 export async function recordStockMovement(
   db: Database,
-  actor: AuthenticatedUser,
   input: StockMovementMutationInput,
 ) {
   const increasing = input.type === "IN" || input.type === "RETURN";
-  assertPermission(actor.role, increasing ? "INVENTORY_IN" : "INVENTORY_OUT");
 
   return db.transaction(async (tx) => {
     const [before] = await tx
@@ -345,14 +324,13 @@ export async function recordStockMovement(
       quantity: input.quantity,
       fromLocationId: increasing ? null : updated.locationId,
       toLocationId: increasing ? updated.locationId : null,
-      userId: databaseUserIdForActor(actor.id),
+      userId: null,
       reason: input.reason,
       metadata: {
         direction: increasing ? "IN" : "OUT",
         fromQuantity: before.quantity,
         toQuantity: updated.quantity,
         resultingStatus: updated.status,
-        actorId: actor.id,
       },
     });
     const action = {
@@ -362,7 +340,6 @@ export async function recordStockMovement(
       RETURN: "INVENTORY_RETURN",
     } as const;
     await createAuditLog(tx, {
-      userId: actor.id,
       action: action[input.type],
       entityType: "INVENTORY_ITEM",
       entityId: updated.id,

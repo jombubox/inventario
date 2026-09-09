@@ -1,8 +1,8 @@
 # Manual operativo breve
 
-## Acceso y roles
+## Acceso
 
-Entra por `/login` con la identidad administrativa configurada en el entorno del servidor. La sesión siempre tiene rol ADMIN y conserva todos los permisos de productos, inventario, ubicaciones, importaciones, imágenes, exportes y auditoría. El servidor vuelve a validar sesión y permiso aunque una acción se invoque fuera de la UI.
+Entra por `/login` con el correo y la contraseña administrativos configurados en el entorno del servidor. El servidor vuelve a validar la sesión firmada en todas las páginas, acciones y APIs administrativas, aunque una operación se invoque fuera de la UI.
 
 ## Flujo recomendado
 
@@ -23,14 +23,14 @@ No fuerces duplicados sin comprobar hash, SKU, número de bolsa y modelo. Descar
 
 ## Exportación
 
-ADMIN y EDITOR descargan **Exportar inventario** desde Inventario. El archivo contiene `Inventario`, `Productos`, `Ubicaciones` y `README`; es una fotografía del momento, no una fuente para editar la base. Su contenido es interno: puede incluir costos, adquisición, notas y ubicaciones.
+El administrador descarga **Exportar inventario** desde Inventario. El archivo contiene `Inventario`, `Productos`, `Ubicaciones` y `README`; es una fotografía del momento, no una fuente para editar la base. Su contenido es interno: puede incluir costos, adquisición, notas y ubicaciones.
 
 ## Incidentes
 
 - Stock incorrecto: no borres filas; registra un ajuste con motivo.
 - Ubicación incorrecta: usa movimiento para conservar trazabilidad.
 - Imagen defectuosa: retírala desde el producto y comprueba la entrega pública.
-- Credencial comprometida: rota `ADMIN_BOOTSTRAP_PASSWORD` en la plataforma y vuelve a desplegar; el cambio invalida las sesiones anteriores.
+- Credencial comprometida: rota `ADMIN_PASSWORD` y `AUTH_SECRET` en la plataforma y vuelve a desplegar; cambiar `AUTH_SECRET` invalida todas las sesiones anteriores.
 - Importación problemática: desactiva `ENABLE_IMPORTS`, conserva job/CSV y sigue `disaster-recovery.md`.
 - Error de plataforma: registra el `X-Request-Id`, hora UTC y acción, sin copiar cookies, tokens ni `DATABASE_URL`.
 

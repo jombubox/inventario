@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { Brand } from "@/components/layout/brand";
 import { Card, CardContent } from "@/components/ui/card";
 import { LoginForm } from "@/features/auth/components/login-form";
-import { getAuthenticatedUser } from "@/features/auth/server/authorization";
+import {
+  ADMIN_SESSION_COOKIE,
+  verifyAdminSession,
+} from "@/features/auth/server/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +19,8 @@ export const metadata: Metadata = {
 };
 
 export default async function LoginPage() {
-  if (await getAuthenticatedUser()) redirect("/admin");
+  const token = (await cookies()).get(ADMIN_SESSION_COOKIE)?.value;
+  if (await verifyAdminSession(token)) redirect("/admin");
 
   return (
     <main className="relative grid min-h-dvh place-items-center overflow-hidden bg-navy px-5 py-10">

@@ -2,12 +2,12 @@ import Link from "next/link";
 
 import { PageHeader } from "@/components/ui/page-header";
 import { getDb } from "@/db";
-import { requirePagePermission } from "@/features/auth/server/authorization";
+import { requireAdmin } from "@/features/auth/server/admin-auth";
 import { ProductForm } from "@/features/products/components/product-form";
 import { listProductCatalogOptions } from "@/features/products/data/admin-product-queries";
 
 export default async function NewProductPage() {
-  await requirePagePermission("PRODUCT_CREATE");
+  await requireAdmin();
   const options = await listProductCatalogOptions(getDb());
 
   return (

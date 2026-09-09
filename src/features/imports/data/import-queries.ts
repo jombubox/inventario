@@ -18,9 +18,6 @@ export async function listRecentImportJobs(db: Database, limit = 25) {
       createdAt: true,
       completedAt: true,
     },
-    with: {
-      creator: { columns: { name: true, email: true } },
-    },
     orderBy: (jobs) => desc(jobs.createdAt),
     limit: Math.min(100, Math.max(1, limit)),
   });

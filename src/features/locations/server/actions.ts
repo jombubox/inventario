@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { getDb } from "@/db";
-import { requirePermission } from "@/features/auth/server/authorization";
+import { requireAdmin } from "@/features/auth/server/admin-auth";
 import { createLocation, updateLocation } from "@/features/locations/server/location-service";
 import {
   errorState,
@@ -32,9 +32,9 @@ export async function createLocationAction(
 ): Promise<MutationState> {
   const parsed = createLocationMutationSchema.safeParse(locationFields(formData));
   if (!parsed.success) return validationState(parsed.error);
-  const actor = await requirePermission("LOCATION_CREATE");
+  await requireAdmin();
   try {
-    await createLocation(getDb(), actor, parsed.data);
+    await createLocation(getDb(), parsed.data);
     revalidatePath("/admin/ubicaciones");
     return { status: "success", message: "Ubicación creada." };
   } catch (error) {
@@ -52,9 +52,9 @@ export async function updateLocationAction(
     ...locationFields(formData),
   });
   if (!parsed.success) return validationState(parsed.error);
-  const actor = await requirePermission("LOCATION_UPDATE");
+  await requireAdmin();
   try {
-    await updateLocation(getDb(), actor, parsed.data);
+    await updateLocation(getDb(), parsed.data);
     revalidatePath("/admin/ubicaciones");
     revalidatePath("/admin/inventario");
     return { status: "success", message: "Ubicación actualizada." };

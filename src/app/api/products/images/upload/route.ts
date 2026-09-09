@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getDb } from "@/db";
-import { requirePermissionFromHeaders } from "@/features/auth/server/authorization";
+import { requireAdmin } from "@/features/auth/server/admin-auth";
 import { MAX_IMAGE_BYTES } from "@/features/images/domain/image-policy";
 import { imageErrorResponse } from "@/features/images/server/image-http";
 import { createProductImage } from "@/features/images/server/image-service";
@@ -17,15 +17,13 @@ const MAX_MULTIPART_OVERHEAD_BYTES = 1024 * 1024;
 
 export async function POST(request: Request) {
   const requestId = getRequestId(request);
-  let userId: string | undefined;
   try {
     assertSameOriginMutation(request);
-    const actor = await requirePermissionFromHeaders(request.headers, "IMAGE_MANAGE");
-    userId = actor.id;
+    await requireAdmin(request.headers);
     const db = getDb();
     await consumeOperationalRateLimit(db, {
       scope: "image-upload",
-      identity: actor.id,
+      identity: "admin",
       limit: 30,
       windowSeconds: 600,
     });
@@ -45,7 +43,7 @@ export async function POST(request: Request) {
       alt: form.get("alt") || undefined,
     });
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const image = await createProductImage(db, actor, createR2Storage(), {
+    const image = await createProductImage(db, createR2Storage(), {
       ...input,
       filename: file.name,
       mimeType: file.type,
@@ -54,6 +52,6 @@ export async function POST(request: Request) {
     revalidatePublicCatalog();
     return NextResponse.json({ image }, { status: 201, headers: requestIdHeaders(requestId) });
   } catch (error) {
-    return imageErrorResponse(error, { requestId, event: "image_upload_failed", userId });
+    return imageErrorResponse(error, { requestId, event: "image_upload_failed" });
   }
 }

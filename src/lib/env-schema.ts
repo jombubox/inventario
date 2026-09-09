@@ -32,8 +32,6 @@ export const databaseEnvSchema = z.object({
 
 const serverEnvironmentShape = databaseEnvSchema.extend({
   APP_ENV: z.enum(["development", "preview", "production"]).default("development"),
-  BETTER_AUTH_SECRET: z.string().min(32, "BETTER_AUTH_SECRET must be at least 32 characters"),
-  BETTER_AUTH_URL: optionalUrl,
   NEXT_PUBLIC_SITE_URL: optionalUrl,
   ENABLE_IMPORTS: booleanEnvironmentValue,
   CLOUDFLARE_ACCOUNT_ID: optionalSecret,
@@ -47,7 +45,6 @@ export const serverEnvSchema = serverEnvironmentShape.superRefine((environment, 
   if (environment.APP_ENV !== "production") return;
 
   for (const [key, value] of [
-    ["BETTER_AUTH_URL", environment.BETTER_AUTH_URL],
     ["NEXT_PUBLIC_SITE_URL", environment.NEXT_PUBLIC_SITE_URL],
   ] as const) {
     if (!value) {
@@ -66,19 +63,6 @@ export const serverEnvSchema = serverEnvironmentShape.superRefine((environment, 
         message: `${key} must be a non-local HTTPS origin in production`,
       });
     }
-  }
-
-  if (
-    environment.BETTER_AUTH_URL &&
-    environment.NEXT_PUBLIC_SITE_URL &&
-    new URL(environment.BETTER_AUTH_URL).origin !==
-      new URL(environment.NEXT_PUBLIC_SITE_URL).origin
-  ) {
-    context.addIssue({
-      code: "custom",
-      path: ["BETTER_AUTH_URL"],
-      message: "BETTER_AUTH_URL and NEXT_PUBLIC_SITE_URL must share an origin",
-    });
   }
 
   for (const [key, value] of [

@@ -39,7 +39,7 @@ AuditLog                  ImportJob
 - Una compatibilidad enlaza el producto con una marca y un modelo de televisor normalizado.
 - Una ubicación puede tener cero o un padre y cualquier cantidad de hijos.
 - Un inventario físico conserva su historial mediante muchos movimientos.
-- `AuditLog` e `ImportJob` quedan desacoplados de usuarios hasta que exista autenticación.
+- `AuditLog` e `ImportJob` usan atribución nullable/de sistema; la autenticación administrativa no depende de esas relaciones históricas.
 
 ## Tablas
 
@@ -76,7 +76,7 @@ No asume una profundidad fija, rechaza padres inexistentes, detecta ciclos y apl
 
 ### Operación futura
 
-- `audit_logs`: evento, entidad, snapshots JSONB y metadata. `user_id` queda nullable y sin FK hasta la fase de autenticación.
+- `audit_logs`: evento, entidad, snapshots JSONB y metadata. `user_id` conserva su relación histórica nullable; las operaciones actuales escriben `NULL`.
 - `import_jobs`: estado y conteos de un proceso de importación, errores/metadata JSONB y autor nullable. No almacena el XLSX.
 
 ## SKU de producto

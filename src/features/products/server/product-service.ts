@@ -10,8 +10,6 @@ import {
   products,
 } from "@/db/schema";
 import { createAuditLog } from "@/features/audit/data/audit-log";
-import type { AuthenticatedUser } from "@/features/auth/server/authorization";
-import { assertPermission } from "@/features/auth/domain/permissions";
 import { buildProductTitle } from "@/features/products/domain/build-product-title";
 import {
   appendSkuCollisionSuffix,
@@ -181,10 +179,8 @@ function productSnapshot(product: {
 
 export async function createProductInTransaction(
   tx: ProductTransaction,
-  actor: AuthenticatedUser,
   input: CreateProductMutationInput,
 ) {
-  assertPermission(actor.role, "PRODUCT_CREATE");
   const catalog = await loadCatalogContext(tx, input.brandId, input.componentTypeId);
     const compatibilities = normalizedCompatibilities(input.compatibilities);
     await assertCompatibilityBrandsExist(
@@ -262,7 +258,6 @@ export async function createProductInTransaction(
     }
 
     await createAuditLog(tx, {
-      userId: actor.id,
       action: "PRODUCT_CREATED",
       entityType: "PRODUCT",
       entityId: product.id,
@@ -274,19 +269,15 @@ export async function createProductInTransaction(
 
 export async function createProduct(
   db: Database,
-  actor: AuthenticatedUser,
   input: CreateProductMutationInput,
 ) {
-  assertPermission(actor.role, "PRODUCT_CREATE");
-  return db.transaction((tx) => createProductInTransaction(tx, actor, input));
+  return db.transaction((tx) => createProductInTransaction(tx, input));
 }
 
 export async function updateProduct(
   db: Database,
-  actor: AuthenticatedUser,
   input: UpdateProductMutationInput,
 ) {
-  assertPermission(actor.role, "PRODUCT_UPDATE");
   return db.transaction(async (tx) => {
     const existing = await tx.query.products.findFirst({
       where: and(eq(products.id, input.id), isNull(products.deletedAt)),
@@ -335,7 +326,7 @@ export async function updateProduct(
       .returning();
 
     if (!updated) {
-      throw new ConcurrentModificationError("Product was modified by another user.");
+      throw new ConcurrentModificationError("Product was modified by another operation.");
     }
 
     await tx
@@ -354,7 +345,6 @@ export async function updateProduct(
     }
 
     await createAuditLog(tx, {
-      userId: actor.id,
       action: "PRODUCT_UPDATED",
       entityType: "PRODUCT",
       entityId: input.id,
@@ -369,10 +359,8 @@ export async function updateProduct(
 
 export async function archiveProduct(
   db: Database,
-  actor: AuthenticatedUser,
   input: { id: string; expectedUpdatedAt: Date },
 ) {
-  assertPermission(actor.role, "PRODUCT_ARCHIVE");
   return db.transaction(async (tx) => {
     const existing = await tx.query.products.findFirst({
       where: and(eq(products.id, input.id), isNull(products.deletedAt)),
@@ -387,11 +375,10 @@ export async function archiveProduct(
       )
       .returning();
     if (!archived) {
-      throw new ConcurrentModificationError("Product was modified by another user.");
+      throw new ConcurrentModificationError("Product was modified by another operation.");
     }
 
     await createAuditLog(tx, {
-      userId: actor.id,
       action: "PRODUCT_ARCHIVED",
       entityType: "PRODUCT",
       entityId: input.id,

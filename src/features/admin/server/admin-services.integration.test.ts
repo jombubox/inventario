@@ -18,8 +18,6 @@ import {
   operationalRateLimits,
   productImages,
 } from "@/db/schema";
-import { ENV_ADMIN_ID } from "@/features/auth/domain/env-admin-session";
-import type { AuthenticatedUser } from "@/features/auth/server/authorization";
 import {
   adjustInventoryQuantity,
   createInventoryItem,
@@ -65,7 +63,6 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
   let pool: Pool;
   let nodeDb: NodePgDatabase<typeof schema>;
   let db: Database;
-  let actor: AuthenticatedUser;
 
   beforeAll(() => {
     pool = new Pool({ connectionString: testDatabaseUrl });
@@ -84,13 +81,6 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     `);
     await pool.query("alter sequence inventory_code_seq restart with 1");
     await seedDatabase(nodeDb);
-    actor = {
-      id: ENV_ADMIN_ID,
-      name: "Admin Test",
-      email: "admin@test.local",
-      role: "ADMIN",
-      active: true,
-    };
   });
 
   afterAll(async () => {
@@ -108,7 +98,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
 
   async function createTestProduct() {
     const { brand, componentType } = await catalogIds();
-    return createProduct(db, actor, {
+    return createProduct(db, {
       brandId: brand.id,
       componentTypeId: componentType.id,
       partNumber: "BN94-07820F",
@@ -130,7 +120,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
 
     const { brand, componentType } = await catalogIds();
     await expect(
-      updateProduct(db, actor, {
+      updateProduct(db, {
         id: product.id,
         expectedUpdatedAt: product.updatedAt,
         brandId: brand.id,
@@ -149,7 +139,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
       }),
     ).rejects.toBeInstanceOf(DuplicateEntityError);
 
-    const updated = await updateProduct(db, actor, {
+    const updated = await updateProduct(db, {
       id: product.id,
       expectedUpdatedAt: product.updatedAt,
       brandId: brand.id,
@@ -165,7 +155,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     });
     expect(updated.sku).toBe(product.sku);
 
-    const archived = await archiveProduct(db, actor, {
+    const archived = await archiveProduct(db, {
       id: product.id,
       expectedUpdatedAt: updated.updatedAt,
     });
@@ -180,9 +170,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
       .from(auditLogs);
     expect(attribution).not.toHaveLength(0);
     expect(attribution.every(({ userId }) => userId === null)).toBe(true);
-    expect(
-      attribution.every(({ metadata }) => metadata?.actorId === ENV_ADMIN_ID),
-    ).toBe(true);
+    expect(attribution.every(({ metadata }) => metadata?.actorId === undefined)).toBe(true);
   });
 
   it("serializes concurrent product identity allocation", async () => {
@@ -195,7 +183,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
 
   it("creates inventory, generates its code, moves it and adjusts stock atomically", async () => {
     const product = await createTestProduct();
-    const warehouse = await createLocation(db, actor, {
+    const warehouse = await createLocation(db, {
       code: "WH-01",
       name: "Almacén",
       type: "WAREHOUSE",
@@ -203,7 +191,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
       active: true,
       notes: null,
     });
-    const box = await createLocation(db, actor, {
+    const box = await createLocation(db, {
       code: "C03",
       name: "Caja 03",
       type: "BOX",
@@ -211,7 +199,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
       active: true,
       notes: null,
     });
-    const item = await createInventoryItem(db, actor, {
+    const item = await createInventoryItem(db, {
       productId: product.id,
       locationId: warehouse.id,
       quantity: 3,
@@ -226,21 +214,21 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     });
     expect(item.inventoryCode).toBe("INV-000001");
 
-    const moved = await moveInventoryItem(db, actor, {
+    const moved = await moveInventoryItem(db, {
       id: item.id,
       toLocationId: box.id,
       reason: "Reorganización",
     });
     expect(moved.locationId).toBe(box.id);
     await expect(
-      moveInventoryItem(db, actor, {
+      moveInventoryItem(db, {
         id: item.id,
         toLocationId: box.id,
         reason: "Movimiento repetido",
       }),
     ).rejects.toBeInstanceOf(InvalidOperationError);
 
-    const adjusted = await adjustInventoryQuantity(db, actor, {
+    const adjusted = await adjustInventoryQuantity(db, {
       id: item.id,
       newQuantity: 5,
       newStatus: "AVAILABLE",
@@ -264,7 +252,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
       );
     expect(audits).toHaveLength(3);
 
-    const entered = await recordStockMovement(db, actor, {
+    const entered = await recordStockMovement(db, {
       id: item.id,
       type: "IN",
       quantity: 2,
@@ -272,7 +260,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
       reason: "Compra adicional",
     });
     expect(entered.quantity).toBe(7);
-    const partialOut = await recordStockMovement(db, actor, {
+    const partialOut = await recordStockMovement(db, {
       id: item.id,
       type: "OUT",
       quantity: 3,
@@ -280,7 +268,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
       reason: "Salida a diagnóstico",
     });
     expect(partialOut).toMatchObject({ quantity: 4, status: "AVAILABLE" });
-    const sold = await recordStockMovement(db, actor, {
+    const sold = await recordStockMovement(db, {
       id: item.id,
       type: "SALE",
       quantity: 4,
@@ -288,14 +276,14 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
       reason: "Venta mostrador",
     });
     expect(sold).toMatchObject({ quantity: 0, status: "SOLD" });
-    await expect(recordStockMovement(db, actor, {
+    await expect(recordStockMovement(db, {
       id: item.id,
       type: "OUT",
       quantity: 1,
       resultingStatus: "SCRAPPED",
       reason: "Salida imposible",
     })).rejects.toBeInstanceOf(InvalidOperationError);
-    const returned = await recordStockMovement(db, actor, {
+    const returned = await recordStockMovement(db, {
       id: item.id,
       type: "RETURN",
       quantity: 1,
@@ -309,7 +297,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
 
   it("prevents overselling when two stock exits race", async () => {
     const product = await createTestProduct();
-    const item = await createInventoryItem(db, actor, {
+    const item = await createInventoryItem(db, {
       productId: product.id,
       locationId: null,
       quantity: 1,
@@ -324,8 +312,8 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     });
 
     const attempts = await Promise.allSettled([
-      recordStockMovement(db, actor, { id: item.id, type: "SALE", quantity: 1, resultingStatus: "SOLD", reason: "Venta A" }),
-      recordStockMovement(db, actor, { id: item.id, type: "SALE", quantity: 1, resultingStatus: "SOLD", reason: "Venta B" }),
+      recordStockMovement(db, { id: item.id, type: "SALE", quantity: 1, resultingStatus: "SOLD", reason: "Venta A" }),
+      recordStockMovement(db, { id: item.id, type: "SALE", quantity: 1, resultingStatus: "SOLD", reason: "Venta B" }),
     ]);
     expect(attempts.filter(({ status }) => status === "fulfilled")).toHaveLength(1);
     expect(attempts.filter(({ status }) => status === "rejected")).toHaveLength(1);
@@ -337,7 +325,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
   it("builds a four-sheet protected XLSX export with typed values", async () => {
     const product = await createTestProduct();
     await nodeDb.update(schema.products).set({ title: "=HYPERLINK(\"https://example.test\")" }).where(eq(schema.products.id, product.id));
-    await createInventoryItem(db, actor, {
+    await createInventoryItem(db, {
       productId: product.id,
       locationId: null,
       quantity: 2,
@@ -365,8 +353,8 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
   });
 
   it("enforces operational rate limits atomically", async () => {
-    await consumeOperationalRateLimit(db, { scope: "test", identity: actor.id, limit: 1, windowSeconds: 60 });
-    await expect(consumeOperationalRateLimit(db, { scope: "test", identity: actor.id, limit: 1, windowSeconds: 60 })).rejects.toBeInstanceOf(RateLimitExceededError);
+    await consumeOperationalRateLimit(db, { scope: "test", identity: "admin", limit: 1, windowSeconds: 60 });
+    await expect(consumeOperationalRateLimit(db, { scope: "test", identity: "admin", limit: 1, windowSeconds: 60 })).rejects.toBeInstanceOf(RateLimitExceededError);
     expect(await nodeDb.select().from(operationalRateLimits)).toHaveLength(1);
   });
 
@@ -379,7 +367,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     });
     const defaults = { condition: "UNKNOWN", inventoryStatus: "AVAILABLE", currency: "MXN", isPublic: false } as const;
-    const preview = await analyzeImportFile(db, actor, { file, defaults });
+    const preview = await analyzeImportFile(db, { file, defaults });
     expect(preview.rows[0]).toMatchObject({
       status: "WARNING",
       importable: true,
@@ -392,7 +380,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     });
     expect(preview.rows[0]?.normalized.proposedSku).not.toContain("J1B7");
 
-    const completed = await confirmImportFile(db, actor, {
+    const completed = await confirmImportFile(db, {
       file,
       jobId: preview.jobId,
       mapping: preview.mapping,
@@ -409,9 +397,9 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     expect(importedInventory).toMatchObject({ legacyBagNumber: "0042", legacyLocationCode: "J1B7" });
     expect(await nodeDb.query.importJobRows.findFirst({ where: eq(importJobRows.importJobId, preview.jobId) })).toMatchObject({ status: "IMPORTED" });
 
-    const duplicatePreview = await analyzeImportFile(db, actor, { file, defaults });
+    const duplicatePreview = await analyzeImportFile(db, { file, defaults });
     expect(duplicatePreview.duplicateFile).toBe(true);
-    await expect(confirmImportFile(db, actor, {
+    await expect(confirmImportFile(db, {
       file,
       jobId: duplicatePreview.jobId,
       mapping: duplicatePreview.mapping,
@@ -437,14 +425,14 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
         objects.delete(objectKey);
       },
     };
-    const first = await createProductImage(db, actor, storage, {
+    const first = await createProductImage(db, storage, {
       productId: product.id,
       filename: "frente.jpg",
       mimeType: "image/jpeg",
       bytes: Buffer.from("ffd8ffe00000000000000000", "hex"),
       alt: "Vista frontal",
     });
-    const second = await createProductImage(db, actor, storage, {
+    const second = await createProductImage(db, storage, {
       productId: product.id,
       filename: "reverso.png",
       mimeType: "image/png",
@@ -457,9 +445,9 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     expect(first.storageKey).toMatch(/^products\/SAM-MB-[A-Z0-9-]+\/[0-9a-f-]{36}\.jpg$/u);
     expect(objects.size).toBe(2);
 
-    await updateProductImage(db, actor, { imageId: second.id, makePrimary: true, alt: "Parte posterior" });
-    await reorderProductImages(db, actor, product.id, [second.id, first.id]);
-    await deleteProductImage(db, actor, storage, second.id);
+    await updateProductImage(db, { imageId: second.id, makePrimary: true, alt: "Parte posterior" });
+    await reorderProductImages(db, product.id, [second.id, first.id]);
+    await deleteProductImage(db, storage, second.id);
     const remaining = await nodeDb.select().from(productImages).where(eq(productImages.productId, product.id));
     expect(remaining).toHaveLength(1);
     expect(remaining[0]).toMatchObject({ id: first.id, isPrimary: true, sortOrder: 0 });
@@ -468,7 +456,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
   });
 
   it("creates and edits locations while rejecting self-parent and cycles", async () => {
-    const root = await createLocation(db, actor, {
+    const root = await createLocation(db, {
       code: "WH-01",
       name: "Almacén",
       type: "WAREHOUSE",
@@ -476,7 +464,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
       active: true,
       notes: null,
     });
-    const child = await createLocation(db, actor, {
+    const child = await createLocation(db, {
       code: "J1",
       name: "Estante J1",
       type: "SHELF",
@@ -485,7 +473,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
       notes: null,
     });
     await expect(
-      updateLocation(db, actor, {
+      updateLocation(db, {
         id: root.id,
         expectedUpdatedAt: root.updatedAt,
         code: root.code,
@@ -497,7 +485,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
       }),
     ).rejects.toThrow(/cycle/u);
     await expect(
-      updateLocation(db, actor, {
+      updateLocation(db, {
         id: child.id,
         expectedUpdatedAt: child.updatedAt,
         code: child.code,

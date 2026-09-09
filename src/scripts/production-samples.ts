@@ -20,7 +20,6 @@ import {
   getPublicProductBySlug,
   getPublicProducts,
 } from "@/features/catalog/data/public-catalog-queries";
-import type { AuthenticatedUser } from "@/features/auth/server/authorization";
 import {
   createProductImage,
   deleteProductImage,
@@ -97,14 +96,6 @@ type SampleProductRow = {
   stock: number;
   location: string | null;
   imageCount: number;
-};
-
-const SAMPLE_SEED_ACTOR: AuthenticatedUser = {
-  id: "system-production-sample-seed",
-  name: "JombuBox sample seeder",
-  email: "system@jombubox.invalid",
-  role: "ADMIN",
-  active: true,
 };
 
 function hasProductionConfirmation(): boolean {
@@ -263,14 +254,13 @@ function createSamplePng(color: readonly [number, number, number], variant: numb
 
 async function ensureLocation(
   db: Database,
-  actor: AuthenticatedUser,
   definition: { code: string; name: string },
 ) {
   let location = await db.query.locations.findFirst({
     where: eq(locations.code, definition.code),
   });
   if (!location) {
-    location = await createLocation(db, actor, {
+    location = await createLocation(db, {
       ...definition,
       type: "BOX",
       parentId: null,
@@ -284,7 +274,6 @@ async function ensureLocation(
 
 async function ensureSampleProducts(
   db: Database,
-  actor: AuthenticatedUser,
   storage: ImageStorage,
 ) {
   const existingSamples = await db
@@ -303,7 +292,7 @@ async function ensureSampleProducts(
     const [brand, componentType, location] = await Promise.all([
       ensureBrand(db, definition.brand),
       ensureComponentType(db, definition.componentType),
-      ensureLocation(db, actor, definition.location),
+      ensureLocation(db, definition.location),
     ]);
     const productInput = {
       brandId: brand.id,
@@ -325,7 +314,7 @@ async function ensureSampleProducts(
       where: and(eq(products.title, definition.title), isNull(products.deletedAt)),
     });
     if (!product) {
-      product = await createProduct(db, actor, productInput);
+      product = await createProduct(db, productInput);
     } else {
       if (
         product.brandId !== brand.id ||
@@ -334,7 +323,7 @@ async function ensureSampleProducts(
       ) {
         throw new Error(`Existing sample identity is inconsistent: ${definition.title}.`);
       }
-      product = await updateProduct(db, actor, {
+      product = await updateProduct(db, {
         ...productInput,
         id: product.id,
         expectedUpdatedAt: product.updatedAt,
@@ -351,7 +340,7 @@ async function ensureSampleProducts(
     }
     let inventory = inventoryRows[0];
     if (!inventory) {
-      inventory = await createInventoryItem(db, actor, {
+      inventory = await createInventoryItem(db, {
         productId: product.id,
         locationId: location.id,
         quantity: definition.stock,
@@ -365,7 +354,7 @@ async function ensureSampleProducts(
         legacyLocationCode: definition.location.name,
       });
     } else {
-      inventory = await updateInventoryDetails(db, actor, {
+      inventory = await updateInventoryDetails(db, {
         id: inventory.id,
         expectedUpdatedAt: inventory.updatedAt,
         condition: definition.condition,
@@ -377,14 +366,14 @@ async function ensureSampleProducts(
         legacyLocationCode: definition.location.name,
       });
       if (inventory.locationId !== location.id) {
-        inventory = await moveInventoryItem(db, actor, {
+        inventory = await moveInventoryItem(db, {
           id: inventory.id,
           toLocationId: location.id,
           reason: "Production sample seed synchronization",
         });
       }
       if (inventory.quantity === definition.stock && inventory.status !== "AVAILABLE") {
-        inventory = await adjustInventoryQuantity(db, actor, {
+        inventory = await adjustInventoryQuantity(db, {
           id: inventory.id,
           newQuantity: definition.stock + 1,
           newStatus: "AVAILABLE",
@@ -392,7 +381,7 @@ async function ensureSampleProducts(
         });
       }
       if (inventory.quantity !== definition.stock || inventory.status !== "AVAILABLE") {
-        inventory = await adjustInventoryQuantity(db, actor, {
+        inventory = await adjustInventoryQuantity(db, {
           id: inventory.id,
           newQuantity: definition.stock,
           newStatus: "AVAILABLE",
@@ -408,11 +397,11 @@ async function ensureSampleProducts(
       .where(eq(productImages.productId, product.id))
       .orderBy(asc(productImages.sortOrder), asc(productImages.createdAt));
     for (const extra of images.slice(1)) {
-      await deleteProductImage(db, actor, storage, extra.id);
+      await deleteProductImage(db, storage, extra.id);
     }
     images = images.slice(0, 1);
     if (images.length === 0) {
-      await createProductImage(db, actor, storage, {
+      await createProductImage(db, storage, {
         productId: product.id,
         filename: `${definition.partNumber.toLowerCase()}-sample.png`,
         mimeType: "image/png",
@@ -428,12 +417,12 @@ async function ensureSampleProducts(
     }
     const image = images[0];
     if (!image) throw new Error(`Sample image was not created: ${definition.title}.`);
-    if (image.sortOrder !== 0) await reorderProductImages(db, actor, product.id, [image.id]);
+    if (image.sortOrder !== 0) await reorderProductImages(db, product.id, [image.id]);
     if (!image.isPrimary) {
-      await updateProductImage(db, actor, { imageId: image.id, makePrimary: true });
+      await updateProductImage(db, { imageId: image.id, makePrimary: true });
     }
     if (image.alt !== definition.title) {
-      await updateProductImage(db, actor, { imageId: image.id, alt: definition.title });
+      await updateProductImage(db, { imageId: image.id, alt: definition.title });
     }
 
     ensured.push({
@@ -642,7 +631,7 @@ async function removeSampleProducts(
   r2.client.destroy();
 
   for (const image of images) {
-    await deleteProductImage(db, SAMPLE_SEED_ACTOR, storage, image.id);
+    await deleteProductImage(db, storage, image.id);
     if (image.storageKey) allObjectKeys.delete(image.storageKey);
   }
   for (const orphanKey of allObjectKeys) await storage.deleteObject(orphanKey);
@@ -696,7 +685,7 @@ async function main(): Promise<void> {
     requireProductionConfirmation(environment);
     const db = createDatabaseClient(environment.DATABASE_URL);
     const storage = createR2Storage(environment);
-    const productResult = await ensureSampleProducts(db, SAMPLE_SEED_ACTOR, storage);
+    const productResult = await ensureSampleProducts(db, storage);
     const verified = await verifySampleState(db, environment);
     console.info(`Products: ${verified.products.length}; images uploaded this run: ${productResult.imagesUploaded}.`);
     for (const product of verified.products) console.info(`${product.title}: ${product.sku}`);

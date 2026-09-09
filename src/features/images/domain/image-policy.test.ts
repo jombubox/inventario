@@ -38,9 +38,9 @@ describe("image upload policy", () => {
 
   it("reads only its own runtime binding when building a public image URL", () => {
     vi.stubEnv("R2_PUBLIC_URL", "https://images.example.com");
-    vi.stubEnv("ADMIN_BOOTSTRAP_NAME", "");
-    vi.stubEnv("ADMIN_BOOTSTRAP_EMAIL", "");
-    vi.stubEnv("ADMIN_BOOTSTRAP_PASSWORD", "");
+    vi.stubEnv("ADMIN_EMAIL", "");
+    vi.stubEnv("ADMIN_PASSWORD", "");
+    vi.stubEnv("AUTH_SECRET", "");
 
     const objectKey = createProductImageObjectKey("JBX-CHAIR-000123", "image/webp");
     expect(getR2PublicUrl(objectKey)).toBe(`https://images.example.com/${objectKey}`);

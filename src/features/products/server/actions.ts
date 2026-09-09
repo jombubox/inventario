@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { getDb } from "@/db";
-import { requirePermission } from "@/features/auth/server/authorization";
+import { requireAdmin } from "@/features/auth/server/admin-auth";
 import { revalidatePublicCatalog } from "@/features/catalog/server/revalidation";
 import { archiveProduct, createProduct, updateProduct } from "@/features/products/server/product-service";
 import {
@@ -50,10 +50,10 @@ export async function createProductAction(
   const parsed = createProductMutationSchema.safeParse(productFields(formData));
   if (!parsed.success) return validationState(parsed.error);
 
-  const actor = await requirePermission("PRODUCT_CREATE");
+  await requireAdmin();
   let productId: string;
   try {
-    const product = await createProduct(getDb(), actor, parsed.data);
+    const product = await createProduct(getDb(), parsed.data);
     productId = product.id;
   } catch (error) {
     return errorState(error);
@@ -76,10 +76,10 @@ export async function updateProductAction(
   });
   if (!parsed.success) return validationState(parsed.error);
 
-  const actor = await requirePermission("PRODUCT_UPDATE");
+  await requireAdmin();
   let productSlug: string;
   try {
-    const product = await updateProduct(getDb(), actor, parsed.data);
+    const product = await updateProduct(getDb(), parsed.data);
     productSlug = product.slug;
   } catch (error) {
     return errorState(error);
@@ -102,10 +102,10 @@ export async function archiveProductAction(
   });
   if (!parsed.success) return validationState(parsed.error);
 
-  const actor = await requirePermission("PRODUCT_ARCHIVE");
+  await requireAdmin();
   let productSlug: string;
   try {
-    const product = await archiveProduct(getDb(), actor, parsed.data);
+    const product = await archiveProduct(getDb(), parsed.data);
     productSlug = product.slug;
   } catch (error) {
     return errorState(error);

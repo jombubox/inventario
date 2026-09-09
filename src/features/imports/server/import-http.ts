@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
-import { ForbiddenError, UnauthorizedError } from "@/features/auth/domain/auth-errors";
+import { UnauthorizedError } from "@/features/auth/domain/auth-errors";
 import { MAX_XLSX_BYTES } from "@/features/imports/domain/xlsx-security";
 import {
   FeatureDisabledError,
@@ -9,11 +9,11 @@ import {
   RateLimitExceededError,
 } from "@/features/shared/domain/service-errors";
 import { logServerError, requestIdHeaders } from "@/lib/observability";
+import { InvalidRequestOriginError } from "@/lib/request-security";
 
 type ImportErrorContext = {
   requestId: string;
   event: string;
-  userId?: string;
 };
 
 export function importErrorResponse(error: unknown, context: ImportErrorContext) {
@@ -24,9 +24,9 @@ export function importErrorResponse(error: unknown, context: ImportErrorContext)
       { status: 401, headers },
     );
   }
-  if (error instanceof ForbiddenError) {
+  if (error instanceof InvalidRequestOriginError) {
     return NextResponse.json(
-      { error: "No tienes permiso para realizar esta acción.", code: "FORBIDDEN", requestId: context.requestId },
+      { error: "La solicitud proviene de un origen no permitido.", code: "INVALID_REQUEST_ORIGIN", requestId: context.requestId },
       { status: 403, headers },
     );
   }

@@ -6,7 +6,7 @@
 - [x] Build Next y OpenNext ejecutados en entorno Linux/CI.
 - [x] Migración `0005` probada desde una base vacía.
 - [x] Concurrencia de stock y SKU probada sobre PostgreSQL real.
-- [x] Roles, filtrado público, XLSX e imágenes cubiertos por E2E/fakes.
+- [x] Sesión administrativa, filtrado público, XLSX e imágenes cubiertos por E2E/fakes.
 - [ ] Tomar backup verificado inmediatamente antes del lanzamiento.
 - [ ] Aplicar migraciones a producción y conservar salida de CI.
 
@@ -14,7 +14,7 @@
 
 - [ ] Cloudflare preview ejecutado con base no productiva y smoke test aprobado.
 - [ ] Dominio final confirmado en ambas URLs públicas.
-- [ ] `BETTER_AUTH_SECRET` y los tres bindings runtime `ADMIN_BOOTSTRAP_*` creados/rotados y no compartidos por chat.
+- [ ] `ADMIN_EMAIL`, `ADMIN_PASSWORD` y `AUTH_SECRET` creados/rotados como bindings runtime y no compartidos por chat.
 - [ ] Retención PITR/restore de Neon confirmada contractualmente.
 - [ ] Objetos de imágenes respaldados o versionados en Cloudflare R2.
 - [ ] Workers Logs, alertas, WAF rate limits y health monitor activos.
@@ -24,7 +24,7 @@
 
 - [ ] `/api/health` devuelve 200 y un `X-Request-Id`.
 - [ ] Home, búsqueda, filtros, detalle, 404 privada y sitemap.
-- [ ] Login ENV ADMIN con credencial correcta; refresh y navegación conservan la sesión.
+- [ ] Login administrativo con credencial correcta; refresh y navegación conservan la sesión.
 - [ ] Correo incorrecto y contraseña incorrecta se rechazan sin crear cookie.
 - [ ] Logout elimina la sesión y `/admin` vuelve a redirigir a `/login`.
 - [ ] Crear producto, existencia, movimiento y ubicación de prueba.

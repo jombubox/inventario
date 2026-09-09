@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { getDb } from "@/db";
-import { requirePermission } from "@/features/auth/server/authorization";
+import { requireAdmin } from "@/features/auth/server/admin-auth";
 import { revalidatePublicCatalog } from "@/features/catalog/server/revalidation";
 import {
   adjustInventoryQuantity,
@@ -44,9 +44,9 @@ export async function createInventoryAction(
   });
   if (!parsed.success) return validationState(parsed.error);
 
-  const actor = await requirePermission("INVENTORY_CREATE");
+  await requireAdmin();
   try {
-    const item = await createInventoryItem(getDb(), actor, parsed.data);
+    const item = await createInventoryItem(getDb(), parsed.data);
     revalidatePath("/admin");
     revalidatePath("/admin/inventario");
     revalidatePath("/admin/productos");
@@ -74,9 +74,9 @@ export async function updateInventoryDetailsAction(
   });
   if (!parsed.success) return validationState(parsed.error);
 
-  const actor = await requirePermission("INVENTORY_UPDATE");
+  await requireAdmin();
   try {
-    await updateInventoryDetails(getDb(), actor, parsed.data);
+    await updateInventoryDetails(getDb(), parsed.data);
     revalidatePath("/admin/inventario");
     revalidatePublicCatalog();
     return { status: "success", message: "Datos del inventario actualizados." };
@@ -96,9 +96,9 @@ export async function moveInventoryAction(
   });
   if (!parsed.success) return validationState(parsed.error);
 
-  const actor = await requirePermission("INVENTORY_MOVE");
+  await requireAdmin();
   try {
-    await moveInventoryItem(getDb(), actor, parsed.data);
+    await moveInventoryItem(getDb(), parsed.data);
     revalidatePath("/admin");
     revalidatePath("/admin/inventario");
     revalidatePath("/admin/productos");
@@ -121,9 +121,9 @@ export async function adjustInventoryAction(
   });
   if (!parsed.success) return validationState(parsed.error);
 
-  const actor = await requirePermission("INVENTORY_UPDATE");
+  await requireAdmin();
   try {
-    await adjustInventoryQuantity(getDb(), actor, parsed.data);
+    await adjustInventoryQuantity(getDb(), parsed.data);
     revalidatePath("/admin");
     revalidatePath("/admin/inventario");
     revalidatePath("/admin/productos");
@@ -147,12 +147,9 @@ export async function stockMovementAction(
   });
   if (!parsed.success) return validationState(parsed.error);
 
-  const permission = parsed.data.type === "IN" || parsed.data.type === "RETURN"
-    ? "INVENTORY_IN"
-    : "INVENTORY_OUT";
-  const actor = await requirePermission(permission);
+  await requireAdmin();
   try {
-    await recordStockMovement(getDb(), actor, parsed.data);
+    await recordStockMovement(getDb(), parsed.data);
     revalidatePath("/admin");
     revalidatePath("/admin/inventario");
     revalidatePath("/admin/movimientos");

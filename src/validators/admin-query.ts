@@ -46,7 +46,6 @@ const optionalDateParam = z.preprocess(
 export const movementListQuerySchema = z.object({
   q: z.string().trim().max(100).catch("").default(""),
   type: z.enum(inventoryMovementTypeValues).optional(),
-  userId: z.uuid().optional(),
   location: z.string().trim().max(100).optional(),
   from: optionalDateParam,
   to: optionalDateParam,
@@ -58,7 +57,6 @@ export const auditListQuerySchema = z.object({
   q: z.string().trim().max(100).catch("").default(""),
   action: z.string().trim().max(100).optional(),
   entityType: z.string().trim().max(100).optional(),
-  userId: z.uuid().optional(),
   from: optionalDateParam,
   to: optionalDateParam,
   page: z.coerce.number().int().positive().catch(1).default(1),

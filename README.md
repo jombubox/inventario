@@ -1,6 +1,6 @@
 # JombuBox
 
-JombuBox es el MVP operativo para catalogar refacciones electrónicas, controlar existencias físicas e importar el inventario legacy, con un catálogo público que nunca expone datos internos. La Fase 5/5 cierra seguridad, permisos, exportación XLSX, observabilidad, rendimiento, QA, respaldos y operación en Cloudflare Workers.
+JombuBox es el MVP operativo para catalogar refacciones electrónicas, controlar existencias físicas e importar el inventario legacy, con un catálogo público que nunca expone datos internos. La Fase 5/5 cierra seguridad, exportación XLSX, observabilidad, rendimiento, QA, respaldos y operación en Cloudflare Workers.
 
 ## Requisitos
 
@@ -21,13 +21,12 @@ Copia `.env.example` a `.env.local` y define valores reales. Nunca publiques ese
 | Variable | Uso |
 |---|---|
 | `DATABASE_URL` | Conexión pooled de Neon |
-| `BETTER_AUTH_SECRET` | Secreto aleatorio de al menos 32 caracteres |
-| `BETTER_AUTH_URL` | Origen HTTPS canónico de autenticación |
+| `ADMIN_EMAIL` | Correo server-only del único administrador |
+| `ADMIN_PASSWORD` | Contraseña server-only del único administrador |
+| `AUTH_SECRET` | Secreto aleatorio server-only de al menos 32 caracteres para firmar sesiones |
 | `NEXT_PUBLIC_SITE_URL` | Origen HTTPS de metadata, sitemap y enlaces |
 | `APP_ENV` | `development`, `preview` o `production` |
 | `ENABLE_IMPORTS` | Kill switch del importador |
-| `ADMIN_BOOTSTRAP_NAME` / `ADMIN_BOOTSTRAP_EMAIL` | Identidad canónica server-only del único ADMIN |
-| `ADMIN_BOOTSTRAP_PASSWORD` | Credencial canónica server-only de al menos 16 caracteres; nunca se imprime ni persiste |
 | `CLOUDFLARE_ACCOUNT_ID` | Identificador de la cuenta Cloudflare |
 | `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | Credenciales R2 server-only |
 | `R2_BUCKET_NAME` | Bucket canónico de imágenes |
@@ -43,7 +42,7 @@ pnpm db:seed
 pnpm dev
 ```
 
-No existe registro público ni usuarios administrativos en PostgreSQL. `/login` compara las credenciales exclusivamente en el servidor con `ADMIN_BOOTSTRAP_*` y emite una sesión firmada, `HttpOnly`, `SameSite=Lax` y `Secure` en producción. `BETTER_AUTH_SECRET` firma la sesión y la contraseña nunca forma parte de la cookie.
+No existe registro público ni identidad administrativa en PostgreSQL. `/login` compara las credenciales exclusivamente en el servidor con `ADMIN_EMAIL` y `ADMIN_PASSWORD`. `AUTH_SECRET` firma una cookie de sesión HMAC, `HttpOnly`, `SameSite=Lax`, con expiración de 12 horas y `Secure` en producción. La cookie solo contiene la marca administrativa y su expiración; el correo y la contraseña nunca forman parte de ella.
 
 ### Productos de muestra de producción
 
@@ -65,9 +64,9 @@ pnpm production:remove-samples --confirm-production
 - `/`, `/catalogo`, `/catalogo/[slug]`: catálogo público.
 - `/sitemap.xml`, `/robots.txt`: descubrimiento SEO.
 - `/login`: acceso interno.
-- `/admin`: productos, inventario, ubicaciones, importación, imágenes, movimientos, auditoría y configuración del administrador.
+- `/admin`: productos, inventario, ubicaciones, importación, imágenes, movimientos y auditoría.
 - `/api/health`: liveness sin consulta a DB ni secretos.
-- `/api/exports/inventory`: exportación protegida ADMIN/EDITOR.
+- `/api/exports/inventory`: exportación protegida por la sesión administrativa.
 
 ## Comandos
 
@@ -121,7 +120,7 @@ src/
     inventory/         # Existencias y movimientos transaccionales
     imports|exports/   # Migración legacy y salida XLSX
     images/            # Validación, almacenamiento R2 y URLs públicas
-    auth|users|audit|locations|admin|security/
+    auth|audit|locations|admin|security/
   validators/          # Contratos Zod server-side
   lib/                 # Auth, entorno, redacción y observabilidad
 tests/e2e/             # Flujos de aceptación desktop/mobile

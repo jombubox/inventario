@@ -1,9 +1,12 @@
-import { ForbiddenError } from "@/features/auth/domain/auth-errors";
 import { logServerEvent } from "@/lib/observability";
+
+export class InvalidRequestOriginError extends Error {
+  override readonly name = "InvalidRequestOriginError";
+}
 
 export function assertSameOriginMutation(request: Request): void {
   if (request.headers.get("sec-fetch-site") === "cross-site") {
-    throw new ForbiddenError("Cross-site mutation rejected.");
+    throw new InvalidRequestOriginError("Cross-site mutation rejected.");
   }
   const origin = request.headers.get("origin");
   if (!origin) {
@@ -14,7 +17,7 @@ export function assertSameOriginMutation(request: Request): void {
       host: request.headers.get("host"),
       secFetchSite: request.headers.get("sec-fetch-site"),
     });
-    throw new ForbiddenError("Mutation origin is required.");
+    throw new InvalidRequestOriginError("Mutation origin is required.");
   }
   const requestHost = new URL(request.url).host;
   const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
@@ -23,7 +26,7 @@ export function assertSameOriginMutation(request: Request): void {
   try {
     originHost = new URL(origin).host;
   } catch {
-    throw new ForbiddenError("Request origin is invalid.");
+    throw new InvalidRequestOriginError("Request origin is invalid.");
   }
   const allowedHosts = new Set(
     [requestHost, forwardedHost, host]
@@ -40,6 +43,6 @@ export function assertSameOriginMutation(request: Request): void {
       forwardedProto: request.headers.get("x-forwarded-proto"),
       secFetchSite: request.headers.get("sec-fetch-site"),
     });
-    throw new ForbiddenError("Cross-origin mutation rejected.");
+    throw new InvalidRequestOriginError("Cross-origin mutation rejected.");
   }
 }

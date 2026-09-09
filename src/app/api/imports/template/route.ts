@@ -1,5 +1,5 @@
 import { getDb } from "@/db";
-import { requirePermissionFromHeaders } from "@/features/auth/server/authorization";
+import { requireAdmin } from "@/features/auth/server/admin-auth";
 import { importErrorResponse } from "@/features/imports/server/import-http";
 import { buildInventoryTemplate } from "@/features/imports/server/template-workbook";
 import { getRequestId, requestIdHeaders } from "@/lib/observability";
@@ -8,10 +8,8 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const requestId = getRequestId(request);
-  let userId: string | undefined;
   try {
-    const actor = await requirePermissionFromHeaders(request.headers, "IMPORT_READ");
-    userId = actor.id;
+    await requireAdmin(request.headers);
     const bytes = await buildInventoryTemplate(getDb());
     return new Response(bytes, {
       headers: {
@@ -23,6 +21,6 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
-    return importErrorResponse(error, { requestId, event: "import_template_failed", userId });
+    return importErrorResponse(error, { requestId, event: "import_template_failed" });
   }
 }
