@@ -44,6 +44,7 @@ import {
   createProduct,
   updateProduct,
 } from "@/features/products/server/product-service";
+import { CUSTOM_CATALOG_VALUE } from "@/features/products/domain/catalog-selection";
 import {
   DuplicateEntityError,
   InvalidOperationError,
@@ -179,6 +180,139 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     const rejected = attempts.find(({ status }) => status === "rejected");
     expect(rejected).toMatchObject({ reason: expect.any(DuplicateEntityError) });
     expect(await nodeDb.select().from(schema.products)).toHaveLength(1);
+  });
+
+  it("creates and reuses custom brand and component catalogs transactionally", async () => {
+    const first = await createProduct(db, {
+      brandId: CUSTOM_CATALOG_VALUE,
+      customBrandName: "  Marca Ñueva  ",
+      componentTypeId: CUSTOM_CATALOG_VALUE,
+      customComponentTypeName: "  Módulo   especial  ",
+      partNumber: "CUSTOM-001",
+      title: null,
+      description: null,
+      salePrice: null,
+      currency: "MXN",
+      status: "DRAFT",
+      isPublic: false,
+      compatibilities: [],
+    });
+    const second = await createProduct(db, {
+      brandId: CUSTOM_CATALOG_VALUE,
+      customBrandName: "marca nueva",
+      componentTypeId: CUSTOM_CATALOG_VALUE,
+      customComponentTypeName: "MÓDULO ESPECIAL",
+      partNumber: "CUSTOM-002",
+      title: null,
+      description: null,
+      salePrice: null,
+      currency: "MXN",
+      status: "DRAFT",
+      isPublic: false,
+      compatibilities: [],
+    });
+
+    expect(second.brandId).toBe(first.brandId);
+    expect(second.componentTypeId).toBe(first.componentTypeId);
+    expect(await nodeDb.select().from(brands).where(eq(brands.id, first.brandId))).toEqual([
+      expect.objectContaining({ name: "Marca Ñueva", normalizedName: "MARCA NUEVA" }),
+    ]);
+    expect(
+      await nodeDb.select().from(componentTypes).where(eq(componentTypes.id, first.componentTypeId)),
+    ).toEqual([
+      expect.objectContaining({ name: "Módulo especial", normalizedName: "MODULO ESPECIAL" }),
+    ]);
+
+    const seeded = await catalogIds();
+    const existingCatalogProduct = await createProduct(db, {
+      brandId: CUSTOM_CATALOG_VALUE,
+      customBrandName: "  samsung ",
+      componentTypeId: CUSTOM_CATALOG_VALUE,
+      customComponentTypeName: " MAINBOARD ",
+      partNumber: "CUSTOM-EXISTING-001",
+      title: null,
+      description: null,
+      salePrice: null,
+      currency: "MXN",
+      status: "DRAFT",
+      isPublic: false,
+      compatibilities: [],
+    });
+    expect(existingCatalogProduct.brandId).toBe(seeded.brand.id);
+    expect(existingCatalogProduct.componentTypeId).toBe(seeded.componentType.id);
+
+    const [hisense, tCon] = await Promise.all([
+      nodeDb.query.brands.findFirst({ where: eq(brands.normalizedName, "HISENSE") }),
+      nodeDb.query.componentTypes.findFirst({
+        where: eq(componentTypes.normalizedName, "T-CON"),
+      }),
+    ]);
+    if (!hisense || !tCon) throw new Error("Alias targets are missing.");
+    const aliasCatalogProduct = await createProduct(db, {
+      brandId: CUSTOM_CATALOG_VALUE,
+      customBrandName: "hissense",
+      componentTypeId: CUSTOM_CATALOG_VALUE,
+      customComponentTypeName: "t-com",
+      partNumber: "CUSTOM-ALIAS-001",
+      title: null,
+      description: null,
+      salePrice: null,
+      currency: "MXN",
+      status: "DRAFT",
+      isPublic: false,
+      compatibilities: [],
+    });
+    expect(aliasCatalogProduct.brandId).toBe(hisense.id);
+    expect(aliasCatalogProduct.componentTypeId).toBe(tCon.id);
+
+    const updated = await updateProduct(db, {
+      id: first.id,
+      expectedUpdatedAt: first.updatedAt,
+      brandId: CUSTOM_CATALOG_VALUE,
+      customBrandName: "MARCA NUEVA",
+      componentTypeId: CUSTOM_CATALOG_VALUE,
+      customComponentTypeName: "módulo especial",
+      partNumber: first.partNumber,
+      title: first.title,
+      description: first.description,
+      salePrice: first.salePrice,
+      currency: first.currency,
+      status: first.status,
+      isPublic: first.isPublic,
+      compatibilities: [],
+    });
+    expect(updated.brandId).toBe(first.brandId);
+    expect(updated.componentTypeId).toBe(first.componentTypeId);
+    expect(updated.sku).toBe(first.sku);
+
+    await expect(
+      createProduct(db, {
+        brandId: CUSTOM_CATALOG_VALUE,
+        customBrandName: "Catálogo que debe revertirse",
+        componentTypeId: CUSTOM_CATALOG_VALUE,
+        customComponentTypeName: "Componente que debe revertirse",
+        partNumber: null,
+        title: null,
+        description: null,
+        salePrice: null,
+        currency: "MXN",
+        status: "DRAFT",
+        isPublic: false,
+        compatibilities: [],
+      }),
+    ).rejects.toThrow();
+    expect(
+      await nodeDb
+        .select()
+        .from(brands)
+        .where(eq(brands.normalizedName, "CATALOGO QUE DEBE REVERTIRSE")),
+    ).toHaveLength(0);
+    expect(
+      await nodeDb
+        .select()
+        .from(componentTypes)
+        .where(eq(componentTypes.normalizedName, "COMPONENTE QUE DEBE REVERTIRSE")),
+    ).toHaveLength(0);
   });
 
   it("creates inventory, generates its code, moves it and adjusts stock atomically", async () => {

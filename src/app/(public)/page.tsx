@@ -74,7 +74,7 @@ export default async function HomePage() {
             </form>
           </div>
 
-          <div className="rounded-2xl border border-navy/10 bg-navy p-6 text-white shadow-[0_18px_55px_rgba(0,15,48,0.16)] sm:p-7">
+          <div className="rounded-2xl border border-brand-navy/10 bg-brand-navy p-6 text-white shadow-[0_18px_55px_rgba(0,15,48,0.16)] sm:p-7">
             <p className="text-label uppercase tracking-[0.16em] text-accent">Inventario público</p>
             <p className="mt-4 text-4xl font-semibold tracking-[-0.04em]">{catalog.total}</p>
             <p className="mt-2 text-small text-white/70">

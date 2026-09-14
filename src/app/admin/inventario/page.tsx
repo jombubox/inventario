@@ -121,7 +121,7 @@ export default async function InventoryPage({
               <option value="">Con y sin ubicación</option>
               <option value="true">Solo sin ubicación</option>
             </Select>
-            <button className="h-11 rounded-xl bg-navy px-4 text-small font-semibold text-white">
+            <button className="h-11 rounded-xl bg-brand-navy px-4 text-small font-semibold text-white">
               Aplicar filtros
             </button>
           </form>

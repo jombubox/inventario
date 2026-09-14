@@ -14,13 +14,13 @@ export type ButtonSize = "sm" | "md" | "lg" | "icon";
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    "bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-active",
-  secondary: "bg-navy text-white hover:bg-navy/90 active:bg-navy/80",
+    "bg-action text-action-foreground hover:bg-action-hover active:bg-action-active",
+  secondary: "bg-brand-navy text-white hover:bg-brand-navy/90 active:bg-brand-navy/80",
   outline:
     "border border-border bg-card text-card-foreground hover:border-input hover:bg-muted active:bg-muted/80",
   ghost: "text-foreground hover:bg-muted active:bg-muted/80",
   destructive:
-    "bg-danger text-white hover:bg-danger/90 active:bg-danger/80",
+    "bg-danger-action text-danger-action-foreground hover:bg-danger-action-hover active:bg-danger-action-active",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Google_Sans } from "next/font/google";
 import type { ReactNode } from "react";
 
+import { themeInitializationScript } from "@/features/theme/theme";
 import { getSiteUrl } from "@/lib/site-url";
 
 import "./globals.css";
@@ -42,7 +43,15 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="es" className={googleSans.variable} data-scroll-behavior="smooth">
+    <html
+      lang="es"
+      className={googleSans.variable}
+      data-scroll-behavior="smooth"
+      suppressHydrationWarning
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitializationScript }} />
+      </head>
       <body className="min-h-dvh bg-background font-sans text-foreground antialiased">
         {children}
       </body>

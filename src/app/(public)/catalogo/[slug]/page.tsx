@@ -165,7 +165,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
               )}
             </div>
 
-            <div className="mt-7 rounded-2xl bg-navy p-5 text-white sm:p-6">
+            <div className="mt-7 rounded-2xl bg-brand-navy p-5 text-white sm:p-6">
               <p className="text-label uppercase tracking-[0.14em] text-accent">Referencia para consulta</p>
               <p className="mt-3 text-lg font-semibold">Conserva el SKU {product.sku}</p>
               <p className="mt-2 text-small text-white/70">

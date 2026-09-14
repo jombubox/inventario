@@ -9,7 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { CreatableCatalogSelect } from "@/features/products/components/creatable-catalog-select";
 import { buildProductTitle } from "@/features/products/domain/build-product-title";
+import { buildCatalogIdentity } from "@/features/products/domain/catalog-identity";
+import { CUSTOM_CATALOG_VALUE } from "@/features/products/domain/catalog-selection";
 import { generateSku } from "@/features/products/domain/generate-sku";
 import {
   createProductAction,
@@ -51,6 +54,8 @@ export function ProductForm({
   const [componentTypeId, setComponentTypeId] = useState(
     product?.componentTypeId ?? componentTypes[0]?.id ?? "",
   );
+  const [customBrandName, setCustomBrandName] = useState("");
+  const [customComponentTypeName, setCustomComponentTypeName] = useState("");
   const [partNumber, setPartNumber] = useState(product?.partNumber ?? "");
   const [compatibilities, setCompatibilities] = useState<CompatibilityValue[]>(
     product?.compatibilities ?? [],
@@ -58,8 +63,26 @@ export function ProductForm({
   const [manualTitle, setManualTitle] = useState(product?.title ?? "");
   const [titleOverridden, setTitleOverridden] = useState(Boolean(product));
 
-  const brand = brands.find((item) => item.id === brandId);
-  const componentType = componentTypes.find((item) => item.id === componentTypeId);
+  const brand = useMemo(
+    () => brandId === CUSTOM_CATALOG_VALUE && customBrandName.trim()
+      ? {
+          id: CUSTOM_CATALOG_VALUE,
+          name: customBrandName.trim(),
+          code: buildCatalogIdentity(customBrandName, "brand").code,
+        }
+      : brands.find((item) => item.id === brandId),
+    [brandId, brands, customBrandName],
+  );
+  const componentType = useMemo(
+    () => componentTypeId === CUSTOM_CATALOG_VALUE && customComponentTypeName.trim()
+      ? {
+          id: CUSTOM_CATALOG_VALUE,
+          name: customComponentTypeName.trim(),
+          code: buildCatalogIdentity(customComponentTypeName, "componentType").code,
+        }
+      : componentTypes.find((item) => item.id === componentTypeId),
+    [componentTypeId, componentTypes, customComponentTypeName],
+  );
   const firstModel = compatibilities[0]?.model ?? "";
   const suggestedTitle = useMemo(
     () =>
@@ -113,20 +136,36 @@ export function ProductForm({
       <FormFeedback state={state} />
 
       <section className="grid gap-5 rounded-2xl border border-border bg-card p-5 sm:grid-cols-2 sm:p-6">
-        <div>
-          <Label htmlFor="brandId">Marca</Label>
-          <Select id="brandId" name="brandId" value={brandId} onChange={(event) => setBrandId(event.target.value)} className="mt-2">
-            {brands.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.code}</option>)}
-          </Select>
-          <FieldError errors={state.fieldErrors?.brandId} />
-        </div>
-        <div>
-          <Label htmlFor="componentTypeId">Tipo de componente</Label>
-          <Select id="componentTypeId" name="componentTypeId" value={componentTypeId} onChange={(event) => setComponentTypeId(event.target.value)} className="mt-2">
-            {componentTypes.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.code}</option>)}
-          </Select>
-          <FieldError errors={state.fieldErrors?.componentTypeId} />
-        </div>
+        <CreatableCatalogSelect
+          id="brandId"
+          name="brandId"
+          label="Marca"
+          options={brands}
+          value={brandId}
+          onChange={setBrandId}
+          customName={customBrandName}
+          onCustomNameChange={setCustomBrandName}
+          customFieldName="customBrandName"
+          customLabel="Nombre de la nueva marca"
+          addLabel="Agregar otra marca…"
+          selectionErrors={state.fieldErrors?.brandId}
+          customErrors={state.fieldErrors?.customBrandName}
+        />
+        <CreatableCatalogSelect
+          id="componentTypeId"
+          name="componentTypeId"
+          label="Tipo de componente"
+          options={componentTypes}
+          value={componentTypeId}
+          onChange={setComponentTypeId}
+          customName={customComponentTypeName}
+          onCustomNameChange={setCustomComponentTypeName}
+          customFieldName="customComponentTypeName"
+          customLabel="Nombre del nuevo componente"
+          addLabel="Agregar otro componente…"
+          selectionErrors={state.fieldErrors?.componentTypeId}
+          customErrors={state.fieldErrors?.customComponentTypeName}
+        />
         <div>
           <Label htmlFor="partNumber">Número de parte</Label>
           <Input id="partNumber" name="partNumber" value={partNumber} onChange={(event) => setPartNumber(event.target.value)} placeholder="BN94-07820F" className="mt-2" />
@@ -144,7 +183,7 @@ export function ProductForm({
       <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div><h2 className="text-h3">Compatibilidades</h2><p className="mt-1 text-small text-muted-foreground">Agrega una marca y modelo por cada televisor compatible.</p></div>
-          <Button type="button" variant="outline" size="sm" onClick={() => setCompatibilities((items) => [...items, { brandId: brandId || brands[0]?.id || "", model: "", notes: "" }])}>Agregar modelo</Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => setCompatibilities((items) => [...items, { brandId: brandId !== CUSTOM_CATALOG_VALUE ? brandId : brands[0]?.id || "", model: "", notes: "" }])}>Agregar modelo</Button>
         </div>
         <div className="mt-5 space-y-3">
           {compatibilities.length === 0 ? <p className="rounded-xl bg-muted px-4 py-3 text-small text-muted-foreground">Sin compatibilidades. Si tampoco existe número de parte, agrega un modelo para generar el SKU.</p> : null}

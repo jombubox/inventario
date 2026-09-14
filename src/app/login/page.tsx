@@ -23,13 +23,13 @@ export default async function LoginPage() {
   if (await verifyAdminSession(token)) redirect("/admin");
 
   return (
-    <main className="relative grid min-h-dvh place-items-center overflow-hidden bg-navy px-5 py-10">
+    <main className="relative grid min-h-dvh place-items-center overflow-hidden bg-brand-navy px-5 py-10">
       <div className="absolute inset-0 opacity-20 surface-grid" aria-hidden="true" />
       <div className="relative w-full max-w-md">
-        <div className="mx-auto mb-8 flex w-fit justify-center rounded-xl bg-white px-5 py-3 shadow-lg shadow-black/20">
+        <div className="mx-auto mb-8 flex w-fit justify-center rounded-xl bg-card px-5 py-3 shadow-lg shadow-black/20">
           <Brand admin />
         </div>
-        <Card className="border-white/10 shadow-2xl shadow-black/25">
+        <Card className="border-border shadow-2xl shadow-black/25">
           <CardContent className="p-6 sm:p-8">
             <p className="text-label uppercase tracking-[0.16em] text-primary">Acceso interno</p>
             <h1 className="mt-2 text-h2 text-navy">Bienvenido a JombuBox</h1>

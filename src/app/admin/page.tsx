@@ -31,7 +31,7 @@ export default async function AdminPage() {
         title="Dashboard"
         description="Estado actual del catálogo y del inventario físico de JombuBox."
         actions={(
-          <Link href="/admin/productos/nuevo" className="inline-flex h-11 items-center rounded-xl bg-primary px-4 text-small font-semibold text-white hover:bg-primary-hover">
+          <Link href="/admin/productos/nuevo" className="inline-flex h-11 items-center rounded-xl bg-action px-4 text-small font-semibold text-action-foreground hover:bg-action-hover">
             Nuevo producto
           </Link>
         )}

@@ -31,7 +31,9 @@ function parseCompatibilities(value: FormDataEntryValue | null): unknown[] {
 function productFields(formData: FormData) {
   return {
     brandId: formData.get("brandId"),
+    customBrandName: formData.get("customBrandName"),
     componentTypeId: formData.get("componentTypeId"),
+    customComponentTypeName: formData.get("customComponentTypeName"),
     partNumber: formData.get("partNumber"),
     title: formData.get("title"),
     description: formData.get("description"),

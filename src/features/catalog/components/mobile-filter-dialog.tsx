@@ -27,7 +27,7 @@ export function MobileFilterDialog({ activeCount, children }: MobileFilterDialog
       <Button variant="outline" onClick={() => dialogRef.current?.showModal()}>
         Filtros
         {activeCount > 0 ? (
-          <span className="grid min-w-5 place-items-center rounded-full bg-primary px-1.5 text-xs text-white">
+          <span className="grid min-w-5 place-items-center rounded-full bg-action px-1.5 text-xs text-action-foreground">
             {activeCount}
           </span>
         ) : null}
@@ -35,7 +35,7 @@ export function MobileFilterDialog({ activeCount, children }: MobileFilterDialog
       <dialog
         ref={dialogRef}
         aria-labelledby="mobile-filter-title"
-        className="m-0 ml-auto h-dvh max-h-none w-[min(92vw,25rem)] max-w-none border-0 bg-card p-0 text-foreground shadow-2xl backdrop:bg-navy/45 open:flex open:flex-col"
+        className="m-0 ml-auto h-dvh max-h-none w-[min(92vw,25rem)] max-w-none border-0 bg-card p-0 text-foreground shadow-2xl backdrop:bg-brand-navy/65 open:flex open:flex-col"
       >
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <h2 id="mobile-filter-title" className="text-h3 text-navy">
@@ -55,4 +55,3 @@ export function MobileFilterDialog({ activeCount, children }: MobileFilterDialog
     </div>
   );
 }
-

@@ -50,12 +50,18 @@ export async function createProductImage(
     alt?: string | null;
   },
 ) {
-  assertSafeImageDescription({
-    filename: input.filename,
-    mimeType: input.mimeType,
-    size: input.bytes.byteLength,
-    signatureHex: imageSignatureHex(input.bytes),
-  });
+  try {
+    assertSafeImageDescription({
+      filename: input.filename,
+      mimeType: input.mimeType,
+      size: input.bytes.byteLength,
+      signatureHex: imageSignatureHex(input.bytes),
+    });
+  } catch (error) {
+    throw new InvalidOperationError(
+      error instanceof Error ? error.message : "La imagen no es válida.",
+    );
+  }
   const product = await assertProductExists(db, input.productId);
   await assertImageCapacity(db, input.productId);
 

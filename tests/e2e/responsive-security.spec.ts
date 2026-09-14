@@ -27,6 +27,30 @@ test("public and login shells remain usable at release viewports", async ({ page
   }
 });
 
+test("the light and dark theme choice persists after navigation and reload", async ({ page }, testInfo) => {
+  await page.goto("/");
+  const root = page.locator("html");
+  const initialTheme = await root.getAttribute("data-theme");
+  expect(["light", "dark"]).toContain(initialTheme);
+  const nextTheme = initialTheme === "dark" ? "light" : "dark";
+
+  await page.getByRole("button", { name: /Cambiar a modo (?:claro|oscuro)/u }).click();
+  await expect(root).toHaveAttribute("data-theme", nextTheme);
+  await page.reload();
+  await expect(root).toHaveAttribute("data-theme", nextTheme);
+
+  await page.goto("/catalogo");
+  await expect(root).toHaveAttribute("data-theme", nextTheme);
+  if (testInfo.project.name.startsWith("mobile")) {
+    await page.getByRole("button", { name: /^Filtros/u }).click();
+    await expect(
+      page.getByRole("dialog", { name: "Filtrar catálogo" }).getByLabel("Marca"),
+    ).toBeVisible();
+  } else {
+    await expect(page.locator("aside").getByLabel("Marca")).toBeVisible();
+  }
+});
+
 test("health and security headers expose no dependency details", async ({ request }) => {
   const response = await request.get("/api/health");
   expect(response.status()).toBe(200);

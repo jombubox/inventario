@@ -1,5 +1,7 @@
 export const MAX_PRODUCT_IMAGES = 10;
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+export const MAX_IMAGE_MULTIPART_OVERHEAD_BYTES = 1024 * 1024;
+export const MAX_IMAGE_REQUEST_BYTES = MAX_IMAGE_BYTES + MAX_IMAGE_MULTIPART_OVERHEAD_BYTES;
 export const allowedImageMimeTypes = ["image/jpeg", "image/png", "image/webp"] as const;
 
 export type AllowedImageMimeType = (typeof allowedImageMimeTypes)[number];

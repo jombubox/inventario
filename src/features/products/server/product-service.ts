@@ -10,6 +10,7 @@ import {
   products,
 } from "@/db/schema";
 import { createAuditLog } from "@/features/audit/data/audit-log";
+import { CUSTOM_CATALOG_VALUE } from "@/features/products/domain/catalog-selection";
 import { buildProductTitle } from "@/features/products/domain/build-product-title";
 import {
   appendSkuCollisionSuffix,
@@ -20,6 +21,10 @@ import {
   normalizePartNumber,
 } from "@/features/products/domain/product-normalization";
 import {
+  resolveOrCreateBrand,
+  resolveOrCreateComponentType,
+} from "@/features/products/server/catalog-service";
+import {
   appendSlugCollisionSuffix,
   generateProductSlug,
 } from "@/features/products/domain/product-slug";
@@ -27,6 +32,7 @@ import {
   ConcurrentModificationError,
   DuplicateEntityError,
   EntityNotFoundError,
+  InvalidOperationError,
 } from "@/features/shared/domain/service-errors";
 import type {
   CreateProductMutationInput,
@@ -42,24 +48,41 @@ export type ProductTransaction = Parameters<Parameters<Database["transaction"]>[
 
 async function loadCatalogContext(
   db: Parameters<Parameters<Database["transaction"]>[0]>[0],
-  brandId: string,
-  componentTypeId: string,
+  input: Pick<
+    CreateProductMutationInput,
+    "brandId" | "customBrandName" | "componentTypeId" | "customComponentTypeName"
+  >,
 ): Promise<CatalogContext> {
-  const [brand, componentType] = await Promise.all([
-    db.query.brands.findFirst({
+  const brand = input.brandId === CUSTOM_CATALOG_VALUE
+    ? input.customBrandName
+      ? await resolveOrCreateBrand(db, input.customBrandName)
+      : null
+    : await db.query.brands.findFirst({
       columns: { id: true, name: true, code: true },
-      where: and(eq(brands.id, brandId), eq(brands.active, true)),
-    }),
-    db.query.componentTypes.findFirst({
+      where: and(eq(brands.id, input.brandId), eq(brands.active, true)),
+    });
+  const componentType = input.componentTypeId === CUSTOM_CATALOG_VALUE
+    ? input.customComponentTypeName
+      ? await resolveOrCreateComponentType(db, input.customComponentTypeName)
+      : null
+    : await db.query.componentTypes.findFirst({
       columns: { id: true, name: true, code: true },
-      where: and(eq(componentTypes.id, componentTypeId), eq(componentTypes.active, true)),
-    }),
-  ]);
+      where: and(
+        eq(componentTypes.id, input.componentTypeId),
+        eq(componentTypes.active, true),
+      ),
+    });
 
   if (!brand) {
+    if (input.brandId === CUSTOM_CATALOG_VALUE) {
+      throw new InvalidOperationError("Escribe el nombre de la nueva marca.");
+    }
     throw new EntityNotFoundError("Brand not found or inactive.");
   }
   if (!componentType) {
+    if (input.componentTypeId === CUSTOM_CATALOG_VALUE) {
+      throw new InvalidOperationError("Escribe el nombre del nuevo componente.");
+    }
     throw new EntityNotFoundError("Component type not found or inactive.");
   }
 
@@ -181,88 +204,88 @@ export async function createProductInTransaction(
   tx: ProductTransaction,
   input: CreateProductMutationInput,
 ) {
-  const catalog = await loadCatalogContext(tx, input.brandId, input.componentTypeId);
-    const compatibilities = normalizedCompatibilities(input.compatibilities);
-    await assertCompatibilityBrandsExist(
-      tx,
-      compatibilities.map(({ brandId }) => brandId),
-    );
+  const catalog = await loadCatalogContext(tx, input);
+  const compatibilities = normalizedCompatibilities(input.compatibilities);
+  await assertCompatibilityBrandsExist(
+    tx,
+    compatibilities.map(({ brandId }) => brandId),
+  );
 
-    const normalizedPartNumber = input.partNumber
-      ? normalizePartNumber(input.partNumber)
-      : null;
-    const compatibleModel = compatibilities[0]?.model ?? null;
-    const baseSku = generateSku({
-      brandCode: catalog.brand.code,
-      componentCode: catalog.componentType.code,
-      partNumber: input.partNumber,
-      compatibleModel,
-    });
-    await tx.execute(
-      sql`select pg_advisory_xact_lock(hashtextextended(${`product-sku:${baseSku}`}, 0))`,
-    );
-    const sku = await resolveAvailableSku(tx, baseSku, {
-      brandId: input.brandId,
-      componentTypeId: input.componentTypeId,
-      normalizedPartNumber,
-    });
-    const generatedTitle = buildProductTitle({
-      componentType: catalog.componentType.name.toUpperCase(),
-      partNumber: input.partNumber,
-      brand: catalog.brand.name.toUpperCase(),
-      compatibleModel,
-    });
-    const title = input.title ?? generatedTitle;
-    const baseSlug = generateProductSlug({
-      componentType: catalog.componentType.name,
-      partNumber: input.partNumber,
-      brand: catalog.brand.name,
-      compatibleModel,
+  const normalizedPartNumber = input.partNumber
+    ? normalizePartNumber(input.partNumber)
+    : null;
+  const compatibleModel = compatibilities[0]?.model ?? null;
+  const baseSku = generateSku({
+    brandCode: catalog.brand.code,
+    componentCode: catalog.componentType.code,
+    partNumber: input.partNumber,
+    compatibleModel,
+  });
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${`product-sku:${baseSku}`}, 0))`,
+  );
+  const sku = await resolveAvailableSku(tx, baseSku, {
+    brandId: catalog.brand.id,
+    componentTypeId: catalog.componentType.id,
+    normalizedPartNumber,
+  });
+  const generatedTitle = buildProductTitle({
+    componentType: catalog.componentType.name.toUpperCase(),
+    partNumber: input.partNumber,
+    brand: catalog.brand.name.toUpperCase(),
+    compatibleModel,
+  });
+  const title = input.title ?? generatedTitle;
+  const baseSlug = generateProductSlug({
+    componentType: catalog.componentType.name,
+    partNumber: input.partNumber,
+    brand: catalog.brand.name,
+    compatibleModel,
+    sku,
+  });
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${`product-slug:${baseSlug}`}, 0))`,
+  );
+  const slug = await resolveAvailableSlug(tx, baseSlug);
+  const isPublic = input.status === "ACTIVE" && input.isPublic;
+  const [product] = await tx
+    .insert(products)
+    .values({
       sku,
-    });
-    await tx.execute(
-      sql`select pg_advisory_xact_lock(hashtextextended(${`product-slug:${baseSlug}`}, 0))`,
+      slug,
+      brandId: catalog.brand.id,
+      componentTypeId: catalog.componentType.id,
+      partNumber: input.partNumber,
+      normalizedPartNumber,
+      title,
+      description: input.description,
+      salePrice: input.salePrice,
+      currency: input.currency,
+      status: input.status,
+      isPublic,
+    })
+    .returning();
+
+  if (!product) throw new Error("Product insert did not return a row.");
+
+  if (compatibilities.length > 0) {
+    await tx.insert(productCompatibilities).values(
+      compatibilities.map((compatibility) => ({
+        productId: product.id,
+        brandId: compatibility.brandId,
+        model: compatibility.model,
+        normalizedModel: compatibility.normalizedModel,
+        notes: compatibility.notes,
+      })),
     );
-    const slug = await resolveAvailableSlug(tx, baseSlug);
-    const isPublic = input.status === "ACTIVE" && input.isPublic;
-    const [product] = await tx
-      .insert(products)
-      .values({
-        sku,
-        slug,
-        brandId: input.brandId,
-        componentTypeId: input.componentTypeId,
-        partNumber: input.partNumber,
-        normalizedPartNumber,
-        title,
-        description: input.description,
-        salePrice: input.salePrice,
-        currency: input.currency,
-        status: input.status,
-        isPublic,
-      })
-      .returning();
+  }
 
-    if (!product) throw new Error("Product insert did not return a row.");
-
-    if (compatibilities.length > 0) {
-      await tx.insert(productCompatibilities).values(
-        compatibilities.map((compatibility) => ({
-          productId: product.id,
-          brandId: compatibility.brandId,
-          model: compatibility.model,
-          normalizedModel: compatibility.normalizedModel,
-          notes: compatibility.notes,
-        })),
-      );
-    }
-
-    await createAuditLog(tx, {
-      action: "PRODUCT_CREATED",
-      entityType: "PRODUCT",
-      entityId: product.id,
-      after: { sku: product.sku, ...productSnapshot(product) },
-    });
+  await createAuditLog(tx, {
+    action: "PRODUCT_CREATED",
+    entityType: "PRODUCT",
+    entityId: product.id,
+    after: { sku: product.sku, ...productSnapshot(product) },
+  });
 
   return product;
 }
@@ -284,7 +307,7 @@ export async function updateProduct(
     });
     if (!existing) throw new EntityNotFoundError("Product not found.");
 
-    const catalog = await loadCatalogContext(tx, input.brandId, input.componentTypeId);
+    const catalog = await loadCatalogContext(tx, input);
     const compatibilities = normalizedCompatibilities(input.compatibilities);
     await assertCompatibilityBrandsExist(
       tx,
@@ -302,8 +325,8 @@ export async function updateProduct(
     const [updated] = await tx
       .update(products)
       .set({
-        brandId: input.brandId,
-        componentTypeId: input.componentTypeId,
+        brandId: catalog.brand.id,
+        componentTypeId: catalog.componentType.id,
         partNumber: input.partNumber,
         normalizedPartNumber: input.partNumber
           ? normalizePartNumber(input.partNumber)

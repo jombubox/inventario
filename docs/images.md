@@ -21,7 +21,11 @@ R2_PUBLIC_URL=https://images.example.com
 
 ADMIN o EDITOR envía cada archivo al route handler autenticado de JombuBox. El servidor valida producto, cupo, extensión, MIME, tamaño y firma binaria; genera `products/<sku-sanitizado>/<uuid>.<ext>`; sube el objeto a R2; y guarda solo esa clave en `product_images.storage_key`. El catálogo construye la URL pública en tiempo de ejecución con `R2_PUBLIC_URL`.
 
-Formatos: JPEG, PNG y WEBP. Límites: 10 MB por archivo y 10 imágenes por producto.
+Formatos: JPEG, PNG y WEBP. Límites: 10 MiB por archivo, 11 MiB por petición completa (incluye un margen de 1 MiB para el sobre `multipart/form-data`) y 10 imágenes por producto. Cada archivo viaja en una petición independiente, por lo que seleccionar varias imágenes no suma todos sus bytes en una sola petición.
+
+El endpoint de subida no coincide con el middleware `/admin/:path*`, por lo que `experimental.proxyClientMaxBodySize` de Next.js no controla esta ruta y no se aumenta globalmente. El proxy o CDN que esté delante de la aplicación debe aceptar al menos 11 MiB por petición. Cloudflare admite ese tamaño con sus límites estándar; si el `Maximum Upload Size` de la zona se redujo manualmente, debe mantenerse por encima de 11 MiB.
+
+Los errores de la ruta usan JSON. Si una capa anterior a la aplicación (por ejemplo, el proxy de despliegue) devuelve texto o HTML, el cliente inspecciona `Content-Type` y el estado HTTP antes de mostrar un mensaje; nunca intenta interpretar ciegamente esa respuesta como JSON ni presenta HTML al usuario.
 
 El borrado conserva primero el registro y su clave, marca la operación pendiente, elimina el objeto de R2 y solo después elimina la fila y normaliza el orden. Si R2 falla, la fila queda recuperable para reintentar. Si una subida llega a R2 pero falla el registro en PostgreSQL, JombuBox intenta eliminar el objeto huérfano y registra cualquier fallo de limpieza.
 

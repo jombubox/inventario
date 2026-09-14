@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { parseApiResponse } from "@/features/images/domain/api-response";
 import { MAX_IMAGE_BYTES, MAX_PRODUCT_IMAGES } from "@/features/images/domain/image-policy";
 
 type ProductImage = {
@@ -24,16 +25,18 @@ async function jsonRequest<T>(path: string, init: RequestInit): Promise<T> {
     ...init,
     headers: { "Content-Type": "application/json", ...init.headers },
   });
-  const result = (await response.json()) as T & { error?: string };
-  if (!response.ok) throw new Error(result.error ?? "No fue posible completar la operación.");
-  return result;
+  return parseApiResponse<T>(response, {
+    fallbackError: "No fue posible completar la operación.",
+  });
 }
 
 async function uploadRequest<T>(body: FormData): Promise<T> {
   const response = await fetch("/api/products/images/upload", { method: "POST", body });
-  const result = (await response.json()) as T & { error?: string };
-  if (!response.ok) throw new Error(result.error ?? "No fue posible subir la imagen.");
-  return result;
+  return parseApiResponse<T>(response, {
+    fallbackError: "No fue posible subir la imagen. Intenta de nuevo.",
+    payloadTooLargeError:
+      "La imagen es demasiado grande para el servidor. El máximo permitido es 10 MB.",
+  });
 }
 
 export function ProductImageManager({

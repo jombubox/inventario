@@ -56,7 +56,7 @@ export function ProductCard({ product }: { product: PublicProductCardDTO }) {
               {formatPublicPrice(product.salePrice, product.currency)}
             </p>
           </div>
-          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary-soft text-primary-active transition-colors group-hover:bg-primary group-hover:text-white" aria-hidden="true">
+          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary-soft text-primary-active transition-colors group-hover:bg-action group-hover:text-action-foreground" aria-hidden="true">
             →
           </span>
         </div>

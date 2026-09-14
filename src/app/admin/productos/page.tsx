@@ -44,7 +44,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="mx-auto w-full max-w-[96rem] space-y-6">
-      <PageHeader eyebrow="Catálogo interno" title="Productos" description="Busca, filtra y administra la identidad comercial de cada refacción." actions={<Link href="/admin/productos/nuevo" className="inline-flex h-11 items-center rounded-xl bg-primary px-4 text-small font-semibold text-white hover:bg-primary-hover">Nuevo producto</Link>} />
+      <PageHeader eyebrow="Catálogo interno" title="Productos" description="Busca, filtra y administra la identidad comercial de cada refacción." actions={<Link href="/admin/productos/nuevo" className="inline-flex h-11 items-center rounded-xl bg-action px-4 text-small font-semibold text-action-foreground hover:bg-action-hover">Nuevo producto</Link>} />
 
       <Card><CardContent className="p-4 sm:p-5">
         <form className="grid gap-3 md:grid-cols-3 xl:grid-cols-7" method="get">
@@ -53,7 +53,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           <Select name="type" defaultValue={query.type ?? ""}><option value="">Todos los tipos</option>{options.componentTypes.map((item) => <option key={item.id} value={item.slug}>{item.name}</option>)}</Select>
           <Select name="status" defaultValue={query.status ?? ""}><option value="">Todos los estados</option><option value="DRAFT">Borrador</option><option value="ACTIVE">Activo</option><option value="ARCHIVED">Archivado</option></Select>
           <Select name="stock" defaultValue={query.stock ?? ""}><option value="">Cualquier stock</option><option value="in-stock">Con stock</option><option value="out-of-stock">Sin stock</option><option value="unlocated">Sin ubicación</option></Select>
-          <button className="h-11 rounded-xl bg-navy px-4 text-small font-semibold text-white hover:bg-navy/90">Aplicar filtros</button>
+          <button className="h-11 rounded-xl bg-brand-navy px-4 text-small font-semibold text-white hover:bg-brand-navy/90">Aplicar filtros</button>
           <div className="flex gap-3 md:col-span-3 xl:col-span-7">
             <Select name="public" defaultValue={query.public === undefined ? "" : String(query.public)} className="max-w-44"><option value="">Público o interno</option><option value="true">Publicado</option><option value="false">No publicado</option></Select>
             <Select name="sort" defaultValue={query.sort} className="max-w-48"><option value="updatedAt">Actualización</option><option value="title">Título</option><option value="sku">SKU</option><option value="createdAt">Creación</option></Select>

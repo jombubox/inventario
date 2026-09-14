@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Brand } from "@/components/layout/brand";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 
 export function PublicHeader() {
   return (
@@ -26,6 +27,7 @@ export function PublicHeader() {
           >
             Admin
           </Link>
+          <ThemeToggle />
         </nav>
       </div>
     </header>

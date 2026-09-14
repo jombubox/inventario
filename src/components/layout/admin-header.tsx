@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Brand } from "@/components/layout/brand";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { logoutAction } from "@/features/auth/server/actions";
@@ -21,7 +22,8 @@ export function AdminHeader() {
           <p className="truncate text-small text-muted-foreground">Sesión administrativa</p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="primary">Administrador</Badge>
+          <ThemeToggle />
+          <Badge variant="primary" className="hidden sm:inline-flex">Administrador</Badge>
           <form action={logoutAction}>
             <Button type="submit" variant="ghost" size="sm">
               Salir
