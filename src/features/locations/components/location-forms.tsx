@@ -10,6 +10,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   createLocationAction,
+  deleteBoxAction,
   updateLocationAction,
 } from "@/features/locations/server/actions";
 import { initialMutationState } from "@/features/shared/domain/mutation-state";
@@ -48,4 +49,45 @@ export function CreateLocationForm({ options }: { options: LocationOption[] }) {
 export function EditLocationForm({ location, options }: { location: LocationValue; options: LocationOption[] }) {
   const [state, action] = useActionState(updateLocationAction, initialMutationState);
   return <form action={action} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" noValidate><input type="hidden" name="id" value={location.id} /><input type="hidden" name="expectedUpdatedAt" value={location.updatedAt} /><LocationFields location={location} options={options} /><div className="sm:col-span-2 lg:col-span-3"><FormFeedback state={state} /></div><div className="sm:col-span-2 lg:col-span-3 flex justify-end"><SubmitButton size="sm" pendingLabel="Actualizando…">Guardar ubicación</SubmitButton></div></form>;
+}
+
+export function DeleteBoxForm({
+  box,
+}: {
+  box: { id: string; code: string; activeUnits: number; updatedAt: string };
+}) {
+  const [state, action] = useActionState(deleteBoxAction, initialMutationState);
+  return (
+    <form
+      action={action}
+      className="mt-4 flex flex-col gap-3 rounded-xl border border-danger/20 bg-danger/5 p-4 sm:flex-row sm:items-center sm:justify-between"
+      onSubmit={(event) => {
+        const detail = box.activeUnits > 0
+          ? `La caja contiene ${box.activeUnits} unidad(es) y no se eliminará.`
+          : "La caja se eliminará si está vacía; si tiene historial, se desactivará.";
+        if (!window.confirm(`¿Eliminar la caja ${box.code}?\n\n${detail}`)) {
+          event.preventDefault();
+        }
+      }}
+    >
+      <input type="hidden" name="id" value={box.id} />
+      <input type="hidden" name="expectedUpdatedAt" value={box.updatedAt} />
+      <div>
+        <p className="text-small font-semibold text-navy">Eliminar caja</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {box.activeUnits > 0
+            ? `Contiene ${box.activeUnits} unidad(es); mueve o da salida al stock primero.`
+            : "Se conservará cualquier referencia histórica."}
+        </p>
+        <FormFeedback state={state} />
+      </div>
+      <SubmitButton
+        variant="destructive"
+        size="sm"
+        pendingLabel="Comprobando…"
+      >
+        Eliminar caja
+      </SubmitButton>
+    </form>
+  );
 }

@@ -8,6 +8,7 @@ import {
   brands,
   componentTypes,
   inventoryItems,
+  locations,
   productCompatibilities,
   products,
 } from "@/db/schema";
@@ -30,6 +31,7 @@ try {
   await pool.query(`
     truncate table
       inventory_movements, inventory_items, product_compatibilities, product_images,
+      product_serial_numbers,
       products, locations, audit_logs, import_job_rows, import_jobs, brand_aliases,
       component_type_aliases, brands, component_types, session, account,
       verification, rate_limit, operational_rate_limits, "user"
@@ -187,12 +189,29 @@ try {
       notes: null,
     },
   ]);
+  const [warehouse] = await db.insert(locations).values({
+    code: "E2E-WH",
+    name: "Almacén E2E",
+    type: "WAREHOUSE",
+    parentId: null,
+    active: true,
+  }).returning();
+  if (!warehouse) throw new Error("E2E warehouse missing.");
+  const [box] = await db.insert(locations).values({
+    code: "E2E-A01",
+    name: "Caja E2E A01",
+    type: "BOX",
+    parentId: warehouse.id,
+    active: true,
+  }).returning();
+  if (!box) throw new Error("E2E box missing.");
   await db.insert(inventoryItems).values([
     {
       productId: publicProduct.id,
       quantity: 2,
       status: "AVAILABLE",
       condition: "USED_GOOD",
+      locationId: box.id,
       notes: "CAJA-E2E",
       legacyLocationCode: "CAJA-E2E",
     },

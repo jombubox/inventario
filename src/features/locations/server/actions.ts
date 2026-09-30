@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { getDb } from "@/db";
 import { requireAdmin } from "@/features/auth/server/admin-auth";
-import { createLocation, updateLocation } from "@/features/locations/server/location-service";
+import { createLocation, deleteBox, updateLocation } from "@/features/locations/server/location-service";
 import {
   errorState,
   type MutationState,
@@ -14,6 +14,7 @@ import {
   createLocationMutationSchema,
   updateLocationMutationSchema,
 } from "@/validators/admin-location";
+import { deleteBoxMutationSchema } from "@/validators/quick-add-inventory";
 
 function locationFields(formData: FormData) {
   return {
@@ -58,6 +59,32 @@ export async function updateLocationAction(
     revalidatePath("/admin/ubicaciones");
     revalidatePath("/admin/inventario");
     return { status: "success", message: "Ubicación actualizada." };
+  } catch (error) {
+    return errorState(error);
+  }
+}
+
+export async function deleteBoxAction(
+  _previousState: MutationState,
+  formData: FormData,
+): Promise<MutationState> {
+  const parsed = deleteBoxMutationSchema.safeParse({
+    id: formData.get("id"),
+    expectedUpdatedAt: formData.get("expectedUpdatedAt"),
+  });
+  if (!parsed.success) return validationState(parsed.error);
+  await requireAdmin();
+  try {
+    const result = await deleteBox(getDb(), parsed.data);
+    revalidatePath("/admin");
+    revalidatePath("/admin/ubicaciones");
+    revalidatePath("/admin/inventario");
+    return {
+      status: "success",
+      message: result.mode === "deleted"
+        ? "Caja eliminada."
+        : "La caja se desactivó para conservar su historial.",
+    };
   } catch (error) {
     return errorState(error);
   }

@@ -48,6 +48,7 @@ describe.skipIf(!safeLocalDatabase).sequential("public catalog queries on Postgr
     await pool.query(`
       truncate table
         inventory_movements, inventory_items, product_compatibilities, product_images,
+        product_serial_numbers,
         products, locations, audit_logs, import_job_rows, import_jobs, brand_aliases,
         component_type_aliases, brands, component_types, session, account,
         verification, rate_limit, operational_rate_limits, "user"

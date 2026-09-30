@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { getDb } from "@/db";
 import { requireAdmin } from "@/features/auth/server/admin-auth";
+import { AdminQuickAddButton } from "@/features/inventory/components/quick-add-inventory";
 import {
   listAdminProducts,
   listProductCatalogOptions,
@@ -44,11 +45,11 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="mx-auto w-full max-w-[96rem] space-y-6">
-      <PageHeader eyebrow="Catálogo interno" title="Productos" description="Busca, filtra y administra la identidad comercial de cada refacción." actions={<Link href="/admin/productos/nuevo" className="inline-flex h-11 items-center rounded-xl bg-action px-4 text-small font-semibold text-action-foreground hover:bg-action-hover">Nuevo producto</Link>} />
+      <PageHeader eyebrow="Catálogo interno" title="Productos" description="Busca, filtra y administra la identidad comercial de cada refacción." actions={<AdminQuickAddButton />} />
 
       <Card><CardContent className="p-4 sm:p-5">
         <form className="grid gap-3 md:grid-cols-3 xl:grid-cols-7" method="get">
-          <Input name="q" defaultValue={query.q} placeholder="SKU, título, parte, marca o modelo" className="md:col-span-2" />
+          <Input name="q" defaultValue={query.q} placeholder="SKU, título, parte, serie, marca o modelo" className="md:col-span-2" />
           <Select name="brand" defaultValue={query.brand ?? ""}><option value="">Todas las marcas</option>{options.brands.map((item) => <option key={item.id} value={item.slug}>{item.name}</option>)}</Select>
           <Select name="type" defaultValue={query.type ?? ""}><option value="">Todos los tipos</option>{options.componentTypes.map((item) => <option key={item.id} value={item.slug}>{item.name}</option>)}</Select>
           <Select name="status" defaultValue={query.status ?? ""}><option value="">Todos los estados</option><option value="DRAFT">Borrador</option><option value="ACTIVE">Activo</option><option value="ARCHIVED">Archivado</option></Select>
@@ -64,7 +65,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
       </CardContent></Card>
 
       <Card><CardContent className="p-0">
-        {rows.length === 0 ? <div className="p-8"><EmptyState title="No se encontraron productos" description="Ajusta los filtros o crea el primer producto de JombuBox." action={<Link href="/admin/productos/nuevo" className="font-semibold text-primary">Crear producto</Link>} /></div> : (
+        {rows.length === 0 ? <div className="p-8"><EmptyState title="No se encontraron productos" description="Ajusta los filtros o crea el primer producto de JombuBox." action={<AdminQuickAddButton className="w-auto" />} /></div> : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[58rem] text-left text-small">
               <thead className="border-b border-border bg-muted/60 text-muted-foreground"><tr><th className="px-4 py-3 font-medium">Imagen</th><th className="px-4 py-3 font-medium">SKU / Producto</th><th className="px-4 py-3 font-medium">Marca</th><th className="px-4 py-3 font-medium">Tipo / Parte</th><th className="px-4 py-3 text-right font-medium">Stock</th><th className="px-4 py-3 font-medium">Estado</th><th className="px-4 py-3 font-medium">Actualizado</th><th className="px-4 py-3 text-right font-medium">Acción</th></tr></thead>

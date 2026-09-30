@@ -10,6 +10,10 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { CreatableCatalogSelect } from "@/features/products/components/creatable-catalog-select";
+import {
+  ProductSerialFields,
+  type SerialNumberValue,
+} from "@/features/products/components/product-serial-fields";
 import { buildProductTitle } from "@/features/products/domain/build-product-title";
 import { buildCatalogIdentity } from "@/features/products/domain/catalog-identity";
 import { CUSTOM_CATALOG_VALUE } from "@/features/products/domain/catalog-selection";
@@ -29,6 +33,8 @@ type ProductFormValue = {
   brandId: string;
   componentTypeId: string;
   partNumber: string | null;
+  primarySerialNumber: string | null;
+  secondarySerialNumbers: string[];
   title: string;
   description: string | null;
   salePrice: string | null;
@@ -57,6 +63,15 @@ export function ProductForm({
   const [customBrandName, setCustomBrandName] = useState("");
   const [customComponentTypeName, setCustomComponentTypeName] = useState("");
   const [partNumber, setPartNumber] = useState(product?.partNumber ?? "");
+  const [primarySerialNumber, setPrimarySerialNumber] = useState(
+    product?.primarySerialNumber ?? "",
+  );
+  const [secondarySerialNumbers, setSecondarySerialNumbers] = useState<SerialNumberValue[]>(
+    () => (product?.secondarySerialNumbers ?? []).map((value, index) => ({
+      id: `existing-${index}`,
+      value,
+    })),
+  );
   const [compatibilities, setCompatibilities] = useState<CompatibilityValue[]>(
     product?.compatibilities ?? [],
   );
@@ -133,6 +148,12 @@ export function ProductForm({
         </>
       ) : null}
       <input type="hidden" name="compatibilities" value={JSON.stringify(compatibilities)} />
+      <input type="hidden" name="primarySerialNumber" value={primarySerialNumber} />
+      <input
+        type="hidden"
+        name="secondarySerialNumbers"
+        value={JSON.stringify(secondarySerialNumbers.map(({ value }) => value))}
+      />
       <FormFeedback state={state} />
 
       <section className="grid gap-5 rounded-2xl border border-border bg-card p-5 sm:grid-cols-2 sm:p-6">
@@ -178,6 +199,24 @@ export function ProductForm({
           </div>
           <p className="mt-1.5 text-xs text-muted-foreground">El servidor vuelve a generarlo y valida colisiones al guardar.</p>
         </div>
+      </section>
+
+      <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+        <div className="mb-5">
+          <h2 className="text-h3">Números de serie del modelo</h2>
+          <p className="mt-1 text-small text-muted-foreground">
+            Son identificadores del producto y permanecen separados del número de parte y del SKU.
+          </p>
+        </div>
+        <ProductSerialFields
+          idPrefix="product"
+          primarySerialNumber={primarySerialNumber}
+          onPrimarySerialNumberChange={setPrimarySerialNumber}
+          secondarySerialNumbers={secondarySerialNumbers}
+          onSecondarySerialNumbersChange={setSecondarySerialNumbers}
+          primaryErrors={state.fieldErrors?.primarySerialNumber}
+          secondaryErrors={state.fieldErrors?.secondarySerialNumbers}
+        />
       </section>
 
       <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">

@@ -12,6 +12,7 @@ import {
   recordStockMovement,
   updateInventoryDetails,
 } from "@/features/inventory/server/inventory-service";
+import { quickAddInventory } from "@/features/inventory/server/quick-add-service";
 import {
   errorState,
   type MutationState,
@@ -24,6 +25,63 @@ import {
   updateInventoryDetailsMutationSchema,
   stockMovementMutationSchema,
 } from "@/validators/admin-inventory";
+import { quickAddInventoryMutationSchema } from "@/validators/quick-add-inventory";
+
+function parseStringArray(value: FormDataEntryValue | null): unknown[] {
+  if (typeof value !== "string" || value === "") return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function quickAddInventoryAction(
+  _previousState: MutationState,
+  formData: FormData,
+): Promise<MutationState> {
+  const parsed = quickAddInventoryMutationSchema.safeParse({
+    productMode: formData.get("productMode"),
+    productId: formData.get("productId"),
+    brandId: formData.get("brandId"),
+    customBrandName: formData.get("customBrandName"),
+    componentTypeId: formData.get("componentTypeId"),
+    customComponentTypeName: formData.get("customComponentTypeName"),
+    partNumber: formData.get("partNumber"),
+    primarySerialNumber: formData.get("primarySerialNumber"),
+    secondarySerialNumbers: parseStringArray(formData.get("secondarySerialNumbers")),
+    compatibleModel: formData.get("compatibleModel"),
+    title: formData.get("title"),
+    locationId: formData.get("locationId"),
+    boxMode: formData.get("boxMode"),
+    boxId: formData.get("boxId"),
+    newBoxCode: formData.get("newBoxCode"),
+    newBoxName: formData.get("newBoxName"),
+    bagLabel: formData.get("bagLabel"),
+    quantity: formData.get("quantity"),
+  });
+  if (!parsed.success) return validationState(parsed.error);
+
+  await requireAdmin();
+  try {
+    const result = await quickAddInventory(getDb(), parsed.data);
+    revalidatePath("/admin");
+    revalidatePath("/admin/inventario");
+    revalidatePath("/admin/movimientos");
+    revalidatePath("/admin/auditoria");
+    revalidatePath("/admin/productos");
+    revalidatePath("/admin/ubicaciones");
+    revalidatePublicCatalog(result.product.slug);
+    const bag = parsed.data.bagLabel ? ` · ${parsed.data.bagLabel}` : "";
+    return {
+      status: "success",
+      message: `${parsed.data.quantity} unidad(es) agregadas correctamente a ${result.box.name}${bag}.`,
+    };
+  } catch (error) {
+    return errorState(error);
+  }
+}
 
 export async function createInventoryAction(
   _previousState: MutationState,

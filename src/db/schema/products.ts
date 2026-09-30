@@ -106,6 +106,52 @@ export const productCompatibilities = pgTable(
   ],
 );
 
+export const productSerialNumbers = pgTable(
+  "product_serial_numbers",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    kind: text("kind").$type<"PRIMARY" | "SECONDARY">().notNull(),
+    serialNumber: text("serial_number").notNull(),
+    normalizedSerialNumber: text("normalized_serial_number").notNull(),
+    sortOrder: integer("sort_order").default(0).notNull(),
+    createdAt: createdAtColumn(),
+  },
+  (table) => [
+    unique("product_serial_numbers_product_normalized_unique").on(
+      table.productId,
+      table.normalizedSerialNumber,
+    ),
+    uniqueIndex("product_serial_numbers_one_primary_per_product")
+      .on(table.productId)
+      .where(sql`${table.kind} = 'PRIMARY'`),
+    index("product_serial_numbers_product_sort_idx").on(
+      table.productId,
+      table.kind,
+      table.sortOrder,
+    ),
+    index("product_serial_numbers_normalized_idx").on(table.normalizedSerialNumber),
+    check(
+      "product_serial_numbers_kind_valid",
+      sql`${table.kind} in ('PRIMARY', 'SECONDARY')`,
+    ),
+    check(
+      "product_serial_numbers_serial_not_blank",
+      sql`length(btrim(${table.serialNumber})) > 0`,
+    ),
+    check(
+      "product_serial_numbers_normalized_not_blank",
+      sql`length(btrim(${table.normalizedSerialNumber})) > 0`,
+    ),
+    check(
+      "product_serial_numbers_sort_order_non_negative",
+      sql`${table.sortOrder} >= 0`,
+    ),
+  ],
+);
+
 export const productImages = pgTable(
   "product_images",
   {

@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { getDb } from "@/db";
 import { getDashboardData } from "@/features/admin/data/dashboard-queries";
 import { requireAdmin } from "@/features/auth/server/admin-auth";
+import { AdminQuickAddButton } from "@/features/inventory/components/quick-add-inventory";
 import { formatDateTime } from "@/lib/format";
 
 const metricLabels = {
@@ -31,9 +32,7 @@ export default async function AdminPage() {
         title="Dashboard"
         description="Estado actual del catálogo y del inventario físico de JombuBox."
         actions={(
-          <Link href="/admin/productos/nuevo" className="inline-flex h-11 items-center rounded-xl bg-action px-4 text-small font-semibold text-action-foreground hover:bg-action-hover">
-            Nuevo producto
-          </Link>
+          <AdminQuickAddButton />
         )}
       />
 

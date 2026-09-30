@@ -28,6 +28,16 @@ function parseCompatibilities(value: FormDataEntryValue | null): unknown[] {
   }
 }
 
+function parseStringArray(value: FormDataEntryValue | null): unknown[] {
+  if (typeof value !== "string" || value === "") return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 function productFields(formData: FormData) {
   return {
     brandId: formData.get("brandId"),
@@ -35,6 +45,8 @@ function productFields(formData: FormData) {
     componentTypeId: formData.get("componentTypeId"),
     customComponentTypeName: formData.get("customComponentTypeName"),
     partNumber: formData.get("partNumber"),
+    primarySerialNumber: formData.get("primarySerialNumber"),
+    secondarySerialNumbers: parseStringArray(formData.get("secondarySerialNumbers")),
     title: formData.get("title"),
     description: formData.get("description"),
     salePrice: formData.get("salePrice"),

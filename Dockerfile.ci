@@ -8,12 +8,20 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 
-ENV APP_ENV=preview
+ARG BUILD_APP_ENV=preview
+ARG BUILD_R2_PUBLIC_URL
+
+ENV APP_ENV=$BUILD_APP_ENV
 ENV ENABLE_IMPORTS=true
 
 ENV BUILD_DATABASE=postgresql://build:build@127.0.0.1:5432/jumbobox_build
-ENV BUILD_ORIGIN=http://127.0.0.1:3000
+ARG BUILD_ORIGIN=http://127.0.0.1:3000
 
 RUN DATABASE_URL=$BUILD_DATABASE \
     NEXT_PUBLIC_SITE_URL=$BUILD_ORIGIN \
+    R2_PUBLIC_URL=$BUILD_R2_PUBLIC_URL \
     pnpm cf:build
+
+FROM scratch AS opennext-artifact
+
+COPY --from=verify /app/.open-next/ /.open-next/

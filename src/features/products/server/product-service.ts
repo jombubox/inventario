@@ -1,12 +1,13 @@
 import "server-only";
 
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import type { Database } from "@/db/connection";
 import {
   brands,
   componentTypes,
   productCompatibilities,
+  productSerialNumbers,
   products,
 } from "@/db/schema";
 import { createAuditLog } from "@/features/audit/data/audit-log";
@@ -20,6 +21,13 @@ import {
   normalizeModel,
   normalizePartNumber,
 } from "@/features/products/domain/product-normalization";
+import {
+  cleanSerialNumber,
+  findDuplicateSerialNumber,
+  MAX_PRODUCT_SECONDARY_SERIALS,
+  MAX_PRODUCT_SERIAL_LENGTH,
+  normalizeSerialNumber,
+} from "@/features/products/domain/serial-number";
 import {
   resolveOrCreateBrand,
   resolveOrCreateComponentType,
@@ -105,6 +113,76 @@ function normalizedCompatibilities(input: CreateProductMutationInput["compatibil
   return normalized;
 }
 
+function normalizedSerials(
+  input: Pick<
+    CreateProductMutationInput,
+    "primarySerialNumber" | "secondarySerialNumbers"
+  >,
+) {
+  const primarySerialNumber = cleanSerialNumber(input.primarySerialNumber ?? "") || null;
+  const secondarySerialNumbers = (input.secondarySerialNumbers ?? [])
+    .map(cleanSerialNumber)
+    .filter(Boolean);
+
+  if (secondarySerialNumbers.length > MAX_PRODUCT_SECONDARY_SERIALS) {
+    throw new InvalidOperationError(
+      `A product can have at most ${MAX_PRODUCT_SECONDARY_SERIALS} secondary serial numbers.`,
+    );
+  }
+  if (
+    [primarySerialNumber, ...secondarySerialNumbers].some(
+      (serialNumber) => serialNumber && serialNumber.length > MAX_PRODUCT_SERIAL_LENGTH,
+    )
+  ) {
+    throw new InvalidOperationError(
+      `Serial numbers can have at most ${MAX_PRODUCT_SERIAL_LENGTH} characters.`,
+    );
+  }
+
+  const duplicate = findDuplicateSerialNumber(
+    primarySerialNumber,
+    secondarySerialNumbers,
+  );
+  if (duplicate) {
+    throw new InvalidOperationError(
+      `El número de serie ${duplicate} está repetido dentro de este producto.`,
+    );
+  }
+
+  return { primarySerialNumber, secondarySerialNumbers };
+}
+
+async function replaceProductSerialNumbers(
+  tx: ProductTransaction,
+  productId: string,
+  serials: ReturnType<typeof normalizedSerials>,
+) {
+  await tx
+    .delete(productSerialNumbers)
+    .where(eq(productSerialNumbers.productId, productId));
+
+  const values = [
+    ...(serials.primarySerialNumber
+      ? [{
+          productId,
+          kind: "PRIMARY" as const,
+          serialNumber: serials.primarySerialNumber,
+          normalizedSerialNumber: normalizeSerialNumber(serials.primarySerialNumber),
+          sortOrder: 0,
+        }]
+      : []),
+    ...serials.secondarySerialNumbers.map((serialNumber, index) => ({
+      productId,
+      kind: "SECONDARY" as const,
+      serialNumber,
+      normalizedSerialNumber: normalizeSerialNumber(serialNumber),
+      sortOrder: index,
+    })),
+  ];
+
+  if (values.length > 0) await tx.insert(productSerialNumbers).values(values);
+}
+
 async function assertCompatibilityBrandsExist(
   db: Parameters<Parameters<Database["transaction"]>[0]>[0],
   brandIds: readonly string[],
@@ -186,6 +264,9 @@ function productSnapshot(product: {
   currency: string;
   status: string;
   isPublic: boolean;
+}, serials?: {
+  primarySerialNumber: string | null;
+  secondarySerialNumbers: string[];
 }) {
   return {
     brandId: product.brandId,
@@ -197,6 +278,8 @@ function productSnapshot(product: {
     currency: product.currency,
     status: product.status,
     isPublic: product.isPublic,
+    primarySerialNumber: serials?.primarySerialNumber ?? null,
+    secondarySerialNumbers: serials?.secondarySerialNumbers ?? [],
   };
 }
 
@@ -206,6 +289,7 @@ export async function createProductInTransaction(
 ) {
   const catalog = await loadCatalogContext(tx, input);
   const compatibilities = normalizedCompatibilities(input.compatibilities);
+  const serials = normalizedSerials(input);
   await assertCompatibilityBrandsExist(
     tx,
     compatibilities.map(({ brandId }) => brandId),
@@ -280,11 +364,13 @@ export async function createProductInTransaction(
     );
   }
 
+  await replaceProductSerialNumbers(tx, product.id, serials);
+
   await createAuditLog(tx, {
     action: "PRODUCT_CREATED",
     entityType: "PRODUCT",
     entityId: product.id,
-    after: { sku: product.sku, ...productSnapshot(product) },
+    after: { sku: product.sku, ...productSnapshot(product, serials) },
   });
 
   return product;
@@ -307,8 +393,22 @@ export async function updateProduct(
     });
     if (!existing) throw new EntityNotFoundError("Product not found.");
 
+    const existingSerialRows = await tx
+      .select()
+      .from(productSerialNumbers)
+      .where(eq(productSerialNumbers.productId, input.id))
+      .orderBy(asc(productSerialNumbers.sortOrder));
+    const existingSerials = {
+      primarySerialNumber:
+        existingSerialRows.find(({ kind }) => kind === "PRIMARY")?.serialNumber ?? null,
+      secondarySerialNumbers: existingSerialRows
+        .filter(({ kind }) => kind === "SECONDARY")
+        .map(({ serialNumber }) => serialNumber),
+    };
+
     const catalog = await loadCatalogContext(tx, input);
     const compatibilities = normalizedCompatibilities(input.compatibilities);
+    const serials = normalizedSerials(input);
     await assertCompatibilityBrandsExist(
       tx,
       compatibilities.map(({ brandId }) => brandId),
@@ -367,12 +467,14 @@ export async function updateProduct(
       );
     }
 
+    await replaceProductSerialNumbers(tx, input.id, serials);
+
     await createAuditLog(tx, {
       action: "PRODUCT_UPDATED",
       entityType: "PRODUCT",
       entityId: input.id,
-      before: productSnapshot(existing),
-      after: productSnapshot(updated),
+      before: productSnapshot(existing, existingSerials),
+      after: productSnapshot(updated, serials),
       metadata: { skuPreserved: existing.sku === updated.sku },
     });
 

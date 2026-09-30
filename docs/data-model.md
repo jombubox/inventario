@@ -56,9 +56,11 @@ Los generadores no contienen un `switch` de marcas o tipos. Reciben los códigos
 
 - `products`: identidad comercial, SKU, slug estable, marca, tipo, número de parte original y normalizado, título, descripción, precio de venta, moneda, estado de catálogo, publicación y soft delete.
 - `product_compatibilities`: pares marca/modelo compatibles. El mismo producto no puede repetir `brandId + normalizedModel`.
+- `product_serial_numbers`: identificadores adicionales del modelo en filas consultables, con tipo `PRIMARY` o `SECONDARY`, valor original normalizado solo con NFKC/trim para almacenamiento y una clave de comparación case-insensitive que conserva separadores. Una restricción parcial permite un principal por producto y la combinación `product_id + normalized_serial_number` evita duplicados locales.
 - `product_images`: `storage_key` es la referencia canónica para objetos R2; las columnas heredadas se conservan para compatibilidad del schema. Admite orden y como máximo una imagen primaria por producto.
 
 El número de parte original no se destruye: `BN94-07820F` se almacena en `part_number`; `BN9407820F` se usa en `normalized_part_number` para comparación.
+Los seriales no alimentan el SKU, no sustituyen `part_number` y no se relacionan con una unidad concreta de `inventory_items`.
 
 ### Ubicaciones e inventario
 

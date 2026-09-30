@@ -10,7 +10,12 @@ import {
 import { inventoryItems, inventoryMovements } from "@/db/schema/inventory";
 import { locations } from "@/db/schema/locations";
 import { auditLogs, importJobRows, importJobs } from "@/db/schema/operations";
-import { productCompatibilities, productImages, products } from "@/db/schema/products";
+import {
+  productCompatibilities,
+  productImages,
+  productSerialNumbers,
+  products,
+} from "@/db/schema/products";
 
 export const brandsRelations = relations(brands, ({ many }) => ({
   aliases: many(brandAliases),
@@ -44,6 +49,7 @@ export const productsRelations = relations(products, ({ one, many }) => ({
     references: [componentTypes.id],
   }),
   compatibilities: many(productCompatibilities),
+  serialNumbers: many(productSerialNumbers),
   images: many(productImages),
   inventoryItems: many(inventoryItems),
 }));
@@ -68,6 +74,16 @@ export const productImagesRelations = relations(productImages, ({ one }) => ({
     references: [products.id],
   }),
 }));
+
+export const productSerialNumbersRelations = relations(
+  productSerialNumbers,
+  ({ one }) => ({
+    product: one(products, {
+      fields: [productSerialNumbers.productId],
+      references: [products.id],
+    }),
+  }),
+);
 
 export const locationsRelations = relations(locations, ({ one, many }) => ({
   parent: one(locations, {

@@ -100,7 +100,7 @@ function formatEnvironmentError(error: z.ZodError): Error {
   return new Error(`Invalid server environment: ${details}`);
 }
 
-export function parseDatabaseEnv(environment: NodeJS.ProcessEnv): DatabaseEnv {
+export function parseDatabaseEnv(environment: Partial<NodeJS.ProcessEnv>): DatabaseEnv {
   const result = databaseEnvSchema.safeParse(environment);
 
   if (!result.success) {
@@ -110,7 +110,7 @@ export function parseDatabaseEnv(environment: NodeJS.ProcessEnv): DatabaseEnv {
   return result.data;
 }
 
-export function parseServerEnv(environment: NodeJS.ProcessEnv): ServerEnv {
+export function parseServerEnv(environment: Partial<NodeJS.ProcessEnv>): ServerEnv {
   const result = serverEnvSchema.safeParse(environment);
 
   if (!result.success) {

@@ -8,6 +8,10 @@ import {
   optionalDisplayText,
   requiredDisplayText,
 } from "@/validators/shared";
+import {
+  productSerialFields,
+  validateProductSerialFields,
+} from "@/validators/product-serials";
 
 export const compatibilityMutationSchema = z.object({
   brandId: z.uuid("Selecciona una marca válida."),
@@ -31,6 +35,7 @@ const productFields = {
     z.string().max(120, "El componente debe tener 120 caracteres o menos.").nullable().optional(),
   ),
   partNumber: optionalDisplayText,
+  ...productSerialFields,
   title: optionalDisplayText,
   description: optionalDisplayText,
   salePrice: z.union([moneyString, z.literal(""), z.null()]).transform((value) => value || null),
@@ -70,7 +75,10 @@ function validateCatalogSelections(
 
 export const createProductMutationSchema = z
   .object(productFields)
-  .superRefine(validateCatalogSelections);
+  .superRefine((value, context) => {
+    validateCatalogSelections(value, context);
+    validateProductSerialFields(value, context);
+  });
 
 export const updateProductMutationSchema = z
   .object({
@@ -78,7 +86,10 @@ export const updateProductMutationSchema = z
     expectedUpdatedAt: z.coerce.date(),
     ...productFields,
   })
-  .superRefine(validateCatalogSelections);
+  .superRefine((value, context) => {
+    validateCatalogSelections(value, context);
+    validateProductSerialFields(value, context);
+  });
 
 export const archiveProductMutationSchema = z.object({
   id: z.uuid(),

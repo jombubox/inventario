@@ -26,26 +26,28 @@
     "production:remove-samples": "node --conditions=react-server --import tsx src/scripts/production-samples.ts remove-samples",
     "db:studio": "drizzle-kit studio",
     "cf:build": "opennextjs-cloudflare build",
+    "cf:build:staging": "opennextjs-cloudflare build --env staging",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "deploy:staging": "opennextjs-cloudflare build --env staging && opennextjs-cloudflare deploy --env staging",
     "upload": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
     "cf:typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1116.0",
     "@neondatabase/serverless": "^1.1.0",
-    "@opennextjs/cloudflare": "^1.20.2",
+    "@opennextjs/cloudflare": "^1.20.7",
     "drizzle-orm": "^0.45.2",
     "exceljs": "^4.4.0",
     "motion": "^13.1.0",
-    "next": "16.3.0",
+    "next": "16.3.6",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "^0.0.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@next/env": "16.3.0",
+    "@next/env": "16.3.6",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^22.20.1",
@@ -55,13 +57,20 @@
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
-    "eslint-config-next": "16.3.0",
+    "eslint-config-next": "16.3.6",
     "pg": "^8.23.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.12",
     "typescript": "^5",
     "vitest": "^4.1.10",
-    "wrangler": "^4.120.1"
+    "wrangler": "^4.145.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "brace-expansion@1": "1.1.20",
+      "brace-expansion@2": "2.1.7",
+      "brace-expansion@5": "5.0.12"
+    }
   },
   "packageManager": "pnpm@10.15.0"
 }

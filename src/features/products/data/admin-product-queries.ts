@@ -18,6 +18,7 @@ import {
   inventoryItems,
   productCompatibilities,
   productImages,
+  productSerialNumbers,
   products,
 } from "@/db/schema";
 import { getR2PublicUrl } from "@/features/images/server/r2-public-url";
@@ -71,6 +72,7 @@ export async function listAdminProducts(db: Database, query: ProductListQuery) {
         ilike(products.sku, pattern),
         ilike(products.title, pattern),
         ilike(products.partNumber, pattern),
+        sql`exists (select 1 from ${productSerialNumbers} psn where psn.product_id = ${products.id} and psn.serial_number ilike ${pattern})`,
         ilike(brands.name, pattern),
         sql`exists (select 1 from ${productCompatibilities} pc where pc.product_id = ${products.id} and pc.model ilike ${pattern})`,
       )!,
@@ -147,6 +149,9 @@ export async function getAdminProductDetail(db: Database, productId: string) {
       brand: true,
       componentType: true,
       compatibilities: { with: { brand: true } },
+      serialNumbers: {
+        orderBy: [asc(productSerialNumbers.kind), asc(productSerialNumbers.sortOrder)],
+      },
       inventoryItems: { with: { location: true } },
       images: true,
     },

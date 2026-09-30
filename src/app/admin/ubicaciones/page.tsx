@@ -6,6 +6,7 @@ import { getDb } from "@/db";
 import { requireAdmin } from "@/features/auth/server/admin-auth";
 import {
   CreateLocationForm,
+  DeleteBoxForm,
   EditLocationForm,
 } from "@/features/locations/components/location-forms";
 import { listAdminLocations } from "@/features/locations/data/admin-location-queries";
@@ -57,6 +58,11 @@ export default async function LocationsPage() {
                       <div className="flex flex-wrap items-center gap-2">
                         <h2 className="font-semibold text-navy">{location.name}</h2>
                         <Badge>{location.type}</Badge>
+                        {location.type === "BOX" ? (
+                          <Badge variant={location.activeUnits > 0 ? "warning" : "neutral"}>
+                            {location.activeUnits} unidades
+                          </Badge>
+                        ) : null}
                         {location.active ? (
                           <Badge variant="success">Activa</Badge>
                         ) : (
@@ -92,6 +98,16 @@ export default async function LocationsPage() {
                           }}
                           options={options}
                         />
+                        {location.type === "BOX" ? (
+                          <DeleteBoxForm
+                            box={{
+                              id: location.id,
+                              code: location.code,
+                              activeUnits: location.activeUnits,
+                              updatedAt: location.updatedAt.toISOString(),
+                            }}
+                          />
+                        ) : null}
                       </div>
                   </details>
                 </article>

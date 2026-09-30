@@ -22,9 +22,9 @@ import type {
   StockMovementMutationInput,
 } from "@/validators/admin-inventory";
 
-type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+export type InventoryTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
-async function assertProductExists(tx: Transaction, productId: string): Promise<void> {
+async function assertProductExists(tx: InventoryTransaction, productId: string): Promise<void> {
   const product = await tx.query.products.findFirst({
     columns: { id: true },
     where: and(eq(products.id, productId), isNull(products.deletedAt)),
@@ -32,7 +32,7 @@ async function assertProductExists(tx: Transaction, productId: string): Promise<
   if (!product) throw new EntityNotFoundError("Product not found.");
 }
 
-async function assertActiveLocation(tx: Transaction, locationId: string): Promise<void> {
+async function assertActiveLocation(tx: InventoryTransaction, locationId: string): Promise<void> {
   const location = await tx.query.locations.findFirst({
     columns: { id: true },
     where: and(eq(locations.id, locationId), eq(locations.active, true)),
@@ -41,7 +41,7 @@ async function assertActiveLocation(tx: Transaction, locationId: string): Promis
 }
 
 export async function createInventoryItemInTransaction(
-  tx: Transaction,
+  tx: InventoryTransaction,
   input: CreateInventoryMutationInput,
 ) {
   await assertProductExists(tx, input.productId);
@@ -267,86 +267,91 @@ export async function recordStockMovement(
   db: Database,
   input: StockMovementMutationInput,
 ) {
+  return db.transaction((tx) => recordStockMovementInTransaction(tx, input));
+}
+
+export async function recordStockMovementInTransaction(
+  tx: InventoryTransaction,
+  input: StockMovementMutationInput,
+) {
   const increasing = input.type === "IN" || input.type === "RETURN";
 
-  return db.transaction(async (tx) => {
-    const [before] = await tx
-      .select()
-      .from(inventoryItems)
+  const [before] = await tx
+    .select()
+    .from(inventoryItems)
+    .where(eq(inventoryItems.id, input.id))
+    .for("update")
+    .limit(1);
+  if (!before) throw new EntityNotFoundError("Inventory item not found.");
+  if (
+    !increasing &&
+    (before.quantity < input.quantity || !["AVAILABLE", "RESERVED", "DAMAGED"].includes(before.status))
+  ) {
+    throw new InvalidOperationError(
+      "La salida supera la cantidad física disponible o el registro ya está cerrado.",
+    );
+  }
+  let updated: typeof inventoryItems.$inferSelect | undefined;
+  if (increasing) {
+    [updated] = await tx
+      .update(inventoryItems)
+      .set({
+        quantity: sql`${inventoryItems.quantity} + ${input.quantity}`,
+        status: input.resultingStatus,
+        updatedAt: new Date(),
+      })
       .where(eq(inventoryItems.id, input.id))
-      .for("update")
-      .limit(1);
-    if (!before) throw new EntityNotFoundError("Inventory item not found.");
-    if (
-      !increasing &&
-      (before.quantity < input.quantity || !["AVAILABLE", "RESERVED", "DAMAGED"].includes(before.status))
-    ) {
-      throw new InvalidOperationError(
-        "La salida supera la cantidad física disponible o el registro ya está cerrado.",
-      );
-    }
-    let updated: typeof inventoryItems.$inferSelect | undefined;
-    if (increasing) {
-      [updated] = await tx
-        .update(inventoryItems)
-        .set({
-          quantity: sql`${inventoryItems.quantity} + ${input.quantity}`,
-          status: input.resultingStatus,
-          updatedAt: new Date(),
-        })
-        .where(eq(inventoryItems.id, input.id))
-        .returning();
-    } else {
-      [updated] = await tx
-        .update(inventoryItems)
-        .set({
-          quantity: sql`${inventoryItems.quantity} - ${input.quantity}`,
-          status: sql`case when ${inventoryItems.quantity} - ${input.quantity} = 0 then ${input.resultingStatus}::inventory_status else ${inventoryItems.status} end`,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(inventoryItems.id, input.id),
-            gte(inventoryItems.quantity, input.quantity),
-            sql`${inventoryItems.status} in ('AVAILABLE', 'RESERVED', 'DAMAGED')`,
-          ),
-        )
-        .returning();
-    }
+      .returning();
+  } else {
+    [updated] = await tx
+      .update(inventoryItems)
+      .set({
+        quantity: sql`${inventoryItems.quantity} - ${input.quantity}`,
+        status: sql`case when ${inventoryItems.quantity} - ${input.quantity} = 0 then ${input.resultingStatus}::inventory_status else ${inventoryItems.status} end`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(inventoryItems.id, input.id),
+          gte(inventoryItems.quantity, input.quantity),
+          sql`${inventoryItems.status} in ('AVAILABLE', 'RESERVED', 'DAMAGED')`,
+        ),
+      )
+      .returning();
+  }
 
-    if (!updated) {
-      throw new InvalidOperationError("No fue posible registrar el movimiento de stock.");
-    }
+  if (!updated) {
+    throw new InvalidOperationError("No fue posible registrar el movimiento de stock.");
+  }
 
-    await tx.insert(inventoryMovements).values({
-      inventoryItemId: updated.id,
-      type: input.type,
-      quantity: input.quantity,
-      fromLocationId: increasing ? null : updated.locationId,
-      toLocationId: increasing ? updated.locationId : null,
-      userId: null,
-      reason: input.reason,
-      metadata: {
-        direction: increasing ? "IN" : "OUT",
-        fromQuantity: before.quantity,
-        toQuantity: updated.quantity,
-        resultingStatus: updated.status,
-      },
-    });
-    const action = {
-      IN: "INVENTORY_IN",
-      OUT: "INVENTORY_OUT",
-      SALE: "INVENTORY_SALE",
-      RETURN: "INVENTORY_RETURN",
-    } as const;
-    await createAuditLog(tx, {
-      action: action[input.type],
-      entityType: "INVENTORY_ITEM",
-      entityId: updated.id,
-      before: { quantity: before.quantity, status: before.status },
-      after: { quantity: updated.quantity, status: updated.status },
-      metadata: { movementType: input.type, quantity: input.quantity, reason: input.reason },
-    });
-    return updated;
+  await tx.insert(inventoryMovements).values({
+    inventoryItemId: updated.id,
+    type: input.type,
+    quantity: input.quantity,
+    fromLocationId: increasing ? null : updated.locationId,
+    toLocationId: increasing ? updated.locationId : null,
+    userId: null,
+    reason: input.reason,
+    metadata: {
+      direction: increasing ? "IN" : "OUT",
+      fromQuantity: before.quantity,
+      toQuantity: updated.quantity,
+      resultingStatus: updated.status,
+    },
   });
+  const action = {
+    IN: "INVENTORY_IN",
+    OUT: "INVENTORY_OUT",
+    SALE: "INVENTORY_SALE",
+    RETURN: "INVENTORY_RETURN",
+  } as const;
+  await createAuditLog(tx, {
+    action: action[input.type],
+    entityType: "INVENTORY_ITEM",
+    entityId: updated.id,
+    before: { quantity: before.quantity, status: before.status },
+    after: { quantity: updated.quantity, status: updated.status },
+    metadata: { movementType: input.type, quantity: input.quantity, reason: input.reason },
+  });
+  return updated;
 }

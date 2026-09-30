@@ -1,15 +1,16 @@
 export type AdminNavigationItem = {
   label: string;
   href: string;
-  short: string;
+  icon: "home" | "inventory" | "products" | "locations" | "import" | "movements" | "audit";
+  section: "workspace" | "other";
 };
 
 export const adminNavigation: readonly AdminNavigationItem[] = [
-  { label: "Dashboard", short: "DB", href: "/admin" },
-  { label: "Productos", short: "PR", href: "/admin/productos" },
-  { label: "Inventario", short: "IN", href: "/admin/inventario" },
-  { label: "Ubicaciones", short: "UB", href: "/admin/ubicaciones" },
-  { label: "Importar", short: "IM", href: "/admin/importar" },
-  { label: "Movimientos", short: "MV", href: "/admin/movimientos" },
-  { label: "Auditoría", short: "AU", href: "/admin/auditoria" },
+  { label: "Resumen", icon: "home", section: "workspace", href: "/admin" },
+  { label: "Inventario", icon: "inventory", section: "workspace", href: "/admin/inventario" },
+  { label: "Productos", icon: "products", section: "other", href: "/admin/productos" },
+  { label: "Ubicaciones", icon: "locations", section: "other", href: "/admin/ubicaciones" },
+  { label: "Importar", icon: "import", section: "other", href: "/admin/importar" },
+  { label: "Movimientos", icon: "movements", section: "other", href: "/admin/movimientos" },
+  { label: "Auditoría", icon: "audit", section: "other", href: "/admin/auditoria" },
 ] as const;

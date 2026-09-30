@@ -154,8 +154,8 @@ export default async function InventoryPage({
                       <p className="font-semibold text-navy">{item.productTitle}</p>
                       <p className="mt-1 text-small text-muted-foreground">
                         {item.legacyBagNumber
-                          ? `Bolsa ${item.legacyBagNumber}`
-                          : "Sin bolsa legacy"}{" "}
+                          ? item.legacyBagNumber
+                          : "Sin bolsa"}{" "}
                         · {item.legacyLocationCode ?? "sin código legacy"}
                       </p>
                     </div>

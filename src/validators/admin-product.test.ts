@@ -59,3 +59,37 @@ describe("product custom catalog validation", () => {
     }
   });
 });
+
+describe("product serial validation", () => {
+  it("trims serials and drops blank secondary values", () => {
+    const parsed = createProductMutationSchema.parse({
+      ...baseInput,
+      primarySerialNumber: "  ABC-123  ",
+      secondarySerialNumbers: ["  XYZ-9 ", "   "],
+    });
+
+    expect(parsed.primarySerialNumber).toBe("ABC-123");
+    expect(parsed.secondarySerialNumbers).toEqual(["XYZ-9"]);
+  });
+
+  it.each([
+    { primarySerialNumber: "ABC-123", secondarySerialNumbers: [" abc-123 "] },
+    { primarySerialNumber: null, secondarySerialNumbers: ["XYZ-9", "xyz-9"] },
+  ])("rejects repeated serials within one product", (serials) => {
+    const parsed = createProductMutationSchema.safeParse({ ...baseInput, ...serials });
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      expect(parsed.error.flatten().fieldErrors.secondarySerialNumbers).toBeTruthy();
+    }
+  });
+
+  it("keeps hyphens and internal spaces significant", () => {
+    expect(
+      createProductMutationSchema.safeParse({
+        ...baseInput,
+        primarySerialNumber: "ABC-123",
+        secondarySerialNumbers: ["ABC123", "ABC 123"],
+      }).success,
+    ).toBe(true);
+  });
+});

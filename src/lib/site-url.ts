@@ -1,4 +1,4 @@
-export function getSiteUrl(environment?: NodeJS.ProcessEnv): URL | null {
+export function getSiteUrl(environment?: Partial<NodeJS.ProcessEnv>): URL | null {
   const configured = (
     environment ? environment.NEXT_PUBLIC_SITE_URL : process.env.NEXT_PUBLIC_SITE_URL
   )?.trim();
@@ -17,7 +17,7 @@ export function getSiteUrl(environment?: NodeJS.ProcessEnv): URL | null {
   return nodeEnv === "development" ? new URL("http://localhost:3000") : null;
 }
 
-export function absoluteSiteUrl(pathname: string, environment?: NodeJS.ProcessEnv): string | null {
+export function absoluteSiteUrl(pathname: string, environment?: Partial<NodeJS.ProcessEnv>): string | null {
   const base = getSiteUrl(environment);
   return base ? new URL(pathname, base).toString() : null;
 }
