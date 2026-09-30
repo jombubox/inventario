@@ -205,6 +205,29 @@ try {
     active: true,
   }).returning();
   if (!box) throw new Error("E2E box missing.");
+  await db.insert(locations).values([
+    {
+      code: "E2E-NOBOX-DESK",
+      name: "Almacén E2E sin cajas DESK",
+      type: "WAREHOUSE",
+      parentId: null,
+      active: true,
+    },
+    {
+      code: "E2E-NOBOX-MOB",
+      name: "Almacén E2E sin cajas MOB",
+      type: "WAREHOUSE",
+      parentId: null,
+      active: true,
+    },
+    {
+      code: "E2E-INACTIVE-WH",
+      name: "Almacén E2E inactivo",
+      type: "WAREHOUSE",
+      parentId: null,
+      active: false,
+    },
+  ]);
   await db.insert(inventoryItems).values([
     {
       productId: publicProduct.id,

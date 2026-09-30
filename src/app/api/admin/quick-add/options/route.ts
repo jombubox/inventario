@@ -1,8 +1,7 @@
 import { getDb } from "@/db";
 import { UnauthorizedError } from "@/features/auth/domain/auth-errors";
 import { requireAdmin } from "@/features/auth/server/admin-auth";
-import { searchInventoryModels } from "@/features/inventory/data/quick-add-queries";
-import { modelSearchQuerySchema } from "@/validators/quick-add-inventory";
+import { listQuickAddOptions } from "@/features/inventory/data/quick-add-queries";
 
 export const dynamic = "force-dynamic";
 
@@ -14,17 +13,10 @@ const privateHeaders = {
 export async function GET(request: Request) {
   try {
     await requireAdmin(request.headers);
-    const parsed = modelSearchQuerySchema.safeParse({
-      q: new URL(request.url).searchParams.get("q"),
-    });
-    if (!parsed.success) {
-      return Response.json(
-        { error: "Escribe al menos 2 caracteres.", results: [] },
-        { status: 400, headers: privateHeaders },
-      );
-    }
-    const results = await searchInventoryModels(getDb(), parsed.data.q);
-    return Response.json({ results }, { headers: privateHeaders });
+    return Response.json(
+      { options: await listQuickAddOptions(getDb()) },
+      { headers: privateHeaders },
+    );
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return Response.json(
@@ -33,7 +25,7 @@ export async function GET(request: Request) {
       );
     }
     return Response.json(
-      { error: "No fue posible buscar productos." },
+      { error: "No fue posible actualizar ubicaciones y catálogos." },
       { status: 500, headers: privateHeaders },
     );
   }

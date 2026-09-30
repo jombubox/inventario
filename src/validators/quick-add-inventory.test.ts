@@ -14,7 +14,7 @@ const validExisting = {
   componentTypeId: null,
   customComponentTypeName: null,
   partNumber: null,
-  compatibleModel: null,
+  compatibilities: [],
   title: null,
   locationId: secondId,
   boxMode: "existing",
@@ -26,7 +26,7 @@ const validExisting = {
 };
 
 describe("quickAddInventoryMutationSchema", () => {
-  it("accepts existing models with an existing box and optional bag", () => {
+  it("accepts existing products with an existing box and optional bag", () => {
     expect(quickAddInventoryMutationSchema.parse(validExisting)).toMatchObject({
       productId: id,
       bagLabel: null,
@@ -71,7 +71,7 @@ describe("quickAddInventoryMutationSchema", () => {
     }
   });
 
-  it("requires identity fields for a new model", () => {
+  it("requires identity fields for a new product", () => {
     const result = quickAddInventoryMutationSchema.safeParse({
       ...validExisting,
       productMode: "new",
@@ -79,13 +79,51 @@ describe("quickAddInventoryMutationSchema", () => {
       brandId: id,
       componentTypeId: secondId,
       partNumber: "",
-      compatibleModel: "",
+      compatibilities: [],
     });
     expect(result.success).toBe(false);
     if (!result.success) expect(result.error.flatten().fieldErrors.partNumber).toBeTruthy();
   });
 
-  it("accepts and normalizes serials only as new-model metadata", () => {
+  it.each([0, 1, 3])(
+    "accepts a new product with %i compatible models when it has a part number",
+    (count) => {
+      const compatibilities = Array.from({ length: count }, (_, index) => ({
+        brandId: id,
+        model: ` MODEL-${index + 1} `,
+        notes: null,
+      }));
+      const parsed = quickAddInventoryMutationSchema.parse({
+        ...validExisting,
+        productMode: "new",
+        productId: null,
+        brandId: id,
+        componentTypeId: secondId,
+        partNumber: "PRODUCT-IDENTITY",
+        compatibilities,
+      });
+      expect(parsed.compatibilities).toHaveLength(count);
+      if (count > 0) expect(parsed.compatibilities[0]?.model).toBe("MODEL-1");
+    },
+  );
+
+  it("accepts compatible models as the identity when part number is absent", () => {
+    const parsed = quickAddInventoryMutationSchema.parse({
+      ...validExisting,
+      productMode: "new",
+      productId: null,
+      brandId: id,
+      componentTypeId: secondId,
+      partNumber: "",
+      compatibilities: [{ brandId: id, model: "MODEL-ONLY", notes: null }],
+    });
+    expect(parsed.partNumber).toBeNull();
+    expect(parsed.compatibilities).toEqual([
+      { brandId: id, model: "MODEL-ONLY", notes: null },
+    ]);
+  });
+
+  it("accepts and normalizes serials only as new-product metadata", () => {
     const parsed = quickAddInventoryMutationSchema.parse({
       ...validExisting,
       productMode: "new",
@@ -100,7 +138,7 @@ describe("quickAddInventoryMutationSchema", () => {
     expect(parsed.secondarySerialNumbers).toEqual(["ALT-1"]);
   });
 
-  it("rejects duplicate serials for a new model", () => {
+  it("rejects duplicate serials for a new product", () => {
     const parsed = quickAddInventoryMutationSchema.safeParse({
       ...validExisting,
       productMode: "new",

@@ -17,6 +17,7 @@ import {
   importJobRows,
   operationalRateLimits,
   productImages,
+  productCompatibilities,
   productSerialNumbers,
   products,
   locations,
@@ -44,7 +45,12 @@ import {
   updateLocation,
 } from "@/features/locations/server/location-service";
 import { quickAddInventory } from "@/features/inventory/server/quick-add-service";
-import { searchInventoryModels } from "@/features/inventory/data/quick-add-queries";
+import {
+  listQuickAddOptions,
+  searchCompatibleModels,
+  searchInventoryModels,
+} from "@/features/inventory/data/quick-add-queries";
+import { UNPARENTED_BOXES_LOCATION_ID } from "@/features/locations/domain/quick-add-location";
 import {
   archiveProduct,
   createProduct,
@@ -183,6 +189,79 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     expect(attribution).not.toHaveLength(0);
     expect(attribution.every(({ userId }) => userId === null)).toBe(true);
     expect(attribution.every(({ metadata }) => metadata?.actorId === undefined)).toBe(true);
+  });
+
+  it("persists zero, one and multiple compatible models and searches normalized suggestions", async () => {
+    const { brand, componentType } = await catalogIds();
+    const withoutModels = await createTestProduct({
+      partNumber: "COMPAT-0",
+      compatibilities: [],
+    });
+    const oneModel = await createTestProduct({
+      partNumber: "COMPAT-1",
+      compatibilities: [
+        { brandId: brand.id, model: "UN55NU7100FXZX", notes: null },
+      ],
+    });
+    const threeModels = await createTestProduct({
+      partNumber: "COMPAT-3",
+      compatibilities: [
+        { brandId: brand.id, model: "UN55NU7100FXZX", notes: "Con nota" },
+        { brandId: brand.id, model: "UN58NU7100FXZX", notes: null },
+        { brandId: brand.id, model: "UN50AU7000FXZX", notes: null },
+      ],
+    });
+
+    const compatibilityRows = await nodeDb
+      .select()
+      .from(productCompatibilities)
+      .where(inArray(productCompatibilities.productId, [
+        withoutModels.id,
+        oneModel.id,
+        threeModels.id,
+      ]));
+    expect(compatibilityRows.filter(({ productId }) => productId === withoutModels.id)).toHaveLength(0);
+    expect(compatibilityRows.filter(({ productId }) => productId === oneModel.id)).toHaveLength(1);
+    expect(compatibilityRows.filter(({ productId }) => productId === threeModels.id)).toHaveLength(3);
+
+    const suggestions = await searchCompatibleModels(db, "un55nu7100");
+    expect(suggestions).toEqual([
+      expect.objectContaining({
+        brandId: brand.id,
+        model: "UN55NU7100FXZX",
+        normalizedModel: "UN55NU7100FXZX",
+      }),
+    ]);
+
+    const updated = await updateProduct(db, {
+      id: threeModels.id,
+      expectedUpdatedAt: threeModels.updatedAt,
+      brandId: brand.id,
+      componentTypeId: componentType.id,
+      partNumber: threeModels.partNumber,
+      title: threeModels.title,
+      description: threeModels.description,
+      salePrice: threeModels.salePrice,
+      currency: threeModels.currency,
+      status: threeModels.status,
+      isPublic: threeModels.isPublic,
+      compatibilities: [
+        { brandId: brand.id, model: "UN55NU7100FXZX", notes: "Con nota" },
+        { brandId: brand.id, model: "UN50AU7000FXZX", notes: null },
+        { brandId: brand.id, model: "UN65CU7000FXZX", notes: null },
+      ],
+    });
+    expect(updated.id).toBe(threeModels.id);
+    const reloadedModels = await nodeDb
+      .select({ model: productCompatibilities.model, notes: productCompatibilities.notes })
+      .from(productCompatibilities)
+      .where(eq(productCompatibilities.productId, threeModels.id));
+    expect(reloadedModels).toEqual(expect.arrayContaining([
+      { model: "UN55NU7100FXZX", notes: "Con nota" },
+      { model: "UN50AU7000FXZX", notes: null },
+      { model: "UN65CU7000FXZX", notes: null },
+    ]));
+    expect(reloadedModels).toHaveLength(3);
   });
 
   it("persists optional model serial combinations without changing part-number or SKU semantics", async () => {
@@ -836,7 +915,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
       componentTypeId: null,
       customComponentTypeName: null,
       partNumber: null,
-      compatibleModel: null,
+      compatibilities: [],
       title: null,
       locationId: warehouse.id,
       boxMode: "existing" as const,
@@ -863,6 +942,122 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     expect(movements.map((movement) => movement.type).sort()).toEqual(["IN", "IN", "INITIAL", "INITIAL"]);
   });
 
+  it("uses the same active-location rules in Quick Add and safely exposes legacy root boxes", async () => {
+    const product = await createTestProduct();
+    const activeWarehouse = await createLocation(db, {
+      code: "QA-ACTIVE-WH",
+      name: "Almacén activo",
+      type: "WAREHOUSE",
+      parentId: null,
+      active: true,
+      notes: null,
+    });
+    const activeBox = await createLocation(db, {
+      code: "QA-ACTIVE-BOX",
+      name: "Caja activa",
+      type: "BOX",
+      parentId: activeWarehouse.id,
+      active: true,
+      notes: null,
+    });
+    const emptyWarehouse = await createLocation(db, {
+      code: "QA-EMPTY-WH",
+      name: "Almacén activo sin cajas",
+      type: "WAREHOUSE",
+      parentId: null,
+      active: true,
+      notes: null,
+    });
+    const inactiveWarehouse = await createLocation(db, {
+      code: "QA-INACTIVE-WH",
+      name: "Almacén inactivo",
+      type: "WAREHOUSE",
+      parentId: null,
+      active: false,
+      notes: null,
+    });
+    const inactiveParentBox = await createLocation(db, {
+      code: "QA-INACTIVE-BOX",
+      name: "Caja con padre inactivo",
+      type: "BOX",
+      parentId: inactiveWarehouse.id,
+      active: true,
+      notes: null,
+    });
+    const legacyRootBox = await createLocation(db, {
+      code: "QA-ROOT-BOX",
+      name: "Caja raíz activa",
+      type: "BOX",
+      parentId: null,
+      active: true,
+      notes: null,
+    });
+    const deletedWarehouse = await createLocation(db, {
+      code: "QA-DELETED-WH",
+      name: "Ubicación eliminada",
+      type: "WAREHOUSE",
+      parentId: null,
+      active: true,
+      notes: null,
+    });
+    await nodeDb.delete(locations).where(eq(locations.id, deletedWarehouse.id));
+
+    const options = await listQuickAddOptions(db);
+    expect(options.locations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: activeWarehouse.id, kind: "container" }),
+      expect.objectContaining({ id: emptyWarehouse.id, kind: "container" }),
+      expect.objectContaining({
+        id: UNPARENTED_BOXES_LOCATION_ID,
+        kind: "unparented-boxes",
+      }),
+    ]));
+    expect(options.locations.map(({ id }) => id)).not.toContain(inactiveWarehouse.id);
+    expect(options.locations.map(({ id }) => id)).not.toContain(deletedWarehouse.id);
+    expect(options.boxes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: activeBox.id, parentId: activeWarehouse.id }),
+      expect.objectContaining({
+        id: legacyRootBox.id,
+        parentId: UNPARENTED_BOXES_LOCATION_ID,
+      }),
+    ]));
+    expect(options.boxes.map(({ id }) => id)).not.toContain(inactiveParentBox.id);
+    expect(options.boxes.some(({ parentId }) => parentId === emptyWarehouse.id)).toBe(false);
+    expect(options.locationAvailability).toMatchObject({
+      total: 3,
+      active: 2,
+      inactive: 1,
+      unparentedBoxes: 1,
+    });
+
+    const base = {
+      productMode: "existing" as const,
+      productId: product.id,
+      brandId: null,
+      customBrandName: null,
+      componentTypeId: null,
+      customComponentTypeName: null,
+      partNumber: null,
+      compatibilities: [],
+      title: null,
+      locationId: UNPARENTED_BOXES_LOCATION_ID,
+      boxMode: "existing" as const,
+      boxId: legacyRootBox.id,
+      newBoxCode: null,
+      newBoxName: null,
+      bagLabel: null,
+      quantity: 2,
+    };
+    const added = await quickAddInventory(db, base);
+    expect(added.item).toMatchObject({ locationId: legacyRootBox.id, quantity: 2 });
+    await expect(quickAddInventory(db, {
+      ...base,
+      boxMode: "new",
+      boxId: null,
+      newBoxCode: "QA-ROOT-CHILD",
+      newBoxName: "Caja sin contenedor",
+    })).rejects.toThrow(/ubicación contenedora/u);
+  });
+
   it("creates a new model, inline box, inventory and audit atomically", async () => {
     const { brand, componentType } = await catalogIds();
     const warehouse = await createLocation(db, {
@@ -882,7 +1077,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
       componentTypeId: componentType.id,
       customComponentTypeName: null,
       partNumber: "QUICK-NEW-001",
-      compatibleModel: "MODEL-QA",
+      compatibilities: [{ brandId: brand.id, model: "MODEL-QA", notes: null }],
       title: null,
       locationId: warehouse.id,
       boxMode: "new",
@@ -907,7 +1102,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
       componentTypeId: componentType.id,
       customComponentTypeName: null,
       partNumber: " quick new 001 ",
-      compatibleModel: null,
+      compatibilities: [],
       title: null,
       locationId: warehouse.id,
       boxMode: "new",
@@ -916,7 +1111,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
       newBoxName: "Caja B02",
       bagLabel: null,
       quantity: 1,
-    })).rejects.toThrow(/Ya existe un modelo/u);
+    })).rejects.toThrow(/Ya existe un producto/u);
     expect(await nodeDb.select().from(locations).where(eq(locations.code, "QA-B02"))).toHaveLength(0);
   });
 
@@ -991,7 +1186,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
       componentTypeId: null,
       customComponentTypeName: null,
       partNumber: null,
-      compatibleModel: null,
+      compatibilities: [],
       title: null,
       locationId: warehouse.id,
       boxMode: "existing" as const,
@@ -1037,7 +1232,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
       componentTypeId: null,
       customComponentTypeName: null,
       partNumber: null,
-      compatibleModel: null,
+      compatibilities: [],
       title: null,
       locationId: warehouse.id,
       boxMode: "existing" as const,
@@ -1088,7 +1283,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
         partNumber: "QA-ROLLBACK-01",
         primarySerialNumber: "QA-ROLLBACK-MAIN",
         secondarySerialNumbers: ["QA-ROLLBACK-ALT"],
-        compatibleModel: null,
+        compatibilities: [],
         title: null,
         locationId: warehouse.id,
         boxMode: "new",

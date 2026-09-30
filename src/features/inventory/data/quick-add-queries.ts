@@ -10,6 +10,13 @@ import {
   products,
 } from "@/db/schema";
 import { buildLocationBreadcrumb } from "@/features/locations/domain/location-hierarchy";
+import {
+  isQuickAddBox,
+  isQuickAddContainer,
+  isUnparentedQuickAddBox,
+  UNPARENTED_BOXES_LOCATION_ID,
+} from "@/features/locations/domain/quick-add-location";
+import { normalizeModel } from "@/features/products/domain/product-normalization";
 import { normalizeSerialNumber } from "@/features/products/domain/serial-number";
 import { normalizeIdentifier } from "@/features/shared/domain/text-normalization";
 
@@ -45,26 +52,55 @@ export async function listQuickAddOptions(db: Database) {
         name: locations.name,
         type: locations.type,
         parentId: locations.parentId,
+        active: locations.active,
       })
       .from(locations)
-      .where(eq(locations.active, true))
       .orderBy(asc(locations.name))
       .limit(1_000),
   ]);
 
+  const locationById = new Map(locationRows.map((location) => [location.id, location]));
+  const containers = locationRows.filter(isQuickAddContainer);
+  const boxes = locationRows.filter((location) => {
+    if (!isQuickAddBox(location)) return false;
+    const parent = location.parentId ? locationById.get(location.parentId) : undefined;
+    return parent ? isQuickAddContainer(parent) : false;
+  });
+  const unparentedBoxes = locationRows.filter(isUnparentedQuickAddBox);
+  const physicalLocations = locationRows.filter(
+    (location) => location.type !== "BOX" && location.type !== "BAG",
+  );
+
   return {
     brands: brandRows,
     componentTypes: componentTypeRows,
-    locations: locationRows
-      .filter((location) => location.type !== "BOX" && location.type !== "BAG")
+    locationAvailability: {
+      total: physicalLocations.length,
+      active: containers.length,
+      inactive: physicalLocations.length - containers.length,
+      unparentedBoxes: unparentedBoxes.length,
+    },
+    locations: [
+      ...containers
       .map((location) => ({
         id: location.id,
         code: location.code,
         name: location.name,
         breadcrumb: buildLocationBreadcrumb(location.id, locationRows),
+        kind: "container" as const,
       })),
-    boxes: locationRows
-      .filter((location) => location.type === "BOX" && location.parentId)
+      ...(unparentedBoxes.length > 0
+        ? [{
+            id: UNPARENTED_BOXES_LOCATION_ID,
+            code: "",
+            name: "Cajas sin ubicación padre",
+            breadcrumb: "Cajas sin ubicación padre",
+            kind: "unparented-boxes" as const,
+          }]
+        : []),
+    ],
+    boxes: [
+      ...boxes
       .map((location) => ({
         id: location.id,
         code: location.code,
@@ -72,7 +108,61 @@ export async function listQuickAddOptions(db: Database) {
         parentId: location.parentId!,
         breadcrumb: buildLocationBreadcrumb(location.id, locationRows),
       })),
+      ...unparentedBoxes.map((location) => ({
+        id: location.id,
+        code: location.code,
+        name: location.name,
+        parentId: UNPARENTED_BOXES_LOCATION_ID,
+        breadcrumb: location.name,
+      })),
+    ],
   };
+}
+
+export type CompatibleModelSearchResult = {
+  brandId: string;
+  brandName: string;
+  model: string;
+  normalizedModel: string;
+};
+
+export async function searchCompatibleModels(
+  db: Database,
+  rawQuery: string,
+): Promise<CompatibleModelSearchResult[]> {
+  const query = rawQuery.trim();
+  const pattern = `%${query}%`;
+  const normalized = normalizeModel(query);
+  const normalizedPattern = `%${normalized}%`;
+
+  return db
+    .select({
+      brandId: productCompatibilities.brandId,
+      brandName: brands.name,
+      model: sql<string>`min(${productCompatibilities.model})`,
+      normalizedModel: productCompatibilities.normalizedModel,
+    })
+    .from(productCompatibilities)
+    .innerJoin(brands, eq(productCompatibilities.brandId, brands.id))
+    .where(
+      and(
+        eq(brands.active, true),
+        or(
+          ilike(productCompatibilities.model, pattern),
+          normalized
+            ? ilike(productCompatibilities.normalizedModel, normalizedPattern)
+            : undefined,
+          ilike(brands.name, pattern),
+        ),
+      ),
+    )
+    .groupBy(
+      productCompatibilities.brandId,
+      brands.name,
+      productCompatibilities.normalizedModel,
+    )
+    .orderBy(asc(brands.name), sql`min(${productCompatibilities.model})`)
+    .limit(12);
 }
 
 export async function searchInventoryModels(

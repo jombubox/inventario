@@ -1,6 +1,8 @@
 import { z } from "zod";
 
+import { UNPARENTED_BOXES_LOCATION_ID } from "@/features/locations/domain/quick-add-location";
 import { CUSTOM_CATALOG_VALUE } from "@/features/products/domain/catalog-selection";
+import { compatibilityMutationSchema } from "@/validators/admin-product";
 import { optionalDisplayText, requiredDisplayText } from "@/validators/shared";
 import {
   productSerialFields,
@@ -28,9 +30,12 @@ export const quickAddInventoryMutationSchema = z
     customComponentTypeName: optionalDisplayText,
     partNumber: optionalDisplayText,
     ...productSerialFields,
-    compatibleModel: optionalDisplayText,
+    compatibilities: z.array(compatibilityMutationSchema).max(30),
     title: optionalDisplayText,
-    locationId: z.uuid("Selecciona una ubicación válida."),
+    locationId: z.union([
+      z.uuid("Selecciona una ubicación válida."),
+      z.literal(UNPARENTED_BOXES_LOCATION_ID),
+    ]),
     boxMode: z.enum(["existing", "new"]),
     boxId: z.preprocess(
       (value) => (value === "" || value === undefined ? null : value),
@@ -53,7 +58,7 @@ export const quickAddInventoryMutationSchema = z
       context.addIssue({
         code: "custom",
         path: ["productId"],
-        message: "Selecciona un modelo existente.",
+        message: "Selecciona un producto existente.",
       });
     }
 
@@ -85,7 +90,7 @@ export const quickAddInventoryMutationSchema = z
           message: "Escribe el nombre del nuevo componente.",
         });
       }
-      if (!value.partNumber && !value.compatibleModel) {
+      if (!value.partNumber && value.compatibilities.length === 0) {
         context.addIssue({
           code: "custom",
           path: ["partNumber"],
@@ -95,7 +100,7 @@ export const quickAddInventoryMutationSchema = z
       if (
         value.brandId === CUSTOM_CATALOG_VALUE &&
         !value.partNumber &&
-        value.compatibleModel
+        value.compatibilities.length > 0
       ) {
         context.addIssue({
           code: "custom",

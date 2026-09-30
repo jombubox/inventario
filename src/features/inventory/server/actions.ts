@@ -51,7 +51,7 @@ export async function quickAddInventoryAction(
     partNumber: formData.get("partNumber"),
     primarySerialNumber: formData.get("primarySerialNumber"),
     secondarySerialNumbers: parseStringArray(formData.get("secondarySerialNumbers")),
-    compatibleModel: formData.get("compatibleModel"),
+    compatibilities: parseStringArray(formData.get("compatibilities")),
     title: formData.get("title"),
     locationId: formData.get("locationId"),
     boxMode: formData.get("boxMode"),

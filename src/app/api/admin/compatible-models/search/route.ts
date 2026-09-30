@@ -1,7 +1,7 @@
 import { getDb } from "@/db";
 import { UnauthorizedError } from "@/features/auth/domain/auth-errors";
 import { requireAdmin } from "@/features/auth/server/admin-auth";
-import { searchInventoryModels } from "@/features/inventory/data/quick-add-queries";
+import { searchCompatibleModels } from "@/features/inventory/data/quick-add-queries";
 import { modelSearchQuerySchema } from "@/validators/quick-add-inventory";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
         { status: 400, headers: privateHeaders },
       );
     }
-    const results = await searchInventoryModels(getDb(), parsed.data.q);
+    const results = await searchCompatibleModels(getDb(), parsed.data.q);
     return Response.json({ results }, { headers: privateHeaders });
   } catch (error) {
     if (error instanceof UnauthorizedError) {
@@ -33,7 +33,7 @@ export async function GET(request: Request) {
       );
     }
     return Response.json(
-      { error: "No fue posible buscar productos." },
+      { error: "No fue posible buscar modelos compatibles." },
       { status: 500, headers: privateHeaders },
     );
   }

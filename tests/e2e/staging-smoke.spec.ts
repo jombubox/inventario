@@ -89,9 +89,9 @@ test.describe("remote staging smoke", () => {
     const desktopNav = page.getByRole("navigation", { name: "Navegación de administración" });
     await desktopNav.getByRole("button", { name: "Agregar producto" }).click();
     let dialog = page.getByRole("dialog", { name: "Agregar producto al inventario" });
-    await dialog.getByLabel("Buscar modelo").fill(partNumber);
-    await expect(dialog.getByText("No encontramos este modelo", { exact: true })).toBeVisible();
-    await dialog.getByRole("button", { name: "Crear nuevo modelo" }).click();
+    await dialog.getByLabel("Buscar producto").fill(partNumber);
+    await expect(dialog.getByText("No encontramos este producto", { exact: true })).toBeVisible();
+    await dialog.getByRole("button", { name: "Agregar producto nuevo", exact: true }).click();
     await dialog.getByLabel("Número de serie principal (opcional)").fill(primarySerial);
     await dialog.getByRole("button", { name: "Agregar número de serie secundario" }).click();
     await dialog.getByRole("textbox", { name: "Número de serie secundario 1", exact: true }).fill(secondaryOne);
@@ -99,7 +99,7 @@ test.describe("remote staging smoke", () => {
     await dialog.getByRole("textbox", { name: "Número de serie secundario 2", exact: true }).fill(secondaryTwo);
     await dialog.getByRole("button", { name: "Continuar con ubicación" }).click();
     await selectOptionContaining(dialog.getByLabel("Ubicación"), warehouseName);
-    const createBoxButton = dialog.getByRole("button", { name: "Crear nueva caja" });
+    const createBoxButton = dialog.getByRole("button", { name: "Crear caja" });
     if (await createBoxButton.count()) await createBoxButton.click();
     await dialog.getByLabel("Código").fill(boxCode);
     await dialog.getByLabel("Nombre").fill(boxName);
@@ -112,7 +112,7 @@ test.describe("remote staging smoke", () => {
     await page.reload();
     await desktopNav.getByRole("button", { name: "Agregar producto" }).click();
     dialog = page.getByRole("dialog", { name: "Agregar producto al inventario" });
-    await dialog.getByLabel("Buscar modelo").fill(`${smokeId}-ALT-B`);
+    await dialog.getByLabel("Buscar producto").fill(`${smokeId}-ALT-B`);
     await expect(dialog.getByText(primarySerial, { exact: false })).toBeVisible();
     await dialog.getByRole("button").filter({ hasText: partNumber }).click();
     await selectOptionContaining(dialog.getByLabel("Ubicación"), warehouseName);
@@ -172,8 +172,8 @@ test.describe("remote staging smoke", () => {
     const mobileNav = page.getByRole("navigation", { name: "Navegación móvil de administración" });
     await mobileNav.getByRole("button", { name: "Agregar producto" }).click();
     const dialog = page.getByRole("dialog", { name: "Agregar producto al inventario" });
-    await expect(dialog.getByLabel("Buscar modelo")).toBeFocused();
-    await dialog.getByLabel("Buscar modelo").fill(editedPrimarySerial.slice(-8));
+    await expect(dialog.getByLabel("Buscar producto")).toBeFocused();
+    await dialog.getByLabel("Buscar producto").fill(editedPrimarySerial.slice(-8));
     await expect(dialog.getByRole("button").filter({ hasText: partNumber })).toBeVisible();
     expect(await dialog.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
     await page.keyboard.press("Escape");

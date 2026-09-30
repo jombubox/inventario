@@ -17,7 +17,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import { UNPARENTED_BOXES_LOCATION_ID } from "@/features/locations/domain/quick-add-location";
 import { CUSTOM_CATALOG_VALUE } from "@/features/products/domain/catalog-selection";
+import {
+  CompatibleModelsField,
+  type CompatibilityValue,
+} from "@/features/products/components/compatible-models-field";
 import {
   ProductSerialFields,
   type SerialNumberValue,
@@ -29,7 +34,13 @@ import { initialMutationState } from "@/features/shared/domain/mutation-state";
 import { cn } from "@/lib/cn";
 
 type CatalogOption = { id: string; name: string; code: string };
-type LocationOption = { id: string; code: string; name: string; breadcrumb: string };
+type LocationOption = {
+  id: string;
+  code: string;
+  name: string;
+  breadcrumb: string;
+  kind: "container" | "unparented-boxes";
+};
 type BoxOption = {
   id: string;
   code: string;
@@ -43,6 +54,12 @@ type QuickAddOptions = {
   componentTypes: CatalogOption[];
   locations: LocationOption[];
   boxes: BoxOption[];
+  locationAvailability: {
+    total: number;
+    active: number;
+    inactive: number;
+    unparentedBoxes: number;
+  };
 };
 
 const QuickAddContext = createContext<((trigger?: HTMLElement) => void) | null>(null);
@@ -89,11 +106,19 @@ export function AdminQuickAddProvider({
 }) {
   const [open, setOpen] = useState(false);
   const [session, setSession] = useState(0);
+  const [latestOptions, setLatestOptions] = useState(options);
   const triggerRef = useRef<HTMLElement | null>(null);
 
   const openQuickAdd = (trigger?: HTMLElement) => {
     triggerRef.current = trigger ?? null;
     setOpen(true);
+    void fetch("/api/admin/quick-add/options", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) return;
+        const body = (await response.json()) as { options?: QuickAddOptions };
+        if (body.options) setLatestOptions(body.options);
+      })
+      .catch(() => undefined);
   };
 
   const close = () => {
@@ -111,7 +136,7 @@ export function AdminQuickAddProvider({
       {open ? (
         <QuickAddDialog
           key={session}
-          options={options}
+          options={latestOptions}
           onClose={close}
           onRestart={() => setSession((value) => value + 1)}
         />
@@ -197,25 +222,36 @@ function QuickAddDialog({
   const [partNumber, setPartNumber] = useState("");
   const [primarySerialNumber, setPrimarySerialNumber] = useState("");
   const [secondarySerialNumbers, setSecondarySerialNumbers] = useState<SerialNumberValue[]>([]);
-  const [compatibleModel, setCompatibleModel] = useState("");
+  const [compatibilities, setCompatibilities] = useState<CompatibilityValue[]>([]);
   const [title, setTitle] = useState("");
   const [createError, setCreateError] = useState("");
   const initialLocationId = options.locations[0]?.id ?? "";
   const initialBox = options.boxes.find((box) => box.parentId === initialLocationId);
   const [locationId, setLocationId] = useState(initialLocationId);
-  const [boxMode, setBoxMode] = useState<"existing" | "new">(
-    initialBox ? "existing" : "new",
-  );
+  const [boxMode, setBoxMode] = useState<"existing" | "new">("existing");
   const [boxId, setBoxId] = useState(initialBox?.id ?? "");
   const [newBoxCode, setNewBoxCode] = useState("");
   const [newBoxName, setNewBoxName] = useState("");
   const [bagLabel, setBagLabel] = useState("");
   const [quantity, setQuantity] = useState(1);
 
+  const resolvedLocationId = options.locations.some((location) => location.id === locationId)
+    ? locationId
+    : options.locations[0]?.id ?? "";
   const boxes = useMemo(
-    () => options.boxes.filter((box) => box.parentId === locationId),
-    [locationId, options.boxes],
+    () => options.boxes.filter((box) => box.parentId === resolvedLocationId),
+    [resolvedLocationId, options.boxes],
   );
+  const resolvedBoxId = boxes.some((box) => box.id === boxId)
+    ? boxId
+    : boxes[0]?.id ?? "";
+  const selectedLocation = options.locations.find(
+    (location) => location.id === resolvedLocationId,
+  );
+  const usesUnparentedBoxes = resolvedLocationId === UNPARENTED_BOXES_LOCATION_ID;
+  const locationEmptyMessage = options.locationAvailability.total === 0
+    ? "No hay ubicaciones disponibles."
+    : "No hay ubicaciones activas.";
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -241,12 +277,12 @@ function QuickAddDialog({
           results?: QuickAddProductResult[];
           error?: string;
         };
-        if (!response.ok) throw new Error(body.error ?? "No fue posible buscar modelos.");
+        if (!response.ok) throw new Error(body.error ?? "No fue posible buscar productos.");
         setResults(body.results ?? []);
         setSearchedQuery(trimmed);
       } catch (error) {
         if (controller.signal.aborted) return;
-        setSearchError(error instanceof Error ? error.message : "No fue posible buscar modelos.");
+        setSearchError(error instanceof Error ? error.message : "No fue posible buscar productos.");
       } finally {
         if (!controller.signal.aborted) setSearching(false);
       }
@@ -273,7 +309,7 @@ function QuickAddDialog({
     const firstBox = options.boxes.find((box) => box.parentId === nextLocationId);
     setLocationId(nextLocationId);
     setBoxId(firstBox?.id ?? "");
-    setBoxMode(firstBox ? "existing" : "new");
+    setBoxMode("existing");
     setNewBoxCode("");
     setNewBoxName("");
   };
@@ -288,6 +324,7 @@ function QuickAddDialog({
     setSelectedProduct(product);
     setPrimarySerialNumber("");
     setSecondarySerialNumbers([]);
+    setCompatibilities([]);
     setStep("place");
   };
 
@@ -300,15 +337,16 @@ function QuickAddDialog({
     setPartNumber(query.trim());
     setPrimarySerialNumber("");
     setSecondarySerialNumbers([]);
+    setCompatibilities([]);
     setStep("create");
   };
 
-  const continueNewModel = () => {
+  const continueNewProduct = () => {
     if (!brandId || !componentTypeId) {
       setCreateError("Selecciona marca y tipo de componente.");
       return;
     }
-    if (!partNumber.trim() && !compatibleModel.trim()) {
+    if (!partNumber.trim() && compatibilities.length === 0) {
       setCreateError("Agrega un número de parte o un modelo compatible.");
       return;
     }
@@ -326,7 +364,7 @@ function QuickAddDialog({
     if (
       brandId === CUSTOM_CATALOG_VALUE &&
       !partNumber.trim() &&
-      compatibleModel.trim()
+      compatibilities.length > 0
     ) {
       setCreateError("Una marca nueva necesita número de parte en este flujo rápido.");
       return;
@@ -352,7 +390,7 @@ function QuickAddDialog({
   const selectedType = options.componentTypes.find((item) => item.id === componentTypeId);
   const modelSummary = selectedProduct
     ? selectedProduct.partNumber ?? selectedProduct.compatibleModel ?? selectedProduct.title
-    : partNumber || compatibleModel || "Nuevo modelo";
+    : partNumber || compatibilities[0]?.model || "Nuevo producto";
 
   return (
     <dialog
@@ -385,11 +423,11 @@ function QuickAddDialog({
           name="secondarySerialNumbers"
           value={JSON.stringify(secondarySerialNumbers.map(({ value }) => value))}
         />
-        <input type="hidden" name="compatibleModel" value={compatibleModel} />
+        <input type="hidden" name="compatibilities" value={JSON.stringify(compatibilities)} />
         <input type="hidden" name="title" value={title} />
-        <input type="hidden" name="locationId" value={locationId} />
+        <input type="hidden" name="locationId" value={resolvedLocationId} />
         <input type="hidden" name="boxMode" value={boxMode} />
-        <input type="hidden" name="boxId" value={boxId} />
+        <input type="hidden" name="boxId" value={resolvedBoxId} />
         <input type="hidden" name="newBoxCode" value={newBoxCode} />
         <input type="hidden" name="newBoxName" value={newBoxName} />
         <input type="hidden" name="bagLabel" value={bagLabel} />
@@ -437,13 +475,13 @@ function QuickAddDialog({
               {step === "search" ? (
                 <section aria-labelledby="search-model-title">
                   <h3 id="search-model-title" className="text-h2 text-navy">
-                    ¿Qué pieza quieres agregar?
+                    ¿Qué producto quieres agregar?
                   </h3>
                   <p className="mt-2 text-small text-muted-foreground">
-                    Busca antes de crear. Acepta modelo, SKU, nombre, marca, número de parte o serie.
+                    Busca un producto existente por nombre, SKU, número de parte, serial o modelo compatible.
                   </p>
                   <div className="relative mt-5">
-                    <Label htmlFor="quick-model-search" className="sr-only">Buscar modelo</Label>
+                    <Label htmlFor="quick-model-search" className="sr-only">Buscar producto</Label>
                     <Input
                       ref={searchRef}
                       id="quick-model-search"
@@ -465,26 +503,26 @@ function QuickAddDialog({
 
                   {searchedQuery && !searching && results.length === 0 ? (
                     <div className="mt-5 rounded-2xl border border-dashed border-border bg-muted/40 p-5 text-center">
-                      <p className="font-semibold text-navy">No encontramos este modelo</p>
-                      <p className="mt-1 text-small text-muted-foreground">Revisa la búsqueda o crea una definición nueva.</p>
+                      <p className="font-semibold text-navy">No encontramos este producto</p>
+                      <p className="mt-1 text-small text-muted-foreground">Revisa la búsqueda o crea un producto nuevo.</p>
                     </div>
                   ) : null}
 
-                  {query.trim().length >= 2 && !searching ? (
+                  {!searching ? (
                     <div className="mt-5 border-t border-border pt-5">
                       {showSimilarWarning && results.length > 0 ? (
                         <div className="rounded-xl border border-warning/25 bg-warning/5 p-4">
-                          <p className="font-semibold text-navy">Encontramos modelos parecidos</p>
+                          <p className="font-semibold text-navy">Encontramos productos parecidos</p>
                           <p className="mt-1 text-small text-muted-foreground">
-                            Confirma que ninguno sea la pieza correcta antes de crear otra.
+                            Confirma que ninguno sea el producto correcto antes de crear otro.
                           </p>
                           <Button type="button" variant="outline" size="sm" className="mt-4" onClick={beginCreate}>
-                            Crear uno nuevo de todas formas
+                            Agregar producto nuevo de todas formas
                           </Button>
                         </div>
                       ) : (
                         <Button type="button" variant="outline" onClick={beginCreate}>
-                          <span aria-hidden="true">+</span> Crear nuevo modelo
+                          <span aria-hidden="true">+</span> Agregar producto nuevo
                         </Button>
                       )}
                     </div>
@@ -495,7 +533,7 @@ function QuickAddDialog({
               {step === "create" ? (
                 <section aria-labelledby="create-model-title">
                   <button type="button" className="text-small font-semibold text-primary hover:underline" onClick={() => setStep("search")}>← Volver a buscar</button>
-                  <h3 id="create-model-title" className="mt-4 text-h2 text-navy">Crear nuevo modelo</h3>
+                  <h3 id="create-model-title" className="mt-4 text-h2 text-navy">Crear producto nuevo</h3>
                   <p className="mt-2 text-small text-muted-foreground">Solo necesitamos su identidad. Los datos comerciales e imágenes pueden completarse después.</p>
                   {createError ? <p role="alert" className="mt-4 rounded-xl border border-danger/25 bg-danger/5 p-3 text-small text-danger">{createError}</p> : null}
                   <div className="mt-5 grid gap-5 sm:grid-cols-2">
@@ -531,9 +569,19 @@ function QuickAddDialog({
                         secondaryErrors={state.fieldErrors?.secondarySerialNumbers}
                       />
                     </div>
-                    <div>
-                      <Label htmlFor="quick-compatible-model">Modelo compatible</Label>
-                      <Input id="quick-compatible-model" value={compatibleModel} onChange={(event) => setCompatibleModel(event.target.value)} placeholder="Ej. UN58H5200SXZX" className="mt-2" />
+                    <div className="sm:col-span-2">
+                      <CompatibleModelsField
+                        idPrefix="quick-product"
+                        brands={options.brands}
+                        value={compatibilities}
+                        onChange={setCompatibilities}
+                        defaultBrandId={
+                          brandId === CUSTOM_CATALOG_VALUE
+                            ? options.brands[0]?.id ?? ""
+                            : brandId
+                        }
+                        errors={state.fieldErrors?.compatibilities}
+                      />
                     </div>
                     <div className="sm:col-span-2">
                       <Label htmlFor="quick-title">Nombre administrativo <span className="font-normal text-muted-foreground">(opcional)</span></Label>
@@ -545,9 +593,9 @@ function QuickAddDialog({
 
               {step === "place" ? (
                 <section aria-labelledby="place-model-title">
-                  <button type="button" className="text-small font-semibold text-primary hover:underline" onClick={() => setStep(selectedProduct ? "search" : "create")}>← Cambiar modelo</button>
+                  <button type="button" className="text-small font-semibold text-primary hover:underline" onClick={() => setStep(selectedProduct ? "search" : "create")}>← Cambiar producto</button>
                   <div className="mt-4 rounded-2xl border border-primary/20 bg-primary-soft/50 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.1em] text-primary">{selectedProduct ? "Modelo encontrado" : "Modelo nuevo"}</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.1em] text-primary">{selectedProduct ? "Producto encontrado" : "Producto nuevo"}</p>
                     <p className="mt-1 font-semibold text-navy">{modelSummary}</p>
                     <p className="mt-1 text-small text-muted-foreground">
                       {selectedProduct
@@ -560,10 +608,15 @@ function QuickAddDialog({
                   <div className="mt-5 grid gap-5 sm:grid-cols-2">
                     <div className="sm:col-span-2">
                       <Label htmlFor="quick-location">Ubicación</Label>
-                      <Select id="quick-location" value={locationId} onChange={(event) => updateLocation(event.target.value)} className="mt-2" disabled={options.locations.length === 0}>
-                        {options.locations.length === 0 ? <option value="">No hay ubicaciones activas</option> : null}
+                      <Select id="quick-location" value={resolvedLocationId} onChange={(event) => updateLocation(event.target.value)} className="mt-2" disabled={options.locations.length === 0}>
+                        {options.locations.length === 0 ? <option value="">{locationEmptyMessage}</option> : null}
                         {options.locations.map((location) => <option key={location.id} value={location.id}>{location.breadcrumb}</option>)}
                       </Select>
+                      {selectedLocation?.kind === "unparented-boxes" ? (
+                        <p className="mt-2 text-xs text-warning">
+                          Estas cajas activas aún no tienen una ubicación padre. Puedes usarlas sin confundirlas con una ubicación física.
+                        </p>
+                      ) : null}
                       <FieldError errors={state.fieldErrors?.locationId} />
                     </div>
 
@@ -574,13 +627,21 @@ function QuickAddDialog({
                       </div>
                       {boxMode === "existing" ? (
                         <>
-                          <Select id="quick-box" value={boxId} onChange={(event) => setBoxId(event.target.value)} className="mt-2">
-                            <option value="">Selecciona una caja</option>
-                            {boxes.map((box) => <option key={box.id} value={box.id}>{box.code} · {box.name}</option>)}
-                          </Select>
-                          <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => { setBoxMode("new"); setBoxId(""); }}>
-                            + Crear nueva caja
-                          </Button>
+                          {boxes.length > 0 ? (
+                            <Select id="quick-box" value={resolvedBoxId} onChange={(event) => setBoxId(event.target.value)} className="mt-2">
+                              <option value="">Selecciona una caja</option>
+                              {boxes.map((box) => <option key={box.id} value={box.id}>{box.code} · {box.name}</option>)}
+                            </Select>
+                          ) : (
+                            <p className="mt-2 rounded-xl bg-muted px-4 py-3 text-small text-muted-foreground">
+                              No hay cajas en esta ubicación.
+                            </p>
+                          )}
+                          {!usesUnparentedBoxes ? (
+                            <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => { setBoxMode("new"); setBoxId(""); }}>
+                              + Crear caja
+                            </Button>
+                          ) : null}
                         </>
                       ) : (
                         <div className="mt-2 grid gap-3 rounded-xl border border-primary/20 bg-primary-soft/30 p-4 sm:grid-cols-2">
@@ -613,17 +674,17 @@ function QuickAddDialog({
 
             <footer className="relative z-10 shrink-0 border-t border-border bg-card px-5 py-4 sm:px-7">
               {step === "create" ? (
-                <div className="flex justify-end"><Button type="button" onClick={continueNewModel}>Continuar con ubicación</Button></div>
+                <div className="flex justify-end"><Button type="button" onClick={continueNewProduct}>Continuar con ubicación</Button></div>
               ) : null}
               {step === "place" ? (
                 <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-xs text-muted-foreground">Modelo + caja nueva + inventario se guardan juntos.</p>
-                  <Button type="submit" isLoading={pending} loadingLabel="Agregando…" disabled={!locationId || quantity < 1 || (boxMode === "existing" ? !boxId : !newBoxCode.trim() || !newBoxName.trim())}>
+                  <p className="text-xs text-muted-foreground">Producto + caja nueva + inventario se guardan juntos.</p>
+                  <Button type="submit" isLoading={pending} loadingLabel="Agregando…" disabled={!resolvedLocationId || quantity < 1 || (boxMode === "existing" ? !resolvedBoxId : !newBoxCode.trim() || !newBoxName.trim())}>
                     Agregar {Number.isFinite(quantity) && quantity > 0 ? quantity : ""} al inventario
                   </Button>
                 </div>
               ) : null}
-              {step === "search" ? <p className="text-center text-xs text-muted-foreground">Selecciona un modelo para continuar.</p> : null}
+              {step === "search" ? <p className="text-center text-xs text-muted-foreground">Selecciona un producto o agrega uno nuevo.</p> : null}
             </footer>
           </>
         )}

@@ -36,6 +36,7 @@ export async function createLocationAction(
   await requireAdmin();
   try {
     await createLocation(getDb(), parsed.data);
+    revalidatePath("/admin");
     revalidatePath("/admin/ubicaciones");
     return { status: "success", message: "Ubicación creada." };
   } catch (error) {
@@ -56,6 +57,7 @@ export async function updateLocationAction(
   await requireAdmin();
   try {
     await updateLocation(getDb(), parsed.data);
+    revalidatePath("/admin");
     revalidatePath("/admin/ubicaciones");
     revalidatePath("/admin/inventario");
     return { status: "success", message: "Ubicación actualizada." };

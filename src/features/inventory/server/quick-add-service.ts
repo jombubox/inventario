@@ -1,12 +1,15 @@
 import "server-only";
 
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 
 import type { Database } from "@/db/connection";
 import { inventoryItems, locations, products } from "@/db/schema";
 import { createInventoryItemInTransaction, recordStockMovementInTransaction } from "@/features/inventory/server/inventory-service";
 import { createLocationInTransaction } from "@/features/locations/server/location-service";
-import { CUSTOM_CATALOG_VALUE } from "@/features/products/domain/catalog-selection";
+import {
+  isQuickAddContainer,
+  UNPARENTED_BOXES_LOCATION_ID,
+} from "@/features/locations/domain/quick-add-location";
 import { createProductInTransaction } from "@/features/products/server/product-service";
 import {
   DuplicateEntityError,
@@ -32,17 +35,13 @@ async function resolveProduct(
       .where(and(eq(products.id, input.productId!), sql`${products.deletedAt} is null`))
       .for("update")
       .limit(1);
-    if (!product) throw new EntityNotFoundError("El modelo seleccionado ya no existe.");
+    if (!product) throw new EntityNotFoundError("El producto seleccionado ya no existe.");
     return { product, created: false };
   }
 
   if (!input.brandId || !input.componentTypeId) {
     throw new InvalidOperationError("Completa la marca y el tipo de componente.");
   }
-
-  const compatibleBrandId = input.brandId === CUSTOM_CATALOG_VALUE
-    ? null
-    : input.brandId;
 
   try {
     const product = await createProductInTransaction(tx, {
@@ -59,15 +58,13 @@ async function resolveProduct(
       currency: "MXN",
       status: "DRAFT",
       isPublic: false,
-      compatibilities: input.compatibleModel && compatibleBrandId
-        ? [{ brandId: compatibleBrandId, model: input.compatibleModel, notes: null }]
-        : [],
+      compatibilities: input.compatibilities,
     });
     return { product, created: true };
   } catch (error) {
     if (error instanceof DuplicateEntityError) {
       throw new InvalidOperationError(
-        "Ya existe un modelo con la misma identidad. Búscalo y usa ese modelo para evitar duplicados.",
+        "Ya existe un producto con la misma identidad. Búscalo y usa ese producto para evitar duplicados.",
       );
     }
     throw error;
@@ -78,11 +75,13 @@ async function assertStorageLocation(tx: Transaction, locationId: string) {
   const [location] = await tx
     .select()
     .from(locations)
-    .where(and(eq(locations.id, locationId), eq(locations.active, true)))
+    .where(eq(locations.id, locationId))
     .for("update")
     .limit(1);
-  if (!location) throw new EntityNotFoundError("La ubicación ya no existe o está inactiva.");
-  if (location.type === "BOX" || location.type === "BAG") {
+  if (!location || !isQuickAddContainer(location)) {
+    if (!location || !location.active) {
+      throw new EntityNotFoundError("La ubicación ya no existe o está inactiva.");
+    }
     throw new InvalidOperationError("Selecciona una ubicación contenedora para la caja.");
   }
   return location;
@@ -92,6 +91,33 @@ async function resolveBox(
   tx: Transaction,
   input: QuickAddInventoryMutationInput,
 ) {
+  if (input.locationId === UNPARENTED_BOXES_LOCATION_ID) {
+    if (input.boxMode !== "existing" || !input.boxId) {
+      throw new InvalidOperationError(
+        "Crea una ubicación contenedora antes de agregar una caja nueva.",
+      );
+    }
+    const [box] = await tx
+      .select()
+      .from(locations)
+      .where(
+        and(
+          eq(locations.id, input.boxId),
+          isNull(locations.parentId),
+          eq(locations.type, "BOX"),
+          eq(locations.active, true),
+        ),
+      )
+      .for("update")
+      .limit(1);
+    if (!box) {
+      throw new EntityNotFoundError(
+        "La caja cambió, fue eliminada o ya tiene otra ubicación padre.",
+      );
+    }
+    return { box, created: false };
+  }
+
   await assertStorageLocation(tx, input.locationId);
 
   if (input.boxMode === "existing") {

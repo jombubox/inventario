@@ -2,11 +2,17 @@ import { defineConfig, devices } from "@playwright/test";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 if (testDatabaseUrl) process.env.DATABASE_URL = testDatabaseUrl;
+const parsedTestDatabasePort = testDatabaseUrl
+  ? new URL(testDatabaseUrl).port || "5432"
+  : "54330";
+const testDatabasePort = /^\d{1,5}$/u.test(parsedTestDatabasePort)
+  ? parsedTestDatabasePort
+  : "54330";
 process.env.NEXT_PUBLIC_SITE_URL ??= "http://127.0.0.1:3000";
 process.env.ADMIN_EMAIL ??= "admin@e2e.local";
 process.env.ADMIN_PASSWORD ??= "JombuBox-E2E-Admin-123!";
 process.env.AUTH_SECRET ??= "jombubox-e2e-secret-at-least-32-characters";
-process.env.NEON_LOCAL_WS_PROXY ??= "127.0.0.1:4445/v1?address=host.docker.internal:54330";
+process.env.NEON_LOCAL_WS_PROXY ??= `127.0.0.1:4445/v1?address=host.docker.internal:${testDatabasePort}`;
 process.env.NEON_LOCAL_WS_POOL_REUSE ??= "true";
 process.env.CLOUDFLARE_ACCOUNT_ID ??= "http://127.0.0.1:5555";
 process.env.R2_ACCESS_KEY_ID ??= "e2e-access-key";
@@ -34,7 +40,7 @@ export default defineConfig({
     ? undefined
       : [
         {
-          command: 'docker run --rm --name jombubox-e2e-wsproxy --add-host=host.docker.internal:host-gateway -e "ALLOW_ADDR_REGEX=^host\\.docker\\.internal:(54330|5432)$" -p 127.0.0.1:4445:80 -p 127.0.0.1:4446:2112 ghcr.io/neondatabase/wsproxy:latest',
+          command: `docker run --rm --name jombubox-e2e-wsproxy --add-host=host.docker.internal:host-gateway -e "ALLOW_ADDR_REGEX=^host\\.docker\\.internal:${testDatabasePort}$" -p 127.0.0.1:4445:80 -p 127.0.0.1:4446:2112 ghcr.io/neondatabase/wsproxy:latest`,
           url: "http://127.0.0.1:4446/metrics",
           reuseExistingServer: true,
           timeout: 60_000,

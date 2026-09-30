@@ -13,7 +13,7 @@ async function login(page: Page) {
   await expect(page).toHaveURL(/\/admin$/u);
 }
 
-test("quick add reuses an existing model, creates a new model and preserves box safety", async ({ page }, testInfo) => {
+test("quick add reuses an existing product, creates a product with multiple compatible models and preserves box safety", async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   const suffix = testInfo.project.name.startsWith("mobile") ? "MOB" : "DESK";
   const bagLabel = `Bolsa E2E ${suffix}`;
@@ -23,6 +23,7 @@ test("quick add reuses an existing model, creates a new model and preserves box 
   const secondarySerialOne = `E2E-ALT-A-${suffix}`;
   const secondarySerialTwo = `E2E-ALT-B-${suffix}`;
   const secondarySerialThree = `E2E-ALT-C-${suffix}`;
+  const inlineCompatibleModel = `UN75E2ENEW${suffix}`;
   const newBoxCode = `E2E-Q-${suffix}`;
   const emptyBoxCode = `E2E-EMPTY-${suffix}`;
   await login(page);
@@ -38,14 +39,28 @@ test("quick add reuses an existing model, creates a new model and preserves box 
   }
   await expect(adminNav.getByRole("link", { name: "Resumen", exact: true })).toHaveAttribute("aria-current", "page");
 
+  await page.goto("/admin/ubicaciones");
+  const activeWarehouse = page.locator("article").filter({
+    has: page.getByRole("heading", { name: "Almacén E2E", exact: true }),
+  });
+  await expect(activeWarehouse.getByText("Activa", { exact: true })).toBeVisible();
+
   await adminNav.getByRole("button", { name: "Agregar producto" }).click();
   let dialog = page.getByRole("dialog", { name: "Agregar producto al inventario" });
-  await dialog.getByLabel("Buscar modelo").fill("EAY 123456");
+  await expect(dialog.getByLabel("Buscar producto")).toBeFocused();
+  await expect(dialog.getByRole("button", { name: "Agregar producto nuevo", exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: "Agregar producto nuevo", exact: true }).click();
+  await expect(dialog.getByRole("heading", { name: "Crear producto nuevo" })).toBeVisible();
+  await expect(dialog.getByText("Modelos compatibles", { exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: "← Volver a buscar" }).click();
+  await dialog.getByLabel("Buscar producto").fill("EAY 123456");
   await expect(dialog.getByText("LG-PSU-EAY123456", { exact: false })).toBeVisible();
-  await dialog.getByRole("button", { name: /Crear nuevo modelo/u }).click();
-  await expect(dialog.getByText("Encontramos modelos parecidos", { exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: /Agregar producto nuevo/u }).click();
+  await expect(dialog.getByText("Encontramos productos parecidos", { exact: true })).toBeVisible();
   await dialog.getByRole("button").filter({ hasText: "LG-PSU-EAY123456" }).click();
-  await expect(dialog.getByText("Modelo encontrado", { exact: true })).toBeVisible();
+  await expect(dialog.getByText("Producto encontrado", { exact: true })).toBeVisible();
+  await expect(dialog.getByLabel("Ubicación")).toContainText("Almacén E2E");
+  await dialog.getByLabel("Ubicación").selectOption({ label: "Almacén E2E" });
   await dialog.getByLabel("Bolsa (opcional)").fill(bagLabel);
   await dialog.getByLabel("Cantidad").fill("3");
   const existingSubmit = dialog.getByRole("button", { name: "Agregar 3 al inventario" });
@@ -59,9 +74,8 @@ test("quick add reuses an existing model, creates a new model and preserves box 
 
   await adminNav.getByRole("button", { name: "Agregar producto" }).click();
   dialog = page.getByRole("dialog", { name: "Agregar producto al inventario" });
-  await dialog.getByLabel("Buscar modelo").fill(newPartNumber);
-  await expect(dialog.getByText("No encontramos este modelo", { exact: true })).toBeVisible();
-  await dialog.getByRole("button", { name: "Crear nuevo modelo" }).click();
+  await dialog.getByRole("button", { name: "Agregar producto nuevo", exact: true }).click();
+  await dialog.getByLabel("Número de parte").fill(newPartNumber);
   await dialog.getByLabel("Número de serie principal (opcional)").fill(primarySerial);
   const addSecondary = dialog.getByRole("button", {
     name: "Agregar número de serie secundario",
@@ -70,8 +84,32 @@ test("quick add reuses an existing model, creates a new model and preserves box 
   await dialog.getByRole("textbox", { name: "Número de serie secundario 1", exact: true }).fill(secondarySerialOne);
   await addSecondary.click();
   await dialog.getByRole("textbox", { name: "Número de serie secundario 2", exact: true }).fill(secondarySerialTwo);
+
+  await dialog.getByLabel("Marca del modelo compatible").selectOption({ label: "Samsung" });
+  const compatibleSearch = dialog.getByLabel("Buscar modelo compatible");
+  await compatibleSearch.fill("UN55NU7100");
+  await dialog.getByRole("option", { name: /Samsung UN55NU7100FXZX/u }).click();
+  await compatibleSearch.fill("UN58NU7100");
+  await dialog.getByRole("option", { name: /Samsung UN58NU7100FXZX/u }).click();
+  await compatibleSearch.fill(inlineCompatibleModel);
+  await expect(dialog.getByText("No encontramos este modelo.", { exact: true })).toBeVisible();
+  await dialog.getByRole("option", { name: new RegExp(`Agregar.*${inlineCompatibleModel}`, "u") }).click();
+  const selectedModels = dialog.getByRole("list", { name: "Modelos compatibles seleccionados" });
+  await expect(selectedModels.getByRole("listitem")).toHaveCount(3);
+  await dialog.getByRole("button", {
+    name: "Eliminar modelo compatible Samsung UN55NU7100FXZX",
+  }).click();
+  await expect(selectedModels.getByRole("listitem")).toHaveCount(2);
+  await compatibleSearch.fill("UN55NU7100");
+  await dialog.getByRole("option", { name: /Samsung UN55NU7100FXZX/u }).click();
+  await expect(selectedModels.getByRole("listitem")).toHaveCount(3);
+
   await dialog.getByRole("button", { name: "Continuar con ubicación" }).click();
-  await dialog.getByRole("button", { name: "Crear nueva caja" }).click();
+  await dialog.getByLabel("Ubicación").selectOption({
+    label: `Almacén E2E sin cajas ${suffix}`,
+  });
+  await expect(dialog.getByText("No hay cajas en esta ubicación.", { exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: "Crear caja" }).click();
   await dialog.getByLabel("Código").fill(newBoxCode);
   await dialog.getByLabel("Nombre").fill(`Caja E2E ${suffix}`);
   await dialog.getByLabel("Cantidad").fill("2");
@@ -88,10 +126,10 @@ test("quick add reuses an existing model, creates a new model and preserves box 
 
   await adminNav.getByRole("button", { name: "Agregar producto" }).click();
   dialog = page.getByRole("dialog", { name: "Agregar producto al inventario" });
-  await dialog.getByLabel("Buscar modelo").fill(secondarySerialTwo);
+  await dialog.getByLabel("Buscar producto").fill(secondarySerialTwo);
   await expect(dialog.getByText(primarySerial, { exact: false })).toBeVisible();
   await dialog.getByRole("button").filter({ hasText: newPartNumber }).click();
-  await expect(dialog.getByText("Modelo encontrado", { exact: true })).toBeVisible();
+  await expect(dialog.getByText("Producto encontrado", { exact: true })).toBeVisible();
   await expect(dialog.getByLabel("Número de serie principal (opcional)")).toHaveCount(0);
   await expect(dialog.getByRole("button", { name: "Agregar número de serie secundario" })).toHaveCount(0);
   await page.keyboard.press("Escape");
@@ -106,6 +144,11 @@ test("quick add reuses an existing model, creates a new model and preserves box 
   await page.getByRole("button", { name: "Guardar cambios" }).click();
   await expect(page.getByText("Producto actualizado correctamente.", { exact: true })).toBeVisible();
   await page.reload();
+  const persistedModels = page.getByRole("list", { name: "Modelos compatibles seleccionados" });
+  await expect(persistedModels.getByRole("listitem")).toHaveCount(3);
+  await expect(persistedModels).toContainText("UN55NU7100FXZX");
+  await expect(persistedModels).toContainText("UN58NU7100FXZX");
+  await expect(persistedModels).toContainText(inlineCompatibleModel);
   await expect(page.getByLabel("Número de serie principal (opcional)")).toHaveValue(editedPrimarySerial);
   await expect(page.getByRole("textbox", { name: "Número de serie secundario 1", exact: true })).toHaveValue(secondarySerialTwo);
   await expect(page.getByRole("textbox", { name: "Número de serie secundario 2", exact: true })).toHaveValue(secondarySerialThree);
@@ -153,8 +196,9 @@ test("quick add is keyboard and mobile friendly", async ({ page }, testInfo) => 
   const trigger = adminNav.getByRole("button", { name: "Agregar producto" });
   await trigger.click();
   const dialog = page.getByRole("dialog", { name: "Agregar producto al inventario" });
-  await expect(dialog.getByLabel("Buscar modelo")).toBeFocused();
-  await dialog.getByLabel("Buscar modelo").fill("EAY123456");
+  await expect(dialog.getByLabel("Buscar producto")).toBeFocused();
+  await expect(dialog.getByRole("button", { name: "Agregar producto nuevo", exact: true })).toBeVisible();
+  await dialog.getByLabel("Buscar producto").fill("EAY123456");
   await expect(dialog.getByText("LG-PSU-EAY123456", { exact: false })).toBeVisible();
   await dialog.getByRole("button").filter({ hasText: "LG-PSU-EAY123456" }).click();
   await expect(dialog.getByLabel("Ubicación")).toBeVisible();

@@ -4,11 +4,14 @@ import { useActionState, useMemo, useState } from "react";
 
 import { FieldError, FormFeedback } from "@/components/forms/form-feedback";
 import { SubmitButton } from "@/components/forms/submit-button";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  CompatibleModelsField,
+  type CompatibilityValue,
+} from "@/features/products/components/compatible-models-field";
 import { CreatableCatalogSelect } from "@/features/products/components/creatable-catalog-select";
 import {
   ProductSerialFields,
@@ -25,7 +28,6 @@ import {
 import { initialMutationState } from "@/features/shared/domain/mutation-state";
 
 type CatalogOption = { id: string; name: string; code: string };
-type CompatibilityValue = { brandId: string; model: string; notes?: string | null };
 
 type ProductFormValue = {
   id: string;
@@ -127,18 +129,6 @@ export function ProductForm({
     }
   }
 
-  const updateCompatibility = (
-    index: number,
-    field: keyof CompatibilityValue,
-    value: string,
-  ) => {
-    setCompatibilities((current) =>
-      current.map((item, itemIndex) =>
-        itemIndex === index ? { ...item, [field]: value } : item,
-      ),
-    );
-  };
-
   return (
     <form action={formAction} className="space-y-7" noValidate>
       {product ? (
@@ -203,7 +193,7 @@ export function ProductForm({
 
       <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
         <div className="mb-5">
-          <h2 className="text-h3">Números de serie del modelo</h2>
+          <h2 className="text-h3">Números de serie del producto</h2>
           <p className="mt-1 text-small text-muted-foreground">
             Son identificadores del producto y permanecen separados del número de parte y del SKU.
           </p>
@@ -220,22 +210,14 @@ export function ProductForm({
       </section>
 
       <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div><h2 className="text-h3">Compatibilidades</h2><p className="mt-1 text-small text-muted-foreground">Agrega una marca y modelo por cada televisor compatible.</p></div>
-          <Button type="button" variant="outline" size="sm" onClick={() => setCompatibilities((items) => [...items, { brandId: brandId !== CUSTOM_CATALOG_VALUE ? brandId : brands[0]?.id || "", model: "", notes: "" }])}>Agregar modelo</Button>
-        </div>
-        <div className="mt-5 space-y-3">
-          {compatibilities.length === 0 ? <p className="rounded-xl bg-muted px-4 py-3 text-small text-muted-foreground">Sin compatibilidades. Si tampoco existe número de parte, agrega un modelo para generar el SKU.</p> : null}
-          {compatibilities.map((item, index) => (
-            <div key={`${index}-${item.brandId}`} className="grid gap-3 rounded-xl border border-border p-4 sm:grid-cols-[0.8fr_1fr_1fr_auto]">
-              <div><Label htmlFor={`compat-brand-${index}`}>Marca</Label><Select id={`compat-brand-${index}`} value={item.brandId} onChange={(event) => updateCompatibility(index, "brandId", event.target.value)} className="mt-2">{brands.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}</Select></div>
-              <div><Label htmlFor={`compat-model-${index}`}>Modelo</Label><Input id={`compat-model-${index}`} value={item.model} onChange={(event) => updateCompatibility(index, "model", event.target.value)} placeholder="UN58H5200SXZX" className="mt-2" /></div>
-              <div><Label htmlFor={`compat-notes-${index}`}>Notas</Label><Input id={`compat-notes-${index}`} value={item.notes ?? ""} onChange={(event) => updateCompatibility(index, "notes", event.target.value)} className="mt-2" /></div>
-              <Button type="button" variant="ghost" size="sm" className="self-end text-danger" onClick={() => setCompatibilities((items) => items.filter((_, itemIndex) => itemIndex !== index))}>Quitar</Button>
-            </div>
-          ))}
-        </div>
-        <FieldError errors={state.fieldErrors?.compatibilities} />
+        <CompatibleModelsField
+          idPrefix="product"
+          brands={brands}
+          value={compatibilities}
+          onChange={setCompatibilities}
+          defaultBrandId={brandId === CUSTOM_CATALOG_VALUE ? brands[0]?.id ?? "" : brandId}
+          errors={state.fieldErrors?.compatibilities}
+        />
       </section>
 
       <section className="grid gap-5 rounded-2xl border border-border bg-card p-5 sm:grid-cols-2 sm:p-6">
