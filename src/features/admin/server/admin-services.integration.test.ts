@@ -58,6 +58,18 @@ import {
 } from "@/features/products/server/product-service";
 import { CUSTOM_CATALOG_VALUE } from "@/features/products/domain/catalog-selection";
 import {
+  archiveBrandCatalogEntry,
+  archiveComponentTypeCatalogEntry,
+  createBrandCatalogEntry,
+  createComponentTypeCatalogEntry,
+  updateBrandCatalogEntry,
+  updateComponentTypeCatalogEntry,
+} from "@/features/products/server/catalog-service";
+import {
+  listAdminBrands,
+  listAdminComponentTypes,
+} from "@/features/products/data/admin-catalog-queries";
+import {
   DuplicateEntityError,
   InvalidOperationError,
   RateLimitExceededError,
@@ -129,6 +141,75 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
       ...overrides,
     });
   }
+
+  it("manages brands and piece types with normalized reuse, aliases, search and safe deactivation", async () => {
+    const brandResult = await createBrandCatalogEntry(db, { name: "  Bosch   México " });
+    expect(brandResult.created).toBe(true);
+    const duplicateBrand = await createBrandCatalogEntry(db, { name: "BOSCH MEXICO" });
+    expect(duplicateBrand).toMatchObject({ created: false, entry: { id: brandResult.entry.id } });
+
+    const typeResult = await createComponentTypeCatalogEntry(db, { name: " Sensor ABS " });
+    expect(typeResult.created).toBe(true);
+    const duplicateType = await createComponentTypeCatalogEntry(db, { name: "sensor abs" });
+    expect(duplicateType).toMatchObject({ created: false, entry: { id: typeResult.entry.id } });
+
+    const freshBrand = await nodeDb.query.brands.findFirst({ where: eq(brands.id, brandResult.entry.id) });
+    const freshType = await nodeDb.query.componentTypes.findFirst({ where: eq(componentTypes.id, typeResult.entry.id) });
+    const renamedBrand = await updateBrandCatalogEntry(db, {
+      id: brandResult.entry.id,
+      expectedUpdatedAt: freshBrand!.updatedAt,
+      name: "Bosch Mobility",
+    });
+    const renamedType = await updateComponentTypeCatalogEntry(db, {
+      id: typeResult.entry.id,
+      expectedUpdatedAt: freshType!.updatedAt,
+      name: "Sensor de ABS",
+    });
+    expect((await createBrandCatalogEntry(db, { name: "bosch méxico" })).entry.id).toBe(renamedBrand.id);
+    expect((await createComponentTypeCatalogEntry(db, { name: "SENSOR ABS" })).entry.id).toBe(renamedType.id);
+    expect(await listAdminBrands(db, "Mobility")).toEqual([
+      expect.objectContaining({ id: renamedBrand.id, productCount: 0 }),
+    ]);
+    expect(await listAdminComponentTypes(db, "Sensor de")).toEqual([
+      expect.objectContaining({ id: renamedType.id, productCount: 0 }),
+    ]);
+
+    await createProduct(db, {
+      brandId: renamedBrand.id,
+      componentTypeId: renamedType.id,
+      partNumber: "CATALOG-SAFE-01",
+      title: null,
+      description: null,
+      salePrice: null,
+      currency: "MXN",
+      status: "DRAFT",
+      isPublic: false,
+      compatibilities: [],
+    });
+    const usedBrand = await nodeDb.query.brands.findFirst({ where: eq(brands.id, renamedBrand.id) });
+    const usedType = await nodeDb.query.componentTypes.findFirst({ where: eq(componentTypes.id, renamedType.id) });
+    await expect(archiveBrandCatalogEntry(db, {
+      id: renamedBrand.id,
+      expectedUpdatedAt: usedBrand!.updatedAt,
+    })).rejects.toThrow(/utilizada/u);
+    await expect(archiveComponentTypeCatalogEntry(db, {
+      id: renamedType.id,
+      expectedUpdatedAt: usedType!.updatedAt,
+    })).rejects.toThrow(/utilizado/u);
+
+    const unusedBrand = await createBrandCatalogEntry(db, { name: "Marca sin uso" });
+    const unusedType = await createComponentTypeCatalogEntry(db, { name: "Pieza sin uso" });
+    const unusedBrandRow = await nodeDb.query.brands.findFirst({ where: eq(brands.id, unusedBrand.entry.id) });
+    const unusedTypeRow = await nodeDb.query.componentTypes.findFirst({ where: eq(componentTypes.id, unusedType.entry.id) });
+    expect((await archiveBrandCatalogEntry(db, {
+      id: unusedBrand.entry.id,
+      expectedUpdatedAt: unusedBrandRow!.updatedAt,
+    })).active).toBe(false);
+    expect((await archiveComponentTypeCatalogEntry(db, {
+      id: unusedType.entry.id,
+      expectedUpdatedAt: unusedTypeRow!.updatedAt,
+    })).active).toBe(false);
+  });
 
   it("creates, edits and archives a product without changing its SKU", async () => {
     const product = await createTestProduct();

@@ -146,7 +146,7 @@ export function ProductForm({
       />
       <FormFeedback state={state} />
 
-      <section className="grid gap-5 rounded-2xl border border-border bg-card p-5 sm:grid-cols-2 sm:p-6">
+      <section className="grid gap-5 rounded-md bg-card p-5 shadow-sm sm:grid-cols-2 sm:p-6">
         <CreatableCatalogSelect
           id="brandId"
           name="brandId"
@@ -165,15 +165,15 @@ export function ProductForm({
         <CreatableCatalogSelect
           id="componentTypeId"
           name="componentTypeId"
-          label="Tipo de componente"
+          label="Tipo de pieza"
           options={componentTypes}
           value={componentTypeId}
           onChange={setComponentTypeId}
           customName={customComponentTypeName}
           onCustomNameChange={setCustomComponentTypeName}
           customFieldName="customComponentTypeName"
-          customLabel="Nombre del nuevo componente"
-          addLabel="Agregar otro componente…"
+          customLabel="Nombre del nuevo tipo de pieza"
+          addLabel="Agregar tipo de pieza…"
           selectionErrors={state.fieldErrors?.componentTypeId}
           customErrors={state.fieldErrors?.customComponentTypeName}
         />
@@ -191,7 +191,7 @@ export function ProductForm({
         </div>
       </section>
 
-      <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+      <section className="rounded-md bg-card p-5 shadow-sm sm:p-6">
         <div className="mb-5">
           <h2 className="text-h3">Números de serie del producto</h2>
           <p className="mt-1 text-small text-muted-foreground">
@@ -209,7 +209,7 @@ export function ProductForm({
         />
       </section>
 
-      <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+      <section className="rounded-md bg-card p-5 shadow-sm sm:p-6">
         <CompatibleModelsField
           idPrefix="product"
           brands={brands}
@@ -220,7 +220,7 @@ export function ProductForm({
         />
       </section>
 
-      <section className="grid gap-5 rounded-2xl border border-border bg-card p-5 sm:grid-cols-2 sm:p-6">
+      <section className="grid gap-5 rounded-md bg-card p-5 shadow-sm sm:grid-cols-2 sm:p-6">
         <div className="sm:col-span-2">
           <div className="flex items-center justify-between gap-3"><Label htmlFor="title">Título administrativo</Label>{titleOverridden ? <button type="button" className="text-small font-semibold text-primary hover:underline" onClick={() => setTitleOverridden(false)}>Usar sugerencia</button> : <span className="text-xs text-muted-foreground">Sugerencia automática</span>}</div>
           <Input id="title" name="title" value={title} onChange={(event) => { setTitleOverridden(true); setManualTitle(event.target.value); }} className="mt-2" />

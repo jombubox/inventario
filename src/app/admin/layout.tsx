@@ -13,8 +13,8 @@ import { listQuickAddOptions } from "@/features/inventory/data/quick-add-queries
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Admin",
-  description: "Panel administrativo de JombuBox.",
+  title: "Gestión de inventario",
+  description: "Gestión de inventario de JombuBox.",
   robots: { index: false, follow: false },
 };
 

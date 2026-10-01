@@ -77,7 +77,7 @@ export const quickAddInventoryMutationSchema = z
         context.addIssue({
           code: "custom",
           path: ["componentTypeId"],
-          message: "Selecciona un tipo de componente.",
+          message: "Selecciona un tipo de pieza.",
         });
       }
       if (
@@ -87,7 +87,7 @@ export const quickAddInventoryMutationSchema = z
         context.addIssue({
           code: "custom",
           path: ["customComponentTypeName"],
-          message: "Escribe el nombre del nuevo componente.",
+          message: "Escribe el nombre del nuevo tipo de pieza.",
         });
       }
       if (!value.partNumber && value.compatibilities.length === 0) {

@@ -7,7 +7,7 @@ import { requireAdmin } from "@/features/auth/server/admin-auth";
 import { ImportWizard } from "@/features/imports/components/import-wizard";
 import { listRecentImportJobs } from "@/features/imports/data/import-queries";
 import { getServerEnv } from "@/lib/env";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatImportStatus } from "@/lib/format";
 
 function jobVariant(status: string) {
   if (status === "COMPLETED") return "success" as const;
@@ -38,7 +38,7 @@ export default async function ImportPage() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[52rem] text-left text-small">
               <thead className="border-b border-border bg-muted/60 text-muted-foreground"><tr><th className="px-4 py-3">Archivo</th><th className="px-4 py-3">Estado</th><th className="px-4 py-3">Filas</th><th className="px-4 py-3">Resultado</th><th className="px-4 py-3">Atribución</th><th className="px-4 py-3">Fecha</th></tr></thead>
-              <tbody className="divide-y divide-border">{history.map((job) => <tr key={job.id}><td className="max-w-xs truncate px-4 py-3 font-semibold text-navy">{job.filename}{job.forceDuplicate ? <p className="text-xs font-normal text-warning">Reimportación forzada</p> : null}</td><td className="px-4 py-3"><Badge variant={jobVariant(job.status)}>{job.status}</Badge></td><td className="px-4 py-3">{job.totalRows}</td><td className="px-4 py-3"><span className="text-success">{job.successfulRows} válidas</span> · <span className="text-warning">{job.warningRows} con avisos</span> · <span className="text-danger">{job.failedRows} omitidas/fallidas</span></td><td className="px-4 py-3">Sistema</td><td className="px-4 py-3 text-muted-foreground">{formatDateTime(job.completedAt ?? job.createdAt)}</td></tr>)}</tbody>
+              <tbody className="divide-y divide-border">{history.map((job) => <tr key={job.id}><td className="max-w-xs truncate px-4 py-3 font-semibold text-navy">{job.filename}{job.forceDuplicate ? <p className="text-xs font-normal text-warning">Reimportación forzada</p> : null}</td><td className="px-4 py-3"><Badge variant={jobVariant(job.status)}>{formatImportStatus(job.status)}</Badge></td><td className="px-4 py-3">{job.totalRows}</td><td className="px-4 py-3"><span className="text-success">{job.successfulRows} válidas</span> · <span className="text-warning">{job.warningRows} con avisos</span> · <span className="text-danger">{job.failedRows} omitidas/fallidas</span></td><td className="px-4 py-3">Sistema</td><td className="px-4 py-3 text-muted-foreground">{formatDateTime(job.completedAt ?? job.createdAt)}</td></tr>)}</tbody>
             </table>
           </div>
           {history.length === 0 ? <p className="p-6 text-small text-muted-foreground">Todavía no hay importaciones.</p> : null}

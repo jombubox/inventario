@@ -23,6 +23,12 @@ export const auditActionValues = [
   "PRODUCT_IMAGE_REORDERED",
   "PRODUCT_PRIMARY_IMAGE_CHANGED",
   "PRODUCT_IMAGE_ALT_UPDATED",
+  "BRAND_CREATED",
+  "BRAND_UPDATED",
+  "BRAND_ARCHIVED",
+  "COMPONENT_TYPE_CREATED",
+  "COMPONENT_TYPE_UPDATED",
+  "COMPONENT_TYPE_ARCHIVED",
   "INVENTORY_IN",
   "INVENTORY_OUT",
   "INVENTORY_SALE",
@@ -39,6 +45,8 @@ export function createAuditLog(
     entityType:
       | "PRODUCT"
       | "PRODUCT_IMAGE"
+      | "BRAND"
+      | "COMPONENT_TYPE"
       | "INVENTORY_ITEM"
       | "LOCATION"
       | "IMPORT_JOB";

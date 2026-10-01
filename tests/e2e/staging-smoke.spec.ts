@@ -86,7 +86,7 @@ test.describe("remote staging smoke", () => {
     await expect(page.getByRole("heading", { name: warehouseName, exact: true })).toBeVisible();
 
     await page.goto("/admin");
-    const desktopNav = page.getByRole("navigation", { name: "Navegación de administración" });
+    const desktopNav = page.getByRole("navigation", { name: "Navegación de gestión" });
     await desktopNav.getByRole("button", { name: "Agregar producto" }).click();
     let dialog = page.getByRole("dialog", { name: "Agregar producto al inventario" });
     await dialog.getByLabel("Buscar producto").fill(partNumber);
@@ -169,7 +169,7 @@ test.describe("remote staging smoke", () => {
     await expect(page.locator("article").filter({ hasText: partNumber }).first()).toContainText("5");
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
 
-    const mobileNav = page.getByRole("navigation", { name: "Navegación móvil de administración" });
+    const mobileNav = page.getByRole("navigation", { name: "Navegación móvil de gestión" });
     await mobileNav.getByRole("button", { name: "Agregar producto" }).click();
     const dialog = page.getByRole("dialog", { name: "Agregar producto al inventario" });
     await expect(dialog.getByLabel("Buscar producto")).toBeFocused();

@@ -66,7 +66,7 @@ export function CreatableCatalogSelect({
       </Select>
       <FieldError errors={selectionErrors} id={selectionErrorId} />
       {value === CUSTOM_CATALOG_VALUE ? (
-        <div className="mt-3 rounded-xl border border-primary/20 bg-primary-soft/50 p-3">
+        <div className="mt-3 rounded-md bg-primary-soft/50 p-3">
           <Label htmlFor={customInputId}>{customLabel}</Label>
           <Input
             id={customInputId}

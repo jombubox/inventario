@@ -13,7 +13,7 @@ import {
   listAdminInventory,
   listInventoryFormOptions,
 } from "@/features/inventory/data/admin-inventory-queries";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatInventoryCondition, formatInventoryStatus } from "@/lib/format";
 import { inventoryListQuerySchema } from "@/validators/admin-query";
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -58,14 +58,14 @@ export default async function InventoryPage({
         actions={(
           <a
             href="/api/exports/inventory"
-            className="inline-flex h-11 items-center rounded-xl border border-border bg-card px-4 text-small font-semibold text-navy transition-colors hover:border-primary/40 hover:text-primary"
+            className="inline-flex h-11 items-center rounded-md bg-card px-4 text-small font-semibold text-navy shadow-sm transition-colors hover:text-primary"
           >
             Exportar inventario
           </a>
         )}
       />
 
-      <details className="rounded-2xl border border-border bg-card">
+      <details className="rounded-md bg-card shadow-sm">
           <summary className="cursor-pointer px-5 py-4 font-semibold text-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             Agregar existencia física
           </summary>
@@ -169,10 +169,10 @@ export default async function InventoryPage({
                       <Badge
                         variant={item.status === "AVAILABLE" ? "success" : "neutral"}
                       >
-                        {item.status}
+                        {formatInventoryStatus(item.status)}
                       </Badge>
                       <span className="text-xs text-muted-foreground">
-                        {item.condition}
+                        {formatInventoryCondition(item.condition)}
                       </span>
                     </div>
                     <div>

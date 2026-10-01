@@ -82,7 +82,7 @@ export function InventoryRowActions({ item, locations }: { item: InventoryRowVal
 
   return (
     <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-      <form action={inAction} className="space-y-3 rounded-xl border border-border p-4">
+      <form action={inAction} className="space-y-3 rounded-md bg-muted/45 p-4">
         <input type="hidden" name="id" value={item.id} /><h3 className="font-semibold text-navy">Entrada o devolución</h3>
         <div className="grid grid-cols-2 gap-3"><div><Label htmlFor={`in-type-${item.id}`}>Operación</Label><Select id={`in-type-${item.id}`} name="type" className="mt-2"><option value="IN">Entrada</option><option value="RETURN">Devolución</option></Select></div><div><Label htmlFor={`in-quantity-${item.id}`}>Cantidad</Label><Input id={`in-quantity-${item.id}`} name="quantity" type="number" min="1" step="1" defaultValue="1" className="mt-2" /></div></div>
         <div><Label htmlFor={`in-status-${item.id}`}>Estado resultante</Label><Select id={`in-status-${item.id}`} name="resultingStatus" className="mt-2"><option value="AVAILABLE">Disponible</option><option value="RESERVED">Reservado</option><option value="DAMAGED">Dañado</option></Select></div>
@@ -90,28 +90,28 @@ export function InventoryRowActions({ item, locations }: { item: InventoryRowVal
         <FormFeedback state={inState} /><SubmitButton size="sm" pendingLabel="Registrando…">Registrar entrada</SubmitButton>
       </form>
 
-      <form action={outAction} className="space-y-3 rounded-xl border border-border p-4">
+      <form action={outAction} className="space-y-3 rounded-md bg-muted/45 p-4">
         <input type="hidden" name="id" value={item.id} /><h3 className="font-semibold text-navy">Salida o venta</h3>
         <div className="grid grid-cols-2 gap-3"><div><Label htmlFor={`out-type-${item.id}`}>Operación</Label><Select id={`out-type-${item.id}`} name="type" className="mt-2"><option value="OUT">Salida</option><option value="SALE">Venta</option></Select></div><div><Label htmlFor={`out-quantity-${item.id}`}>Cantidad</Label><Input id={`out-quantity-${item.id}`} name="quantity" type="number" min="1" max={item.quantity} step="1" defaultValue="1" className="mt-2" /></div></div>
         <div><Label htmlFor={`out-status-${item.id}`}>Estado si llega a cero</Label><Select id={`out-status-${item.id}`} name="resultingStatus" className="mt-2"><option value="SOLD">Vendido</option><option value="SCRAPPED">Desechado</option></Select></div>
         <div><Label htmlFor={`out-reason-${item.id}`}>Motivo</Label><Input id={`out-reason-${item.id}`} name="reason" className="mt-2" required /></div>
         <FormFeedback state={outState} /><SubmitButton size="sm" pendingLabel="Registrando…">Registrar salida</SubmitButton>
       </form>
-      <form action={moveAction} onSubmit={(event) => { if (!window.confirm("¿Confirmas el cambio de ubicación?")) event.preventDefault(); }} className="space-y-3 rounded-xl border border-border p-4">
+      <form action={moveAction} onSubmit={(event) => { if (!window.confirm("¿Confirmas el cambio de ubicación?")) event.preventDefault(); }} className="space-y-3 rounded-md bg-muted/45 p-4">
         <input type="hidden" name="id" value={item.id} /><h3 className="font-semibold text-navy">Mover ubicación</h3>
         <div><Label htmlFor={`move-location-${item.id}`}>Destino</Label><Select id={`move-location-${item.id}`} name="toLocationId" className="mt-2" required><option value="">Selecciona destino</option>{locations.map((location) => <option key={location.id} value={location.id} disabled={location.id === item.locationId}>{location.breadcrumb}</option>)}</Select></div>
         <div><Label htmlFor={`move-reason-${item.id}`}>Motivo</Label><Input id={`move-reason-${item.id}`} name="reason" className="mt-2" required /></div>
         <FormFeedback state={moveState} /><SubmitButton size="sm" pendingLabel="Moviendo…">Mover inventario</SubmitButton>
       </form>
 
-      <form action={adjustAction} className="space-y-3 rounded-xl border border-border p-4">
+      <form action={adjustAction} className="space-y-3 rounded-md bg-muted/45 p-4">
         <input type="hidden" name="id" value={item.id} /><h3 className="font-semibold text-navy">Ajustar cantidad</h3>
         <div className="grid grid-cols-2 gap-3"><div><Label htmlFor={`quantity-${item.id}`}>Nueva cantidad</Label><Input id={`quantity-${item.id}`} name="newQuantity" type="number" min="0" step="1" defaultValue={item.quantity} className="mt-2" /></div><div><Label htmlFor={`status-${item.id}`}>Estado</Label><Select id={`status-${item.id}`} name="newStatus" defaultValue={item.status} className="mt-2">{statusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></div></div>
         <div><Label htmlFor={`adjust-reason-${item.id}`}>Motivo</Label><Input id={`adjust-reason-${item.id}`} name="reason" className="mt-2" required /></div>
         <FormFeedback state={adjustState} /><SubmitButton size="sm" pendingLabel="Ajustando…">Registrar ajuste</SubmitButton>
       </form>
 
-      <form action={detailsAction} className="space-y-3 rounded-xl border border-border p-4">
+      <form action={detailsAction} className="space-y-3 rounded-md bg-muted/45 p-4">
         <input type="hidden" name="id" value={item.id} /><input type="hidden" name="expectedUpdatedAt" value={item.updatedAt} /><h3 className="font-semibold text-navy">Datos físicos</h3>
         <div><Label htmlFor={`condition-${item.id}`}>Condición</Label><Select id={`condition-${item.id}`} name="condition" defaultValue={item.condition} className="mt-2">{conditionOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></div>
         <div className="grid grid-cols-2 gap-3"><div><Label htmlFor={`acquired-${item.id}`}>Adquisición</Label><Input id={`acquired-${item.id}`} name="acquiredAt" type="date" defaultValue={item.acquiredAt ?? ""} className="mt-2" /></div><div><Label htmlFor={`cost-${item.id}`}>Costo</Label><Input id={`cost-${item.id}`} name="purchaseCost" defaultValue={item.purchaseCost ?? ""} className="mt-2" /></div></div>

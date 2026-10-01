@@ -9,6 +9,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useTransition,
 } from "react";
 
 import { FieldError, FormFeedback } from "@/components/forms/form-feedback";
@@ -17,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import { MAX_IMAGE_BYTES, MAX_PRODUCT_IMAGES } from "@/features/images/domain/image-policy";
 import { UNPARENTED_BOXES_LOCATION_ID } from "@/features/locations/domain/quick-add-location";
 import { CUSTOM_CATALOG_VALUE } from "@/features/products/domain/catalog-selection";
 import {
@@ -28,9 +30,15 @@ import {
   type SerialNumberValue,
 } from "@/features/products/components/product-serial-fields";
 import { findDuplicateSerialNumber } from "@/features/products/domain/serial-number";
+import {
+  createBrandInlineAction,
+  createComponentTypeInlineAction,
+} from "@/features/products/server/catalog-actions";
 import type { QuickAddProductResult } from "@/features/inventory/data/quick-add-queries";
-import { quickAddInventoryAction } from "@/features/inventory/server/actions";
-import { initialMutationState } from "@/features/shared/domain/mutation-state";
+import {
+  quickAddInventoryAction,
+  type QuickAddMutationState,
+} from "@/features/inventory/server/actions";
 import { cn } from "@/lib/cn";
 
 type CatalogOption = { id: string; name: string; code: string };
@@ -156,7 +164,7 @@ function ProductResult({
     <button
       type="button"
       onClick={onSelect}
-      className="group flex w-full items-start justify-between gap-4 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-primary-soft/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="group flex w-full items-start justify-between gap-4 rounded-md bg-card p-4 text-left shadow-sm transition-colors hover:bg-primary-soft/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <span className="min-w-0">
         <span className="block truncate font-semibold text-navy">
@@ -190,6 +198,180 @@ function ProductResult({
   );
 }
 
+function QuickCatalogField({
+  kind,
+  options,
+  value,
+  onChange,
+  onCreated,
+}: {
+  kind: "brand" | "componentType";
+  options: CatalogOption[];
+  value: string;
+  onChange: (value: string) => void;
+  onCreated: (entry: CatalogOption) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState("");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [saving, startTransition] = useTransition();
+  const isBrand = kind === "brand";
+  const noun = isBrand ? "marca" : "tipo de pieza";
+  const filtered = options.filter((option) =>
+    `${option.name} ${option.code}`.toLocaleLowerCase("es-MX")
+      .includes(query.trim().toLocaleLowerCase("es-MX")),
+  );
+
+  const save = () => {
+    if (!name.trim()) {
+      setError(isBrand ? "Escribe el nombre de la nueva marca." : "Escribe el nombre del nuevo tipo de pieza.");
+      return;
+    }
+    setError("");
+    setMessage("");
+    startTransition(async () => {
+      const body = new FormData();
+      body.set("name", name);
+      const result = isBrand
+        ? await createBrandInlineAction(body)
+        : await createComponentTypeInlineAction(body);
+      if (result.status === "error" || !result.entry) {
+        setError(result.message ?? `No fue posible guardar ${isBrand ? "la marca" : "el tipo de pieza"}.`);
+        return;
+      }
+      onCreated(result.entry);
+      onChange(result.entry.id);
+      setMessage(result.message ?? "Guardado.");
+      setCreating(false);
+      setName("");
+      setQuery("");
+    });
+  };
+
+  return (
+    <div>
+      <Label htmlFor={`quick-${kind}`}>{isBrand ? "Marca" : "Tipo de pieza"}</Label>
+      <Input
+        id={`quick-${kind}-search`}
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder={isBrand ? "Buscar marca…" : "Buscar tipo de pieza…"}
+        className="mt-2"
+        autoComplete="off"
+      />
+      <Select
+        id={`quick-${kind}`}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-2"
+      >
+        {filtered.length === 0 ? <option value="">No encontramos resultados</option> : null}
+        {filtered.map((option) => (
+          <option key={option.id} value={option.id}>{option.name}</option>
+        ))}
+      </Select>
+      <Button type="button" variant="ghost" size="sm" className="mt-2" onClick={() => { setCreating((current) => !current); setError(""); }}>
+        + Agregar {isBrand ? "nueva marca" : "tipo de pieza"}
+      </Button>
+      {creating ? (
+        <div className="mt-2 rounded-md bg-primary-soft/50 p-3">
+          <Label htmlFor={`quick-${kind}-new`}>{isBrand ? "Nueva marca" : "Nuevo tipo de pieza"}</Label>
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+            <Input
+              id={`quick-${kind}-new`}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              maxLength={120}
+              autoFocus
+              disabled={saving}
+            />
+            <Button type="button" size="sm" onClick={save} isLoading={saving} loadingLabel="Guardando…">
+              Guardar {noun}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+      {error ? <p role="alert" className="mt-2 text-small text-danger">{error}</p> : null}
+      {message ? <p role="status" className="mt-2 text-small text-success">{message}</p> : null}
+    </div>
+  );
+}
+
+function ProductPhotoPicker({
+  files,
+  onChange,
+}: {
+  files: File[];
+  onChange: (files: File[]) => void;
+}) {
+  const [error, setError] = useState("");
+  const previews = useMemo(() => files.map((file) => URL.createObjectURL(file)), [files]);
+
+  useEffect(() => () => previews.forEach((url) => URL.revokeObjectURL(url)), [previews]);
+
+  const addFiles = (selected: FileList | null) => {
+    if (!selected?.length) return;
+    const next = [...files, ...Array.from(selected)];
+    if (next.length > MAX_PRODUCT_IMAGES) {
+      setError("Puedes agregar como máximo 10 fotos.");
+      return;
+    }
+    const invalid = next.find((file) => !["image/jpeg", "image/png", "image/webp"].includes(file.type));
+    if (invalid) {
+      setError(`${invalid.name} no es una imagen JPEG, PNG o WEBP.`);
+      return;
+    }
+    const oversized = next.find((file) => file.size > MAX_IMAGE_BYTES);
+    if (oversized) {
+      setError(`${oversized.name} supera el límite de 10 MB.`);
+      return;
+    }
+    setError("");
+    onChange(next);
+  };
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <Label htmlFor="quick-product-photos">Fotos del producto</Label>
+          <p className="mt-1 text-xs text-muted-foreground">La primera foto será la principal.</p>
+        </div>
+        <label className="inline-flex min-h-11 cursor-pointer items-center rounded-md bg-muted px-4 text-small font-semibold text-navy hover:bg-primary-soft">
+          + Agregar fotos
+          <input
+            id="quick-product-photos"
+            type="file"
+            multiple
+            accept="image/jpeg,image/png,image/webp"
+            className="sr-only"
+            onChange={(event) => { addFiles(event.target.files); event.target.value = ""; }}
+          />
+        </label>
+      </div>
+      {error ? <p role="alert" className="mt-2 text-small text-danger">{error}</p> : null}
+      {files.length > 0 ? (
+        <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-5">
+          {files.map((file, index) => (
+            <div key={`${file.name}-${file.lastModified}-${index}`} className="relative aspect-square overflow-hidden rounded-md bg-muted shadow-sm">
+              <div className="h-full w-full bg-contain bg-center bg-no-repeat" style={{ backgroundImage: `url(${previews[index]})` }} />
+              {index === 0 ? <span className="absolute bottom-1 left-1 rounded-sm bg-navy px-1.5 py-1 text-[0.65rem] font-semibold text-white">Foto principal</span> : null}
+              <button
+                type="button"
+                aria-label={`Quitar ${file.name}`}
+                className="absolute right-1 top-1 grid size-8 place-items-center rounded-full bg-background/95 text-lg font-bold shadow"
+                onClick={() => onChange(files.filter((_, fileIndex) => fileIndex !== index))}
+              >×</button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function QuickAddDialog({
   options,
   onClose,
@@ -203,8 +385,12 @@ function QuickAddDialog({
   const searchRef = useRef<HTMLInputElement>(null);
   const [state, formAction, pending] = useActionState(
     quickAddInventoryAction,
-    initialMutationState,
+    { status: "idle" } as QuickAddMutationState,
   );
+  const [catalogOptions, setCatalogOptions] = useState({
+    brands: options.brands,
+    componentTypes: options.componentTypes,
+  });
   const [step, setStep] = useState<"search" | "create" | "place">("search");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<QuickAddProductResult[]>([]);
@@ -214,16 +400,22 @@ function QuickAddDialog({
   const [showSimilarWarning, setShowSimilarWarning] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<QuickAddProductResult | null>(null);
   const [brandId, setBrandId] = useState(options.brands[0]?.id ?? "");
-  const [customBrandName, setCustomBrandName] = useState("");
+  const customBrandName = "";
   const [componentTypeId, setComponentTypeId] = useState(
     options.componentTypes[0]?.id ?? "",
   );
-  const [customComponentTypeName, setCustomComponentTypeName] = useState("");
+  const customComponentTypeName = "";
   const [partNumber, setPartNumber] = useState("");
   const [primarySerialNumber, setPrimarySerialNumber] = useState("");
   const [secondarySerialNumbers, setSecondarySerialNumbers] = useState<SerialNumberValue[]>([]);
   const [compatibilities, setCompatibilities] = useState<CompatibilityValue[]>([]);
   const [title, setTitle] = useState("");
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [uploadState, setUploadState] = useState<"idle" | "uploading" | "done" | "error">("idle");
+  const [uploadAttempt, setUploadAttempt] = useState(0);
+  const [uploadedPhotoCount, setUploadedPhotoCount] = useState(0);
+  const uploadedPhotoCountRef = useRef(0);
+  const [uploadError, setUploadError] = useState("");
   const [createError, setCreateError] = useState("");
   const initialLocationId = options.locations[0]?.id ?? "";
   const initialBox = options.boxes.find((box) => box.parentId === initialLocationId);
@@ -259,6 +451,42 @@ function QuickAddDialog({
     dialog.showModal();
     requestAnimationFrame(() => searchRef.current?.focus());
   }, []);
+
+  useEffect(() => {
+    if (
+      state.status !== "success" ||
+      !state.productCreated ||
+      !state.productId ||
+      photos.length === 0
+    ) return;
+
+    let cancelled = false;
+    const upload = async () => {
+      setUploadState("uploading");
+      for (let index = uploadedPhotoCountRef.current; index < photos.length; index += 1) {
+        const body = new FormData();
+        body.set("productId", state.productId!);
+        body.set("file", photos[index]!);
+        body.set("alt", photos[index]!.name.replace(/\.[^.]+$/u, ""));
+        try {
+          const response = await fetch("/api/products/images/upload", { method: "POST", body });
+          const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+          if (!response.ok) throw new Error(payload?.error ?? "No fue posible subir la foto.");
+          if (cancelled) return;
+          uploadedPhotoCountRef.current = index + 1;
+          setUploadedPhotoCount(index + 1);
+        } catch (caught) {
+          if (cancelled) return;
+          setUploadError(caught instanceof Error ? caught.message : "No fue posible subir las fotos.");
+          setUploadState("error");
+          return;
+        }
+      }
+      if (!cancelled) setUploadState("done");
+    };
+    void upload();
+    return () => { cancelled = true; };
+  }, [photos, state.productCreated, state.productId, state.status, uploadAttempt]);
 
   useEffect(() => {
     const trimmed = query.trim();
@@ -315,7 +543,7 @@ function QuickAddDialog({
   };
 
   const close = () => {
-    if (pending) return;
+    if (pending || uploadState === "uploading") return;
     dialogRef.current?.close();
     onClose();
   };
@@ -343,7 +571,7 @@ function QuickAddDialog({
 
   const continueNewProduct = () => {
     if (!brandId || !componentTypeId) {
-      setCreateError("Selecciona marca y tipo de componente.");
+      setCreateError("Selecciona marca y tipo de pieza.");
       return;
     }
     if (!partNumber.trim() && compatibilities.length === 0) {
@@ -358,7 +586,7 @@ function QuickAddDialog({
       componentTypeId === CUSTOM_CATALOG_VALUE &&
       !customComponentTypeName.trim()
     ) {
-      setCreateError("Escribe el nombre del nuevo tipo de componente.");
+      setCreateError("Escribe el nombre del nuevo tipo de pieza.");
       return;
     }
     if (
@@ -386,8 +614,8 @@ function QuickAddDialog({
   };
 
   const productMode = selectedProduct ? "existing" : "new";
-  const selectedBrand = options.brands.find((brand) => brand.id === brandId);
-  const selectedType = options.componentTypes.find((item) => item.id === componentTypeId);
+  const selectedBrand = catalogOptions.brands.find((brand) => brand.id === brandId);
+  const selectedType = catalogOptions.componentTypes.find((item) => item.id === componentTypeId);
   const modelSummary = selectedProduct
     ? selectedProduct.partNumber ?? selectedProduct.compatibleModel ?? selectedProduct.title
     : partNumber || compatibilities[0]?.model || "Nuevo producto";
@@ -403,11 +631,11 @@ function QuickAddDialog({
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) close();
       }}
-      className="m-0 h-svh max-h-svh w-full max-w-none overflow-hidden bg-transparent p-0 text-foreground backdrop:bg-navy/55 sm:m-auto sm:h-auto sm:max-h-[92dvh] sm:w-[min(52rem,calc(100%-2rem))] sm:rounded-3xl"
+      className="m-0 h-svh max-h-svh w-full max-w-none overflow-hidden bg-transparent p-0 text-foreground backdrop:bg-navy/55 sm:m-auto sm:h-auto sm:max-h-[92dvh] sm:w-[min(52rem,calc(100%-2rem))] sm:rounded-md"
     >
       <form
         action={formAction}
-        className="flex h-full min-h-0 flex-col overflow-hidden bg-background sm:max-h-[92dvh] sm:rounded-3xl sm:border sm:border-border sm:shadow-2xl"
+        className="flex h-full min-h-0 flex-col overflow-hidden bg-background sm:max-h-[92dvh] sm:rounded-md sm:shadow-lg"
         noValidate
       >
         <input type="hidden" name="productMode" value={productMode} />
@@ -435,7 +663,7 @@ function QuickAddDialog({
 
         <header className="shrink-0 flex items-start justify-between gap-4 border-b border-border px-5 py-4 sm:px-7 sm:py-5">
           <div>
-            <p className="text-label font-semibold uppercase tracking-[0.12em] text-primary">
+            <p className="text-label font-semibold text-primary">
               Entrada rápida
             </p>
             <h2 id="quick-add-title" className="mt-1 text-h3 text-navy">
@@ -447,7 +675,7 @@ function QuickAddDialog({
             variant="ghost"
             size="icon"
             onClick={close}
-            disabled={pending}
+            disabled={pending || uploadState === "uploading"}
             aria-label="Cerrar flujo"
             className="-mr-2 -mt-1"
           >
@@ -459,11 +687,40 @@ function QuickAddDialog({
           <div className="grid flex-1 place-items-center overflow-y-auto p-6 sm:p-10">
             <div className="w-full max-w-lg text-center">
               <div className="mx-auto grid size-14 place-items-center rounded-full bg-success/10 text-2xl text-success" aria-hidden="true">✓</div>
-              <h3 className="mt-5 text-h2 text-navy">Inventario actualizado</h3>
+              <h3 className="mt-5 text-h2 text-navy">
+                {uploadState === "uploading" ? "Subiendo fotos…" : "Inventario actualizado"}
+              </h3>
               <div className="mt-4"><FormFeedback state={state} /></div>
+              {uploadState === "uploading" ? (
+                <p role="status" className="mt-3 text-small font-semibold text-primary">
+                  Subiendo foto {Math.min(uploadedPhotoCount + 1, photos.length)} de {photos.length}…
+                </p>
+              ) : null}
+              {uploadState === "done" ? (
+                <p role="status" className="mt-3 text-small text-success">Las fotos se guardaron correctamente.</p>
+              ) : null}
+              {uploadState === "error" ? (
+                <div className="mt-4 rounded-md bg-danger/10 p-4 text-left text-small text-danger">
+                  <p className="font-semibold">El producto y el inventario sí se guardaron.</p>
+                  <p className="mt-1">{uploadError}</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => {
+                      setUploadError("");
+                      setUploadState("idle");
+                      setUploadAttempt((attempt) => attempt + 1);
+                    }}
+                  >
+                    Reintentar fotos pendientes
+                  </Button>
+                </div>
+              ) : null}
               <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
-                <Button type="button" variant="outline" onClick={close}>Cerrar</Button>
-                <Button type="button" onClick={onRestart}>Agregar otro</Button>
+                <Button type="button" variant="outline" onClick={close} disabled={uploadState === "uploading"}>Cerrar</Button>
+                <Button type="button" onClick={onRestart} disabled={uploadState === "uploading"}>Agregar otro</Button>
               </div>
             </div>
           </div>
@@ -502,7 +759,7 @@ function QuickAddDialog({
                   </div>
 
                   {searchedQuery && !searching && results.length === 0 ? (
-                    <div className="mt-5 rounded-2xl border border-dashed border-border bg-muted/40 p-5 text-center">
+                    <div className="mt-5 rounded-md border border-dashed border-border bg-muted/40 p-5 text-center">
                       <p className="font-semibold text-navy">No encontramos este producto</p>
                       <p className="mt-1 text-small text-muted-foreground">Revisa la búsqueda o crea un producto nuevo.</p>
                     </div>
@@ -511,7 +768,7 @@ function QuickAddDialog({
                   {!searching ? (
                     <div className="mt-5 border-t border-border pt-5">
                       {showSimilarWarning && results.length > 0 ? (
-                        <div className="rounded-xl border border-warning/25 bg-warning/5 p-4">
+                        <div className="rounded-md bg-warning/5 p-4 shadow-sm">
                           <p className="font-semibold text-navy">Encontramos productos parecidos</p>
                           <p className="mt-1 text-small text-muted-foreground">
                             Confirma que ninguno sea el producto correcto antes de crear otro.
@@ -534,25 +791,33 @@ function QuickAddDialog({
                 <section aria-labelledby="create-model-title">
                   <button type="button" className="text-small font-semibold text-primary hover:underline" onClick={() => setStep("search")}>← Volver a buscar</button>
                   <h3 id="create-model-title" className="mt-4 text-h2 text-navy">Crear producto nuevo</h3>
-                  <p className="mt-2 text-small text-muted-foreground">Solo necesitamos su identidad. Los datos comerciales e imágenes pueden completarse después.</p>
-                  {createError ? <p role="alert" className="mt-4 rounded-xl border border-danger/25 bg-danger/5 p-3 text-small text-danger">{createError}</p> : null}
+                  <p className="mt-2 text-small text-muted-foreground">Completa los datos principales y agrega fotos sin salir de este flujo.</p>
+                  {createError ? <p role="alert" className="mt-4 rounded-md bg-danger/5 p-3 text-small text-danger">{createError}</p> : null}
                   <div className="mt-5 grid gap-5 sm:grid-cols-2">
-                    <div>
-                      <Label htmlFor="quick-brand">Marca</Label>
-                      <Select id="quick-brand" value={brandId} onChange={(event) => setBrandId(event.target.value)} className="mt-2">
-                        {options.brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name} · {brand.code}</option>)}
-                        <option value={CUSTOM_CATALOG_VALUE}>Agregar otra marca…</option>
-                      </Select>
-                      {brandId === CUSTOM_CATALOG_VALUE ? <Input aria-label="Nombre de la nueva marca" value={customBrandName} onChange={(event) => setCustomBrandName(event.target.value)} placeholder="Nombre de la nueva marca" className="mt-3" autoFocus /> : null}
-                    </div>
-                    <div>
-                      <Label htmlFor="quick-component-type">Tipo de componente</Label>
-                      <Select id="quick-component-type" value={componentTypeId} onChange={(event) => setComponentTypeId(event.target.value)} className="mt-2">
-                        {options.componentTypes.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.code}</option>)}
-                        <option value={CUSTOM_CATALOG_VALUE}>Agregar otro componente…</option>
-                      </Select>
-                      {componentTypeId === CUSTOM_CATALOG_VALUE ? <Input aria-label="Nombre del nuevo componente" value={customComponentTypeName} onChange={(event) => setCustomComponentTypeName(event.target.value)} placeholder="Nombre del nuevo componente" className="mt-3" autoFocus /> : null}
-                    </div>
+                    <QuickCatalogField
+                      kind="brand"
+                      options={catalogOptions.brands}
+                      value={brandId}
+                      onChange={setBrandId}
+                      onCreated={(entry) => setCatalogOptions((current) => ({
+                        ...current,
+                        brands: current.brands.some((item) => item.id === entry.id)
+                          ? current.brands
+                          : [...current.brands, entry].sort((left, right) => left.name.localeCompare(right.name, "es")),
+                      }))}
+                    />
+                    <QuickCatalogField
+                      kind="componentType"
+                      options={catalogOptions.componentTypes}
+                      value={componentTypeId}
+                      onChange={setComponentTypeId}
+                      onCreated={(entry) => setCatalogOptions((current) => ({
+                        ...current,
+                        componentTypes: current.componentTypes.some((item) => item.id === entry.id)
+                          ? current.componentTypes
+                          : [...current.componentTypes, entry].sort((left, right) => left.name.localeCompare(right.name, "es")),
+                      }))}
+                    />
                     <div>
                       <Label htmlFor="quick-part-number">Número de parte</Label>
                       <Input id="quick-part-number" value={partNumber} onChange={(event) => setPartNumber(event.target.value)} placeholder="Ej. BN94-07820F" className="mt-2" />
@@ -572,12 +837,12 @@ function QuickAddDialog({
                     <div className="sm:col-span-2">
                       <CompatibleModelsField
                         idPrefix="quick-product"
-                        brands={options.brands}
+                        brands={catalogOptions.brands}
                         value={compatibilities}
                         onChange={setCompatibilities}
                         defaultBrandId={
                           brandId === CUSTOM_CATALOG_VALUE
-                            ? options.brands[0]?.id ?? ""
+                            ? catalogOptions.brands[0]?.id ?? ""
                             : brandId
                         }
                         errors={state.fieldErrors?.compatibilities}
@@ -587,6 +852,9 @@ function QuickAddDialog({
                       <Label htmlFor="quick-title">Nombre administrativo <span className="font-normal text-muted-foreground">(opcional)</span></Label>
                       <Input id="quick-title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Se generará automáticamente si lo dejas vacío" className="mt-2" />
                     </div>
+                    <div className="sm:col-span-2">
+                      <ProductPhotoPicker files={photos} onChange={setPhotos} />
+                    </div>
                   </div>
                 </section>
               ) : null}
@@ -594,8 +862,8 @@ function QuickAddDialog({
               {step === "place" ? (
                 <section aria-labelledby="place-model-title">
                   <button type="button" className="text-small font-semibold text-primary hover:underline" onClick={() => setStep(selectedProduct ? "search" : "create")}>← Cambiar producto</button>
-                  <div className="mt-4 rounded-2xl border border-primary/20 bg-primary-soft/50 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.1em] text-primary">{selectedProduct ? "Producto encontrado" : "Producto nuevo"}</p>
+                  <div className="mt-4 rounded-md bg-primary-soft/50 p-4">
+                    <p className="text-xs font-semibold text-primary">{selectedProduct ? "Producto encontrado" : "Producto nuevo"}</p>
                     <p className="mt-1 font-semibold text-navy">{modelSummary}</p>
                     <p className="mt-1 text-small text-muted-foreground">
                       {selectedProduct
@@ -644,7 +912,7 @@ function QuickAddDialog({
                           ) : null}
                         </>
                       ) : (
-                        <div className="mt-2 grid gap-3 rounded-xl border border-primary/20 bg-primary-soft/30 p-4 sm:grid-cols-2">
+                        <div className="mt-2 grid gap-3 rounded-md bg-primary-soft/30 p-4 sm:grid-cols-2">
                           <div><Label htmlFor="quick-new-box-code">Código</Label><Input id="quick-new-box-code" value={newBoxCode} onChange={(event) => setNewBoxCode(event.target.value)} placeholder="A12" className="mt-2 bg-background" /><FieldError errors={state.fieldErrors?.newBoxCode} /></div>
                           <div><Label htmlFor="quick-new-box-name">Nombre</Label><Input id="quick-new-box-name" value={newBoxName} onChange={(event) => setNewBoxName(event.target.value)} placeholder="Caja A12" className="mt-2 bg-background" /><FieldError errors={state.fieldErrors?.newBoxName} /></div>
                           <p className="text-xs text-muted-foreground sm:col-span-2">Se creará y seleccionará al confirmar; cancelar no deja una caja vacía.</p>

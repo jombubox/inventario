@@ -24,7 +24,7 @@ export default async function LocationsPage() {
         description="Organiza almacenes, estantes, cajas y bolsas con una jerarquía flexible."
       />
 
-      <details className="rounded-2xl border border-border bg-card">
+      <details className="rounded-md bg-card shadow-sm">
           <summary className="cursor-pointer px-5 py-4 font-semibold text-navy">
             Crear ubicación
           </summary>

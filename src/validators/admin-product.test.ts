@@ -54,7 +54,7 @@ describe("product custom catalog validation", () => {
     expect(invalidComponent.success).toBe(false);
     if (!invalidComponent.success) {
       expect(invalidComponent.error.flatten().fieldErrors.customComponentTypeName).toEqual([
-        "Escribe el nombre del nuevo componente.",
+        "Escribe el nombre del nuevo tipo de pieza.",
       ]);
     }
   });

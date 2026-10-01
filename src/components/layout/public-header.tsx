@@ -25,7 +25,7 @@ export function PublicHeader() {
             href="/admin"
             className="hidden rounded-lg px-3 py-2 text-small font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:inline-flex"
           >
-            Admin
+            Gestionar inventario
           </Link>
           <ThemeToggle />
         </nav>

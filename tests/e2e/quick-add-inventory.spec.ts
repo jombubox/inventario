@@ -24,20 +24,22 @@ test("quick add reuses an existing product, creates a product with multiple comp
   const secondarySerialTwo = `E2E-ALT-B-${suffix}`;
   const secondarySerialThree = `E2E-ALT-C-${suffix}`;
   const inlineCompatibleModel = `UN75E2ENEW${suffix}`;
+  const inlineBrand = `Marca E2E ${suffix}`;
+  const inlinePieceType = `Sensor E2E ${suffix}`;
   const newBoxCode = `E2E-Q-${suffix}`;
   const emptyBoxCode = `E2E-EMPTY-${suffix}`;
   await login(page);
 
   const adminNav = page.getByRole("navigation", {
     name: testInfo.project.name.startsWith("mobile")
-      ? "Navegación móvil de administración"
-      : "Navegación de administración",
+      ? "Navegación móvil de gestión"
+      : "Navegación de gestión",
   });
   if (!testInfo.project.name.startsWith("mobile")) {
     await expect(adminNav.getByText("Espacio de trabajo", { exact: true })).toBeVisible();
     await expect(adminNav.getByText("Otros", { exact: true })).toBeVisible();
   }
-  await expect(adminNav.getByRole("link", { name: "Resumen", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(adminNav.getByRole("link", { name: "Tablero principal", exact: true })).toHaveAttribute("aria-current", "page");
 
   await page.goto("/admin/ubicaciones");
   const activeWarehouse = page.locator("article").filter({
@@ -77,6 +79,24 @@ test("quick add reuses an existing product, creates a product with multiple comp
   await dialog.getByRole("button", { name: "Agregar producto nuevo", exact: true }).click();
   await dialog.getByLabel("Número de parte").fill(newPartNumber);
   await dialog.getByLabel("Número de serie principal (opcional)").fill(primarySerial);
+  await dialog.getByRole("button", { name: /Agregar nueva marca/u }).click();
+  await dialog.getByLabel("Nueva marca").fill(inlineBrand);
+  await dialog.getByRole("button", { name: "Guardar marca" }).click();
+  await expect(dialog.getByText("Se creó la marca.")).toBeVisible();
+  await dialog.getByRole("button", { name: /Agregar nueva marca/u }).click();
+  await dialog.getByLabel("Nueva marca").fill(`  ${inlineBrand.toUpperCase()}  `);
+  await dialog.getByRole("button", { name: "Guardar marca" }).click();
+  await expect(dialog.getByText("Esta marca ya existe; la seleccionamos.")).toBeVisible();
+  await expect(dialog.getByLabel("Número de parte")).toHaveValue(newPartNumber);
+  await expect(dialog.getByLabel("Número de serie principal (opcional)")).toHaveValue(primarySerial);
+  await dialog.getByRole("button", { name: /Agregar tipo de pieza/u }).click();
+  await dialog.getByLabel("Nuevo tipo de pieza").fill(inlinePieceType);
+  await dialog.getByRole("button", { name: "Guardar tipo de pieza" }).click();
+  await expect(dialog.getByText("Se creó el tipo de pieza.")).toBeVisible();
+  await dialog.getByRole("button", { name: /Agregar tipo de pieza/u }).click();
+  await dialog.getByLabel("Nuevo tipo de pieza").fill(inlinePieceType.toLowerCase());
+  await dialog.getByRole("button", { name: "Guardar tipo de pieza" }).click();
+  await expect(dialog.getByText("Este tipo de pieza ya existe; lo seleccionamos.")).toBeVisible();
   const addSecondary = dialog.getByRole("button", {
     name: "Agregar número de serie secundario",
   });
@@ -96,6 +116,21 @@ test("quick add reuses an existing product, creates a product with multiple comp
   await dialog.getByRole("option", { name: new RegExp(`Agregar.*${inlineCompatibleModel}`, "u") }).click();
   const selectedModels = dialog.getByRole("list", { name: "Modelos compatibles seleccionados" });
   await expect(selectedModels.getByRole("listitem")).toHaveCount(3);
+
+  const photoInput = dialog.getByLabel(/Agregar fotos/u);
+  await photoInput.setInputFiles({ name: "archivo.txt", mimeType: "text/plain", buffer: Buffer.from("no-image") });
+  await expect(dialog.getByText(/no es una imagen JPEG, PNG o WEBP/u)).toBeVisible();
+  await photoInput.setInputFiles({ name: "grande.png", mimeType: "image/png", buffer: Buffer.alloc(10 * 1024 * 1024 + 1) });
+  await expect(dialog.getByText(/supera el límite de 10 MB/u)).toBeVisible();
+  await photoInput.setInputFiles([
+    { name: `quitar-${suffix}.jpg`, mimeType: "image/jpeg", buffer: Buffer.from("ffd8ffe00000000000000000", "hex") },
+    { name: `frente-${suffix}.png`, mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZlDkAAAAASUVORK5CYII=", "base64") },
+    { name: `reverso-${suffix}.webp`, mimeType: "image/webp", buffer: Buffer.from("UklGRiIAAABXRUJQVlA4ICAAAADQAQCdASoBAAEAAUAmJaQAA3AA/v89WAAAAA==", "base64") },
+  ]);
+  await expect(dialog.getByText("Foto principal", { exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: `Quitar quitar-${suffix}.jpg` }).click();
+  await expect(dialog.getByRole("button", { name: `Quitar quitar-${suffix}.jpg` })).toHaveCount(0);
+  await expect(dialog.getByText("Foto principal", { exact: true })).toBeVisible();
   await dialog.getByRole("button", {
     name: "Eliminar modelo compatible Samsung UN55NU7100FXZX",
   }).click();
@@ -115,6 +150,7 @@ test("quick add reuses an existing product, creates a product with multiple comp
   await dialog.getByLabel("Cantidad").fill("2");
   await dialog.getByRole("button", { name: "Agregar 2 al inventario" }).click();
   await expect(dialog.getByText(/2 unidad\(es\) agregadas correctamente/u)).toBeVisible({ timeout: 20_000 });
+  await expect(dialog.getByText("Las fotos se guardaron correctamente.", { exact: true })).toBeVisible({ timeout: 20_000 });
   await dialog.getByRole("button", { name: "Cerrar", exact: true }).click();
 
   await page.goto(`/admin/inventario?q=${newPartNumber}`);
@@ -137,6 +173,9 @@ test("quick add reuses an existing product, creates a product with multiple comp
   await page.goto(`/admin/productos?q=${secondarySerialTwo}`);
   const productRow = page.getByRole("row").filter({ hasText: newPartNumber });
   await productRow.getByRole("link", { name: "Editar" }).click();
+  await expect(page.getByAltText(`frente-${suffix}`)).toBeVisible();
+  await expect(page.getByAltText(`reverso-${suffix}`)).toBeVisible();
+  await expect(page.getByText("Principal", { exact: true })).toBeVisible();
   await page.getByLabel("Número de serie principal (opcional)").fill(editedPrimarySerial);
   await page.getByRole("button", { name: "Agregar número de serie secundario" }).click();
   await page.getByRole("textbox", { name: "Número de serie secundario 3", exact: true }).fill(secondarySerialThree);
@@ -155,7 +194,7 @@ test("quick add reuses an existing product, creates a product with multiple comp
   await expect(page.getByRole("textbox", { name: "Número de serie secundario 3", exact: true })).toHaveCount(0);
 
   await page.goto(`/admin/movimientos?q=${newPartNumber}`);
-  await expect(page.getByRole("row").filter({ hasText: newPartNumber })).toContainText("INITIAL");
+  await expect(page.getByRole("row").filter({ hasText: newPartNumber })).toContainText("Registro inicial");
 
   await page.goto("/admin/ubicaciones");
   const stockedBox = page.locator("article").filter({
@@ -190,8 +229,8 @@ test("quick add is keyboard and mobile friendly", async ({ page }, testInfo) => 
   await login(page);
   const adminNav = page.getByRole("navigation", {
     name: testInfo.project.name.startsWith("mobile")
-      ? "Navegación móvil de administración"
-      : "Navegación de administración",
+      ? "Navegación móvil de gestión"
+      : "Navegación de gestión",
   });
   const trigger = adminNav.getByRole("button", { name: "Agregar producto" });
   await trigger.click();

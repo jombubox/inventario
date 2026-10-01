@@ -8,6 +8,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import {
+  conditionLabels,
+  publicConditionValues,
+} from "@/features/catalog/domain/catalog";
 import type {
   AnalyzedImportRow,
   ImportCorrection,
@@ -23,12 +27,21 @@ import {
 
 const PAGE_SIZE = 50;
 
+const inventoryStatusOptions: Array<{
+  value: ImportDefaults["inventoryStatus"];
+  label: string;
+}> = [
+  { value: "AVAILABLE", label: "Disponible" },
+  { value: "RESERVED", label: "Reservado" },
+  { value: "DAMAGED", label: "Dañado" },
+];
+
 const fieldLabels: Record<ImportField, string> = {
   legacyBagNumber: "Bolsa legacy",
   existingSku: "SKU existente",
   brand: "Marca",
   compatibleModel: "Modelo compatible",
-  componentType: "Tipo de componente",
+  componentType: "Tipo de pieza",
   partNumber: "Número de parte",
   condition: "Condición",
   quantity: "Cantidad",
@@ -235,13 +248,17 @@ export function ImportWizard() {
           <div>
             <Label htmlFor="default-condition">Condición predeterminada</Label>
             <Select id="default-condition" className="mt-2" value={defaults.condition} onChange={(event) => { setDefaults({ ...defaults, condition: event.target.value as ImportDefaults["condition"] }); if (preview) setPreviewStale(true); }}>
-              {['UNKNOWN', 'NEW', 'USED_EXCELLENT', 'USED_GOOD', 'USED_FAIR', 'FOR_PARTS'].map((value) => <option key={value}>{value}</option>)}
+              {publicConditionValues.map((value) => (
+                <option key={value} value={value}>{conditionLabels[value]}</option>
+              ))}
             </Select>
           </div>
           <div>
             <Label htmlFor="default-status">Estado predeterminado</Label>
             <Select id="default-status" className="mt-2" value={defaults.inventoryStatus} onChange={(event) => { setDefaults({ ...defaults, inventoryStatus: event.target.value as ImportDefaults["inventoryStatus"] }); if (preview) setPreviewStale(true); }}>
-              {['AVAILABLE', 'RESERVED', 'DAMAGED'].map((value) => <option key={value}>{value}</option>)}
+              {inventoryStatusOptions.map(({ value, label }) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
             </Select>
           </div>
           <div>

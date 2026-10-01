@@ -32,7 +32,7 @@ const productFields = {
     z.literal(CUSTOM_CATALOG_VALUE),
   ]),
   customComponentTypeName: optionalDisplayText.pipe(
-    z.string().max(120, "El componente debe tener 120 caracteres o menos.").nullable().optional(),
+    z.string().max(120, "El tipo de pieza debe tener 120 caracteres o menos.").nullable().optional(),
   ),
   partNumber: optionalDisplayText,
   ...productSerialFields,
@@ -68,7 +68,7 @@ function validateCatalogSelections(
     context.addIssue({
       code: "custom",
       path: ["customComponentTypeName"],
-      message: "Escribe el nombre del nuevo componente.",
+      message: "Escribe el nombre del nuevo tipo de pieza.",
     });
   }
 }

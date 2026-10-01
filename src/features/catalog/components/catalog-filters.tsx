@@ -45,7 +45,7 @@ export function CatalogFilters({ query, brands, componentTypes, idPrefix }: Cata
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-type`}>Tipo de componente</Label>
+        <Label htmlFor={`${idPrefix}-type`}>Tipo de pieza</Label>
         <Select id={`${idPrefix}-type`} name="tipo" defaultValue={query.tipo ?? ""}>
           <option value="">Todos los tipos</option>
           {componentTypes.map((type) => (
@@ -144,4 +144,3 @@ export function CatalogFilters({ query, brands, componentTypes, idPrefix }: Cata
     </form>
   );
 }
-

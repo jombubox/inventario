@@ -8,7 +8,7 @@ import { getDb } from "@/db";
 import { getDashboardData } from "@/features/admin/data/dashboard-queries";
 import { requireAdmin } from "@/features/auth/server/admin-auth";
 import { AdminQuickAddButton } from "@/features/inventory/components/quick-add-inventory";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatImportStatus, formatMovementType, formatProductStatus } from "@/lib/format";
 
 const metricLabels = {
   activeProducts: "Productos activos",
@@ -29,7 +29,7 @@ export default async function AdminPage() {
     <div className="mx-auto w-full max-w-7xl space-y-7">
       <PageHeader
         eyebrow="Resumen operativo"
-        title="Dashboard"
+        title="Panel de control"
         description="Estado actual del catálogo y del inventario físico de JombuBox."
         actions={(
           <AdminQuickAddButton />
@@ -55,7 +55,7 @@ export default async function AdminPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader className="flex-row items-center justify-between"><CardTitle>Última importación</CardTitle><Link href="/admin/importar" className="text-small font-semibold text-primary hover:underline">Abrir importador</Link></CardHeader>
-          <CardContent>{data.latestImport ? <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-navy">{data.latestImport.filename}</p><p className="mt-1 text-small text-muted-foreground">{data.latestImport.successfulRows} válidas · {data.latestImport.warningRows} con avisos · {data.latestImport.failedRows} omitidas/fallidas</p></div><div className="sm:text-right"><Badge variant={data.latestImport.status === "COMPLETED" ? "success" : data.latestImport.status === "FAILED" ? "danger" : "warning"}>{data.latestImport.status}</Badge><p className="mt-2 text-xs text-muted-foreground">{formatDateTime(data.latestImport.completedAt ?? data.latestImport.createdAt)}</p></div></div> : <EmptyState title="Aún no hay importaciones" description="Descarga la plantilla y valida el primer archivo XLSX." />}</CardContent>
+          <CardContent>{data.latestImport ? <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-navy">{data.latestImport.filename}</p><p className="mt-1 text-small text-muted-foreground">{data.latestImport.successfulRows} válidas · {data.latestImport.warningRows} con avisos · {data.latestImport.failedRows} omitidas/fallidas</p></div><div className="sm:text-right"><Badge variant={data.latestImport.status === "COMPLETED" ? "success" : data.latestImport.status === "FAILED" ? "danger" : "warning"}>{formatImportStatus(data.latestImport.status)}</Badge><p className="mt-2 text-xs text-muted-foreground">{formatDateTime(data.latestImport.completedAt ?? data.latestImport.createdAt)}</p></div></div> : <EmptyState title="Aún no hay importaciones" description="Descarga la plantilla y valida el primer archivo XLSX." />}</CardContent>
         </Card>
         <Card>
           <CardHeader className="flex-row items-center justify-between"><CardTitle>Errores de importación recientes</CardTitle><Badge variant={data.recentImportErrors.length > 0 ? "danger" : "neutral"}>{data.recentImportErrors.length}</Badge></CardHeader>
@@ -71,12 +71,12 @@ export default async function AdminPage() {
           </CardHeader>
           <CardContent>
             {data.recentMovements.length === 0 ? (
-              <EmptyState title="Aún no hay movimientos" description="Los registros INITIAL, MOVE y ADJUSTMENT aparecerán aquí." />
+              <EmptyState title="Aún no hay movimientos" description="Las entradas, cambios de ubicación y ajustes aparecerán aquí." />
             ) : (
               <div className="divide-y divide-border">
                 {data.recentMovements.map((movement) => (
                   <div key={movement.id} className="flex gap-4 py-3 first:pt-0 last:pb-0">
-                    <Badge variant="primary">{movement.type}</Badge>
+                    <Badge variant="primary">{formatMovementType(movement.type)}</Badge>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-small font-semibold text-navy">
                         {movement.inventoryCode} · {movement.productTitle}
@@ -99,7 +99,7 @@ export default async function AdminPage() {
           <CardHeader><CardTitle>Inventario por tipo</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             {data.inventoryByType.map((item) => (
-              <div key={item.componentType} className="flex items-center justify-between gap-4 rounded-xl bg-muted px-4 py-3">
+              <div key={item.componentType} className="flex items-center justify-between gap-4 rounded-md bg-muted px-4 py-3">
                 <div>
                   <p className="text-small font-semibold text-navy">{item.componentType}</p>
                   <p className="text-small text-muted-foreground">{item.availableStock} disponibles</p>
@@ -128,7 +128,7 @@ export default async function AdminPage() {
                     <tr key={product.id}>
                       <td className="py-3 font-mono text-xs text-primary">{product.sku}</td>
                       <td className="py-3"><Link href={`/admin/productos/${product.id}`} className="font-semibold text-navy hover:text-primary">{product.title}</Link></td>
-                      <td className="py-3"><Badge>{product.status}</Badge></td>
+                      <td className="py-3"><Badge>{formatProductStatus(product.status)}</Badge></td>
                       <td className="py-3 text-right text-muted-foreground">{formatDateTime(product.updatedAt)}</td>
                     </tr>
                   ))}

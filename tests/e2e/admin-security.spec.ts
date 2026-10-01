@@ -102,7 +102,7 @@ test("the administrator exports inventory and completes the legacy import workfl
   const confirmText = await confirmResponse.text();
   expect(confirmResponse.status(), confirmText).toBe(200);
   await page.goto("/admin/importar");
-  await expect(page.getByText("COMPLETED", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Completado", { exact: true }).first()).toBeVisible();
 });
 
 test("the administrator uploads an image through the server-side fake R2 boundary", async ({ page }, testInfo) => {
@@ -277,39 +277,39 @@ test("the administrator creates and edits a product with custom catalogs", async
   await ensureTheme(page, "dark");
   await page.getByLabel("Marca", { exact: true }).selectOption("__custom__");
   await page.getByLabel("Nombre de la nueva marca").fill("Marca E2E personalizada");
-  await page.getByLabel("Tipo de componente").selectOption("__custom__");
-  await page.getByLabel("Nombre del nuevo componente").fill("Componente E2E personalizado");
+  await page.getByLabel("Tipo de pieza").selectOption("__custom__");
+  await page.getByLabel("Nombre del nuevo tipo de pieza").fill("Componente E2E personalizado");
   await page.getByLabel("Número de parte").fill("E2E-CUSTOM-CATALOG");
   await page.getByRole("button", { name: "Crear producto" }).click();
   await expect(page).toHaveURL(/\/admin\/productos\/[0-9a-f-]+\?notice=created/u, { timeout: 20_000 });
 
   await expect(page.getByLabel("Marca", { exact: true }).locator("option:checked")).toHaveText(/Marca E2E personalizada/u);
-  await expect(page.getByLabel("Tipo de componente").locator("option:checked")).toHaveText(/Componente E2E personalizado/u);
+  await expect(page.getByLabel("Tipo de pieza").locator("option:checked")).toHaveText(/Componente E2E personalizado/u);
   await page.getByRole("button", { name: "Guardar cambios" }).click();
   await expect(page).toHaveURL(/notice=updated/u, { timeout: 20_000 });
 
   await page.reload();
   await expect(page.getByLabel("Marca", { exact: true }).locator("option:checked")).toHaveText(/Marca E2E personalizada/u);
-  await expect(page.getByLabel("Tipo de componente").locator("option:checked")).toHaveText(/Componente E2E personalizado/u);
+  await expect(page.getByLabel("Tipo de pieza").locator("option:checked")).toHaveText(/Componente E2E personalizado/u);
 
   const customBrandId = await page.getByLabel("Marca", { exact: true }).inputValue();
-  const customComponentTypeId = await page.getByLabel("Tipo de componente").inputValue();
+  const customComponentTypeId = await page.getByLabel("Tipo de pieza").inputValue();
   await page.goto("/admin/productos/nuevo");
   await expect(
     page.getByLabel("Marca", { exact: true }).locator("option").filter({ hasText: "Marca E2E personalizada" }),
   ).toHaveCount(1);
   await expect(
-    page.getByLabel("Tipo de componente").locator("option").filter({ hasText: "Componente E2E personalizado" }),
+    page.getByLabel("Tipo de pieza").locator("option").filter({ hasText: "Componente E2E personalizado" }),
   ).toHaveCount(1);
   await page.getByLabel("Marca", { exact: true }).selectOption("__custom__");
   await page.getByLabel("Nombre de la nueva marca").fill("  MARCA E2E PERSONALIZADA  ");
-  await page.getByLabel("Tipo de componente").selectOption("__custom__");
-  await page.getByLabel("Nombre del nuevo componente").fill(" componente e2e PERSONALIZADO ");
+  await page.getByLabel("Tipo de pieza").selectOption("__custom__");
+  await page.getByLabel("Nombre del nuevo tipo de pieza").fill(" componente e2e PERSONALIZADO ");
   await page.getByLabel("Número de parte").fill("E2E-CUSTOM-CATALOG-REUSE");
   await page.getByRole("button", { name: "Crear producto" }).click();
   await expect(page).toHaveURL(/notice=created/u, { timeout: 20_000 });
   await expect(page.getByLabel("Marca", { exact: true })).toHaveValue(customBrandId);
-  await expect(page.getByLabel("Tipo de componente")).toHaveValue(customComponentTypeId);
+  await expect(page.getByLabel("Tipo de pieza")).toHaveValue(customComponentTypeId);
 });
 
 test("ADMIN completes product, stock, location, movement, image and publication", async ({ page }, testInfo) => {

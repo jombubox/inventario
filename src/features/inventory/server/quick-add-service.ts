@@ -40,7 +40,7 @@ async function resolveProduct(
   }
 
   if (!input.brandId || !input.componentTypeId) {
-    throw new InvalidOperationError("Completa la marca y el tipo de componente.");
+    throw new InvalidOperationError("Completa la marca y el tipo de pieza.");
   }
 
   try {

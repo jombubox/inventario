@@ -89,9 +89,9 @@ async function loadCatalogContext(
   }
   if (!componentType) {
     if (input.componentTypeId === CUSTOM_CATALOG_VALUE) {
-      throw new InvalidOperationError("Escribe el nombre del nuevo componente.");
+      throw new InvalidOperationError("Escribe el nombre del nuevo tipo de pieza.");
     }
-    throw new EntityNotFoundError("Component type not found or inactive.");
+    throw new EntityNotFoundError("El tipo de pieza no existe o está inactivo.");
   }
 
   return { brand, componentType };

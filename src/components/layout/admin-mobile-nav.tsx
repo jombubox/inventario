@@ -4,7 +4,7 @@ import { AdminQuickAddButton } from "@/features/inventory/components/quick-add-i
 
 export function AdminMobileNav() {
   return (
-    <nav aria-label="Navegación móvil de administración" className="admin-mobile-nav border-b border-border bg-card md:hidden">
+    <nav aria-label="Navegación móvil de gestión" className="admin-mobile-nav border-b border-border bg-card md:hidden">
       <div className="px-4 pt-3"><AdminQuickAddButton compact /></div>
       <div className="overflow-x-auto">
         <ul className="flex min-w-max gap-1 px-4 py-2">

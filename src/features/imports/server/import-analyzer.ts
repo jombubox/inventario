@@ -289,7 +289,7 @@ export async function analyzeImportRows(
       addMessage(row, "WARNING", "TYPE_ALIAS", `Tipo corregido mediante alias a ${row.componentType?.name}.`);
     }
     if (!row.brand && !existingSku) addMessage(row, "ERROR", "BRAND_UNRESOLVED", "No se pudo resolver la marca.");
-    if (!row.componentType && !existingSku) addMessage(row, "ERROR", "TYPE_UNRESOLVED", "No se pudo resolver el tipo de componente.");
+    if (!row.componentType && !existingSku) addMessage(row, "ERROR", "TYPE_UNRESOLVED", "No se pudo resolver el tipo de pieza.");
     if (!row.partNumber) addMessage(row, "WARNING", "PART_NUMBER_MISSING", "Número de parte ausente.");
     if (!row.compatibleModel) addMessage(row, "WARNING", "MODEL_MISSING", "Modelo compatible ausente.");
     if (quantity.error) addMessage(row, "ERROR", "QUANTITY_INVALID", quantity.error);

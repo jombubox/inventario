@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 
 const segmentLabels: Record<string, string> = {
   productos: "Productos",
+  marcas: "Marcas",
+  "tipos-de-pieza": "Tipos de pieza",
   nuevo: "Nuevo producto",
   inventario: "Inventario",
   ubicaciones: "Ubicaciones",
@@ -25,10 +27,10 @@ export function AdminBreadcrumbs() {
       <ol className="flex flex-wrap items-center gap-2">
         <li>
           {segments.length === 0 ? (
-            <span aria-current="page">Dashboard</span>
+            <span aria-current="page">Panel de control</span>
           ) : (
             <Link href="/admin" className="hover:text-navy hover:underline">
-              Dashboard
+              Tablero principal
             </Link>
           )}
         </li>

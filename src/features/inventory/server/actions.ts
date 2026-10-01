@@ -27,6 +27,11 @@ import {
 } from "@/validators/admin-inventory";
 import { quickAddInventoryMutationSchema } from "@/validators/quick-add-inventory";
 
+export type QuickAddMutationState = MutationState & {
+  productId?: string;
+  productCreated?: boolean;
+};
+
 function parseStringArray(value: FormDataEntryValue | null): unknown[] {
   if (typeof value !== "string" || value === "") return [];
   try {
@@ -38,9 +43,9 @@ function parseStringArray(value: FormDataEntryValue | null): unknown[] {
 }
 
 export async function quickAddInventoryAction(
-  _previousState: MutationState,
+  _previousState: QuickAddMutationState,
   formData: FormData,
-): Promise<MutationState> {
+): Promise<QuickAddMutationState> {
   const parsed = quickAddInventoryMutationSchema.safeParse({
     productMode: formData.get("productMode"),
     productId: formData.get("productId"),
@@ -77,6 +82,8 @@ export async function quickAddInventoryAction(
     return {
       status: "success",
       message: `${parsed.data.quantity} unidad(es) agregadas correctamente a ${result.box.name}${bag}.`,
+      productId: result.product.id,
+      productCreated: result.productCreated,
     };
   } catch (error) {
     return errorState(error);

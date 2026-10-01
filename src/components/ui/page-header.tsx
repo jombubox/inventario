@@ -21,7 +21,7 @@ export function PageHeader({
     <header className={cn("flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between", className)}>
       <div className="max-w-2xl">
         {eyebrow ? (
-          <p className="mb-2 text-label uppercase tracking-[0.16em] text-primary">{eyebrow}</p>
+          <p className="mb-2 text-label text-primary">{eyebrow}</p>
         ) : null}
         <h1 className="text-h1">{title}</h1>
         {description ? (
