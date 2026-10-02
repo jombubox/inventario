@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -43,6 +43,7 @@ import {
   deleteBox,
   createLocation,
   updateLocation,
+  renameQuickAddLocation,
 } from "@/features/locations/server/location-service";
 import { quickAddInventory } from "@/features/inventory/server/quick-add-service";
 import {
@@ -77,6 +78,12 @@ import {
 import { buildInventoryExport } from "@/features/exports/server/inventory-export";
 import { consumeOperationalRateLimit } from "@/features/security/server/rate-limit";
 import type { CreateProductMutationInput } from "@/validators/admin-product";
+import { quickAddInventoryMutationSchema } from "@/validators/quick-add-inventory";
+import { productListQuerySchema } from "@/validators/admin-query";
+import { getAdminProductDetail, getAdminProductReview, listAdminProducts } from "@/features/products/data/admin-product-queries";
+import { getPublicProductBySlug } from "@/features/catalog/data/public-catalog-queries";
+import { productPublicationPath } from "@/features/products/domain/public-product";
+import { ConcurrentModificationError } from "@/features/shared/domain/service-errors";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const safeLocalDatabase = (() => {
@@ -141,6 +148,53 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
       ...overrides,
     });
   }
+
+  it("persists Quick Add publication fields through edit, catalog and bounded list queries", async () => {
+    const { brand, componentType } = await catalogIds();
+    const warehouse = await createLocation(db, { code: "PUB-WH", name: "Almacén publicación", type: "WAREHOUSE", parentId: null, active: true, notes: null });
+    const box = await createLocation(db, { code: "PUB-BOX", name: "Caja publicación", type: "BOX", parentId: warehouse.id, active: true, notes: null });
+    for (const status of ["ACTIVE", "DRAFT", "ARCHIVED"] as const) {
+      for (const isPublic of [true, false]) {
+        const result = await quickAddInventory(db, quickAddInventoryMutationSchema.parse({
+          productMode: "new", brandId: brand.id, componentTypeId: componentType.id,
+          partNumber: `PUB-${status}-${isPublic}`, salePrice: "1250.01", status, isPublic,
+          compatibilities: [{ brandId: brand.id, model: "MODELO PUBLICACIÓN", notes: null }],
+          locationId: warehouse.id, boxMode: "existing", boxId: box.id, quantity: 5,
+        }));
+        const visible = status === "ACTIVE" && isPublic;
+        const edited = await getAdminProductDetail(db, result.product.id);
+        expect(edited).toMatchObject({ salePrice: "1250.01", currency: "MXN", status, isPublic: visible });
+        const publication = await getPublicProductBySlug(db, result.product.slug);
+        expect(Boolean(publication)).toBe(visible);
+        expect(Boolean(productPublicationPath(result.product))).toBe(visible);
+        if (visible) expect(publication).toMatchObject({ salePrice: "1250.01", currency: "MXN" });
+      }
+    }
+    const statements: string[] = [];
+    const loggedDb = drizzle(pool, { schema, logger: { logQuery(query) { statements.push(query); } } }) as unknown as Database;
+    const list = await listAdminProducts(loggedDb, productListQuerySchema.parse({}));
+    expect(list.total).toBe(6);
+    expect(list.rows.every((row) => row.salePrice === "1250.01" && row.compatibilityCount === 1)).toBe(true);
+    expect(statements).toHaveLength(2);
+    statements.length = 0;
+    const review = await getAdminProductReview(loggedDb, list.rows[0]!.id);
+    expect(review?.compatibilities).toEqual([{ brand: brand.name, model: "MODELO PUBLICACIÓN" }]);
+    expect(statements).toHaveLength(3);
+  });
+
+  it("renames physical Quick Add locations without moving boxes or stock and rejects stale edits", async () => {
+    const product = await createTestProduct();
+    const warehouse = await createLocation(db, { code: "RENAME-WH", name: "Almacén anterior", type: "WAREHOUSE", parentId: null, active: true, notes: "Conservar notas" });
+    const box = await createLocation(db, { code: "RENAME-BOX", name: "Caja anterior", type: "BOX", parentId: warehouse.id, active: true, notes: null });
+    const stock = await quickAddInventory(db, quickAddInventoryMutationSchema.parse({ productMode: "existing", productId: product.id, compatibilities: [], locationId: warehouse.id, boxMode: "existing", boxId: box.id, quantity: 3 }));
+    const renamed = await renameQuickAddLocation(db, { id: warehouse.id, name: "Almacén norte", expectedUpdatedAt: warehouse.updatedAt });
+    expect(renamed).toMatchObject({ name: "Almacén norte", type: "WAREHOUSE", parentId: null, code: warehouse.code, notes: warehouse.notes, active: true });
+    expect((await listQuickAddOptions(db)).locations).toContainEqual(expect.objectContaining({ id: warehouse.id, name: "Almacén norte", updatedAt: renamed.updatedAt.toISOString() }));
+    expect(await nodeDb.query.locations.findFirst({ where: eq(locations.id, box.id) })).toMatchObject({ parentId: warehouse.id });
+    expect(await nodeDb.query.inventoryItems.findFirst({ where: eq(inventoryItems.id, stock.item.id) })).toMatchObject({ locationId: box.id, quantity: 3 });
+    await expect(renameQuickAddLocation(db, { id: warehouse.id, name: "Cambio obsoleto", expectedUpdatedAt: warehouse.updatedAt })).rejects.toBeInstanceOf(ConcurrentModificationError);
+    await expect(renameQuickAddLocation(db, { id: box.id, name: "No editar caja", expectedUpdatedAt: box.updatedAt })).rejects.toThrow();
+  });
 
   it("manages brands and piece types with normalized reuse, aliases, search and safe deactivation", async () => {
     const brandResult = await createBrandCatalogEntry(db, { name: "  Bosch   México " });
@@ -709,7 +763,8 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     const movements = await nodeDb
       .select({ type: inventoryMovements.type })
       .from(inventoryMovements)
-      .where(eq(inventoryMovements.inventoryItemId, item.id));
+      .where(eq(inventoryMovements.inventoryItemId, item.id))
+      .orderBy(asc(inventoryMovements.createdAt));
     expect(movements.map(({ type }) => type)).toEqual(["INITIAL", "MOVE", "ADJUSTMENT"]);
     const audits = await nodeDb
       .select({ action: auditLogs.action })
@@ -762,7 +817,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
       reason: "Devolución de cliente",
     });
     expect(returned).toMatchObject({ quantity: 1, status: "AVAILABLE" });
-    const domainMovements = await nodeDb.select({ type: inventoryMovements.type }).from(inventoryMovements).where(eq(inventoryMovements.inventoryItemId, item.id));
+    const domainMovements = await nodeDb.select({ type: inventoryMovements.type }).from(inventoryMovements).where(eq(inventoryMovements.inventoryItemId, item.id)).orderBy(asc(inventoryMovements.createdAt));
     expect(domainMovements.map(({ type }) => type)).toEqual(["INITIAL", "MOVE", "ADJUSTMENT", "IN", "OUT", "SALE", "RETURN"]);
   });
 
@@ -989,6 +1044,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     });
 
     const base = {
+      salePrice: null, currency: "MXN", status: "ACTIVE" as const, isPublic: true,
       productMode: "existing" as const,
       productId: product.id,
       brandId: null,
@@ -1111,6 +1167,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     });
 
     const base = {
+      salePrice: null, currency: "MXN", status: "ACTIVE" as const, isPublic: true,
       productMode: "existing" as const,
       productId: product.id,
       brandId: null,
@@ -1151,6 +1208,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     });
 
     const result = await quickAddInventory(db, {
+      salePrice: null, currency: "MXN", status: "ACTIVE" as const, isPublic: true,
       productMode: "new",
       productId: null,
       brandId: brand.id,
@@ -1176,6 +1234,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     expect(await nodeDb.select().from(auditLogs).where(eq(auditLogs.entityId, result.item.id))).toHaveLength(1);
 
     await expect(quickAddInventory(db, {
+      salePrice: null, currency: "MXN", status: "ACTIVE" as const, isPublic: true,
       productMode: "new",
       productId: null,
       brandId: brand.id,
@@ -1260,6 +1319,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     const warehouse = await createLocation(db, { code: "QA-CON-WH", name: "Almacén concurrente", type: "WAREHOUSE", parentId: null, active: true, notes: null });
     const box = await createLocation(db, { code: "QA-CON-BOX", name: "Caja concurrente", type: "BOX", parentId: warehouse.id, active: true, notes: null });
     const base = {
+      salePrice: null, currency: "MXN", status: "ACTIVE" as const, isPublic: true,
       productMode: "existing" as const,
       productId: product.id,
       brandId: null,
@@ -1306,6 +1366,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     const warehouse = await createLocation(db, { code: "QA-RACE-WH", name: "Almacén carrera", type: "WAREHOUSE", parentId: null, active: true, notes: null });
     const box = await createLocation(db, { code: "QA-RACE-BOX", name: "Caja carrera", type: "BOX", parentId: warehouse.id, active: true, notes: null });
     const input = {
+      salePrice: null, currency: "MXN", status: "ACTIVE" as const, isPublic: true,
       productMode: "existing" as const,
       productId: product.id,
       brandId: null,
@@ -1355,6 +1416,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
 
     await expect(
       quickAddInventory(db, {
+        salePrice: null, currency: "MXN", status: "ACTIVE" as const, isPublic: true,
         productMode: "new",
         productId: null,
         brandId: brand.id,

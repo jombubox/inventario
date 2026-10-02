@@ -105,6 +105,10 @@ export async function listAdminProducts(db: Database, query: ProductListQuery) {
       id: products.id,
       sku: products.sku,
       title: products.title,
+      slug: products.slug,
+      salePrice: products.salePrice,
+      currency: products.currency,
+      createdAt: products.createdAt,
       brand: brands.name,
       componentType: componentTypes.name,
       partNumber: products.partNumber,
@@ -118,9 +122,10 @@ export async function listAdminProducts(db: Database, query: ProductListQuery) {
         from ${productImages} pi
         where pi.product_id = ${products.id}
           and pi.storage_key is not null
-        order by pi.is_primary desc, pi.sort_order asc
+        order by pi.is_primary desc, pi.sort_order asc, pi.created_at asc
         limit 1
       )`,
+      compatibilityCount: sql<number>`(select count(*)::int from ${productCompatibilities} pc where pc.product_id = ${products.id})`,
     })
     .from(products)
     .innerJoin(brands, eq(products.brandId, brands.id))
@@ -139,7 +144,26 @@ export async function listAdminProducts(db: Database, query: ProductListQuery) {
   ]);
 
   const total = totalResult[0]?.value ?? 0;
-  return { rows, total, pageCount: Math.max(1, Math.ceil(total / query.pageSize)) };
+  return { rows: rows.map((row) => ({ ...row, primaryImage: row.primaryImage ? getR2PublicUrl(row.primaryImage) : null })), total, pageCount: Math.max(1, Math.ceil(total / query.pageSize)) };
+}
+
+/** Lightweight review data, fetched once when a row's gallery or compatibility is opened. */
+export async function getAdminProductReview(db: Database, productId: string) {
+  const product = await db.query.products.findFirst({
+    columns: { id: true, title: true },
+    where: and(eq(products.id, productId), isNull(products.deletedAt)),
+  });
+  if (!product) return null;
+  const [images, compatibilities] = await Promise.all([
+    db.select({ storageKey: productImages.storageKey, alt: productImages.alt })
+      .from(productImages).where(eq(productImages.productId, productId))
+      .orderBy(desc(productImages.isPrimary), asc(productImages.sortOrder), asc(productImages.createdAt)),
+    db.select({ brand: brands.name, model: productCompatibilities.model })
+      .from(productCompatibilities).innerJoin(brands, eq(productCompatibilities.brandId, brands.id))
+      .where(eq(productCompatibilities.productId, productId))
+      .orderBy(asc(brands.name), asc(productCompatibilities.model)),
+  ]);
+  return { images: images.flatMap((image) => image.storageKey ? [{ url: getR2PublicUrl(image.storageKey), alt: image.alt || product.title }] : []), compatibilities };
 }
 
 export async function getAdminProductDetail(db: Database, productId: string) {

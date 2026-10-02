@@ -1,3 +1,5 @@
+import { formatMoney } from "@/lib/format";
+
 export const LOW_STOCK_THRESHOLD = 2;
 
 export const publicConditionValues = [
@@ -39,10 +41,5 @@ export function getPublicAvailability(availableUnits: number): PublicAvailabilit
 export function formatPublicPrice(price: string | null, currency: string): string {
   if (price === null) return "Consultar precio";
 
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 2,
-  }).format(Number(price));
+  return formatMoney(price, currency);
 }
-

@@ -63,7 +63,7 @@ export default async function AdminPage() {
         </Card>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
         <Card>
           <CardHeader className="flex-row items-center justify-between">
             <CardTitle>Movimientos recientes</CardTitle>

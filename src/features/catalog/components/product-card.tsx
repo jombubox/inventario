@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { publicProductPath } from "@/features/products/domain/public-product";
 
 import { Badge } from "@/components/ui/badge";
 import { AvailabilityBadge } from "@/features/catalog/components/availability-badge";
@@ -14,7 +15,7 @@ export function ProductCard({ product }: { product: PublicProductCardDTO }) {
 
   return (
     <Link
-      href={`/catalogo/${product.slug}`}
+      href={publicProductPath(product.slug)}
       className="group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgba(0,15,48,0.03)] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-[0_12px_30px_rgba(0,15,48,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       <ProductImage

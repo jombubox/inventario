@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { UNPARENTED_BOXES_LOCATION_ID } from "@/features/locations/domain/quick-add-location";
 import { CUSTOM_CATALOG_VALUE } from "@/features/products/domain/catalog-selection";
-import { compatibilityMutationSchema } from "@/validators/admin-product";
+import { compatibilityMutationSchema, productPublicationFields } from "@/validators/admin-product";
 import { optionalDisplayText, requiredDisplayText } from "@/validators/shared";
 import {
   productSerialFields,
@@ -32,6 +32,10 @@ export const quickAddInventoryMutationSchema = z
     ...productSerialFields,
     compatibilities: z.array(compatibilityMutationSchema).max(30),
     title: optionalDisplayText,
+    ...productPublicationFields,
+    salePrice: productPublicationFields.salePrice.default(null),
+    status: productPublicationFields.status.default("ACTIVE"),
+    isPublic: productPublicationFields.isPublic.default(true),
     locationId: z.union([
       z.uuid("Selecciona una ubicación válida."),
       z.literal(UNPARENTED_BOXES_LOCATION_ID),

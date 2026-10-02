@@ -19,6 +19,13 @@ export const compatibilityMutationSchema = z.object({
   notes: optionalDisplayText,
 });
 
+export const productPublicationFields = {
+  salePrice: z.union([moneyString, z.literal(""), z.null()]).transform((value) => value || null),
+  currency: currencyCode.default("MXN"),
+  status: z.enum(productStatusValues),
+  isPublic: z.boolean(),
+};
+
 const productFields = {
   brandId: z.union([
     z.uuid("Selecciona una marca válida."),
@@ -38,10 +45,7 @@ const productFields = {
   ...productSerialFields,
   title: optionalDisplayText,
   description: optionalDisplayText,
-  salePrice: z.union([moneyString, z.literal(""), z.null()]).transform((value) => value || null),
-  currency: currencyCode.default("MXN"),
-  status: z.enum(productStatusValues),
-  isPublic: z.boolean(),
+  ...productPublicationFields,
   compatibilities: z.array(compatibilityMutationSchema).max(30),
 };
 

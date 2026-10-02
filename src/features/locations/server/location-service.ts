@@ -6,6 +6,7 @@ import type { Database } from "@/db/connection";
 import { inventoryItems, inventoryMovements, locations } from "@/db/schema";
 import { createAuditLog } from "@/features/audit/data/audit-log";
 import { assertValidLocationParent } from "@/features/locations/domain/location-hierarchy";
+import { isQuickAddContainer } from "@/features/locations/domain/quick-add-location";
 import {
   ConcurrentModificationError,
   DuplicateEntityError,
@@ -82,7 +83,27 @@ export async function updateLocation(
   db: Database,
   input: UpdateLocationMutationInput,
 ) {
+  return db.transaction((tx) => updateLocationInTransaction(tx, input));
+}
+
+export async function renameQuickAddLocation(
+  db: Database,
+  input: { id: string; name: string; expectedUpdatedAt: Date },
+) {
   return db.transaction(async (tx) => {
+    const [existing] = await tx.select().from(locations)
+      .where(eq(locations.id, input.id)).for("update").limit(1);
+    if (!existing || !isQuickAddContainer(existing)) {
+      throw new EntityNotFoundError("La ubicación ya no existe o está inactiva.");
+    }
+    return updateLocationInTransaction(tx, { ...existing, ...input });
+  });
+}
+
+async function updateLocationInTransaction(
+  tx: LocationTransaction,
+  input: UpdateLocationMutationInput,
+) {
     const existing = await tx.query.locations.findFirst({
       where: eq(locations.id, input.id),
     });
@@ -134,7 +155,6 @@ export async function updateLocation(
       },
     });
     return updated;
-  });
 }
 
 export async function deleteBox(db: Database, input: DeleteBoxMutationInput) {

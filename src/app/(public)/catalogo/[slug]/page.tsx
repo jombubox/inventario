@@ -23,6 +23,7 @@ import {
   serializeJsonLd,
 } from "@/features/catalog/seo/product-json-ld";
 import { absoluteSiteUrl } from "@/lib/site-url";
+import { publicProductPath } from "@/features/products/domain/public-product";
 
 export const dynamic = "force-dynamic";
 
@@ -79,13 +80,13 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   return {
     title: product.title,
     description,
-    alternates: { canonical: `/catalogo/${product.slug}` },
+    alternates: { canonical: publicProductPath(product.slug) },
     robots: { index: true, follow: true },
     openGraph: {
       type: "website",
       title: `${product.title} | JombuBox`,
       description,
-      url: `/catalogo/${product.slug}`,
+      url: publicProductPath(product.slug),
       images: [socialImage],
     },
     twitter: {
@@ -102,7 +103,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const product = await loadPublicProductBySlug(slug);
   if (!product) notFound();
 
-  const productUrl = absoluteSiteUrl(`/catalogo/${product.slug}`);
+  const productUrl = absoluteSiteUrl(publicProductPath(product.slug));
   const productJsonLd = buildProductJsonLd(product, productUrl);
   const breadcrumbJsonLd = buildBreadcrumbJsonLd(
     product,

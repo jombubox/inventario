@@ -22,7 +22,7 @@ test("home → BN94 search → brand filter → public product detail", async ({
   await page.getByRole("link", { name: /Mainboard Samsung BN94-07820F/ }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Mainboard Samsung BN94-07820F");
   await expect(page.getByText("SAM-MB-BN9407820F", { exact: true })).toBeVisible();
-  await expect(page.getByText("Pocas piezas", { exact: true })).toBeVisible();
+  await expect(page.locator("section").filter({ has: page.getByRole("heading", { level: 1 }) }).getByText("Pocas piezas", { exact: true })).toBeVisible();
   await expect(page.getByText("CAJA-E2E", { exact: true })).toHaveCount(0);
 });
 

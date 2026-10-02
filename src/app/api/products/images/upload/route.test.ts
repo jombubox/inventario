@@ -7,6 +7,7 @@ import {
 import { InvalidOperationError } from "@/features/shared/domain/service-errors";
 
 const createProductImage = vi.fn();
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 vi.mock("@/db", () => ({ getDb: () => ({}) }));
 vi.mock("@/features/auth/server/admin-auth", () => ({ requireAdmin: vi.fn() }));

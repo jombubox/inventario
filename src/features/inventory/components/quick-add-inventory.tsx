@@ -20,6 +20,8 @@ import { Select } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { MAX_IMAGE_BYTES, MAX_PRODUCT_IMAGES } from "@/features/images/domain/image-policy";
 import { UNPARENTED_BOXES_LOCATION_ID } from "@/features/locations/domain/quick-add-location";
+import { QuickAddLocationEditor } from "@/features/locations/components/quick-add-location-editor";
+import { productPublicationFields } from "@/validators/admin-product";
 import { CUSTOM_CATALOG_VALUE } from "@/features/products/domain/catalog-selection";
 import {
   CompatibleModelsField,
@@ -40,6 +42,7 @@ import {
   type QuickAddMutationState,
 } from "@/features/inventory/server/actions";
 import { cn } from "@/lib/cn";
+import { formatMoney } from "@/lib/format";
 
 type CatalogOption = { id: string; name: string; code: string };
 type LocationOption = {
@@ -48,6 +51,7 @@ type LocationOption = {
   name: string;
   breadcrumb: string;
   kind: "container" | "unparented-boxes";
+  updatedAt?: string;
 };
 type BoxOption = {
   id: string;
@@ -147,6 +151,7 @@ export function AdminQuickAddProvider({
           options={latestOptions}
           onClose={close}
           onRestart={() => setSession((value) => value + 1)}
+          onOptionsChanged={setLatestOptions}
         />
       ) : null}
     </QuickAddContext.Provider>
@@ -373,14 +378,20 @@ function ProductPhotoPicker({
 }
 
 function QuickAddDialog({
-  options,
+  options: initialOptions,
   onClose,
   onRestart,
+  onOptionsChanged,
 }: {
   options: QuickAddOptions;
   onClose: () => void;
   onRestart: () => void;
+  onOptionsChanged: (options: QuickAddOptions) => void;
 }) {
+  const [inlineOptions, setOptions] = useState<QuickAddOptions | null>(null);
+  const options = inlineOptions ?? initialOptions;
+  const [locationEditor, setLocationEditor] = useState<"create" | "edit" | null>(null);
+  const [locationSaving, setLocationSaving] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const [state, formAction, pending] = useActionState(
@@ -410,6 +421,9 @@ function QuickAddDialog({
   const [secondarySerialNumbers, setSecondarySerialNumbers] = useState<SerialNumberValue[]>([]);
   const [compatibilities, setCompatibilities] = useState<CompatibilityValue[]>([]);
   const [title, setTitle] = useState("");
+  const [salePrice, setSalePrice] = useState("");
+  const [status, setStatus] = useState<"ACTIVE" | "DRAFT" | "ARCHIVED">("ACTIVE");
+  const [isPublic, setIsPublic] = useState(true);
   const [photos, setPhotos] = useState<File[]>([]);
   const [uploadState, setUploadState] = useState<"idle" | "uploading" | "done" | "error">("idle");
   const [uploadAttempt, setUploadAttempt] = useState(0);
@@ -534,6 +548,7 @@ function QuickAddDialog({
   };
 
   const updateLocation = (nextLocationId: string) => {
+    setLocationEditor(null);
     const firstBox = options.boxes.find((box) => box.parentId === nextLocationId);
     setLocationId(nextLocationId);
     setBoxId(firstBox?.id ?? "");
@@ -543,7 +558,7 @@ function QuickAddDialog({
   };
 
   const close = () => {
-    if (pending || uploadState === "uploading") return;
+    if (pending || locationSaving || uploadState === "uploading") return;
     dialogRef.current?.close();
     onClose();
   };
@@ -570,6 +585,11 @@ function QuickAddDialog({
   };
 
   const continueNewProduct = () => {
+    const price = productPublicationFields.salePrice.safeParse(salePrice);
+    if (!price.success) {
+      setCreateError(price.error.issues[0]?.message ?? "Revisa el precio de venta.");
+      return;
+    }
     if (!brandId || !componentTypeId) {
       setCreateError("Selecciona marca y tipo de pieza.");
       return;
@@ -653,6 +673,9 @@ function QuickAddDialog({
         />
         <input type="hidden" name="compatibilities" value={JSON.stringify(compatibilities)} />
         <input type="hidden" name="title" value={title} />
+        <input type="hidden" name="salePrice" value={salePrice} />
+        <input type="hidden" name="status" value={status} />
+        <input type="hidden" name="isPublic" value={String(isPublic)} />
         <input type="hidden" name="locationId" value={resolvedLocationId} />
         <input type="hidden" name="boxMode" value={boxMode} />
         <input type="hidden" name="boxId" value={resolvedBoxId} />
@@ -675,7 +698,7 @@ function QuickAddDialog({
             variant="ghost"
             size="icon"
             onClick={close}
-            disabled={pending || uploadState === "uploading"}
+            disabled={pending || locationSaving || uploadState === "uploading"}
             aria-label="Cerrar flujo"
             className="-mr-2 -mt-1"
           >
@@ -688,9 +711,12 @@ function QuickAddDialog({
             <div className="w-full max-w-lg text-center">
               <div className="mx-auto grid size-14 place-items-center rounded-full bg-success/10 text-2xl text-success" aria-hidden="true">✓</div>
               <h3 className="mt-5 text-h2 text-navy">
-                {uploadState === "uploading" ? "Subiendo fotos…" : "Inventario actualizado"}
+                {uploadState === "uploading" ? "Subiendo fotos…" : state.productCreated ? "Producto agregado correctamente" : "Inventario actualizado"}
               </h3>
               <div className="mt-4"><FormFeedback state={state} /></div>
+              {state.productCreated ? <p className="mt-3 text-small">{state.publicationPath ? "Publicación: visible en el catálogo público." : "Publicación: este producto no está visible en el catálogo público."}</p> : null}
+              {state.productCreated && photos.length === 0 ? <p className="mt-2 text-small text-muted-foreground">Sin fotos agregadas.</p> : null}
+              {state.productCreated && photos.length > 0 && uploadState === "idle" ? <p role="status" className="mt-2 text-small">Preparando las fotos…</p> : null}
               {uploadState === "uploading" ? (
                 <p role="status" className="mt-3 text-small font-semibold text-primary">
                   Subiendo foto {Math.min(uploadedPhotoCount + 1, photos.length)} de {photos.length}…
@@ -719,8 +745,9 @@ function QuickAddDialog({
                 </div>
               ) : null}
               <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+                {state.publicationPath ? <a href={state.publicationPath} target="_blank" rel="noopener noreferrer" className={buttonStyles({ variant: "outline" })}>Ver publicación</a> : null}
                 <Button type="button" variant="outline" onClick={close} disabled={uploadState === "uploading"}>Cerrar</Button>
-                <Button type="button" onClick={onRestart} disabled={uploadState === "uploading"}>Agregar otro</Button>
+                <Button type="button" onClick={onRestart} disabled={uploadState === "uploading"}>Agregar otro producto</Button>
               </div>
             </div>
           </div>
@@ -849,9 +876,20 @@ function QuickAddDialog({
                       />
                     </div>
                     <div className="sm:col-span-2">
-                      <Label htmlFor="quick-title">Nombre administrativo <span className="font-normal text-muted-foreground">(opcional)</span></Label>
+                      <Label htmlFor="quick-title">Nombre del producto <span className="font-normal text-muted-foreground">(opcional)</span></Label>
                       <Input id="quick-title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Se generará automáticamente si lo dejas vacío" className="mt-2" />
                     </div>
+                    <div className="sm:col-span-2">
+                      <Label htmlFor="quick-sale-price">Precio de venta</Label>
+                      <div className="mt-2 flex items-center gap-3"><Input id="quick-sale-price" inputMode="decimal" value={salePrice} onChange={(event) => setSalePrice(event.target.value)} placeholder="1250.00" aria-describedby="quick-price-help" /><span className="font-semibold">MXN</span></div>
+                      <p id="quick-price-help" className="mt-1 text-xs text-muted-foreground">Hasta dos decimales, sin comas. Si lo dejas vacío, se mostrará «Consultar precio».</p>
+                      <FieldError errors={state.fieldErrors?.salePrice} />
+                    </div>
+                    <div>
+                      <Label htmlFor="quick-status">Estado</Label><Select id="quick-status" value={status} onChange={(event) => setStatus(event.target.value as typeof status)} className="mt-2"><option value="ACTIVE">Activo</option><option value="DRAFT">Borrador</option><option value="ARCHIVED">Archivado</option></Select>
+                    </div>
+                    <label className="flex min-h-11 items-center gap-3 self-end rounded-md border border-border p-3 text-small font-semibold"><input type="checkbox" checked={isPublic} onChange={(event) => setIsPublic(event.target.checked)} className="size-5 accent-primary" />Visible en el catálogo público</label>
+                    {status !== "ACTIVE" ? <p role="status" className="text-small text-muted-foreground sm:col-span-2">Solo los productos activos pueden aparecer en el catálogo. Se guardará sin visibilidad pública.</p> : null}
                     <div className="sm:col-span-2">
                       <ProductPhotoPicker files={photos} onChange={setPhotos} />
                     </div>
@@ -870,13 +908,14 @@ function QuickAddDialog({
                         ? `${selectedProduct.brand} · ${selectedProduct.componentType} · ${selectedProduct.sku}`
                         : `${selectedBrand?.name ?? customBrandName} · ${selectedType?.name ?? customComponentTypeName}`}
                     </p>
+                    {!selectedProduct ? <p className="mt-2 text-small">{status === "ACTIVE" && isPublic ? "Se mostrará en el catálogo público." : "Se guardará sin visibilidad pública."} Precio: {salePrice ? `${formatMoney(salePrice)} MXN` : "Consultar precio"}.</p> : null}
                   </div>
 
                   <h3 id="place-model-title" className="mt-6 text-h2 text-navy">¿Dónde quieres guardar estas piezas?</h3>
                   <div className="mt-5 grid gap-5 sm:grid-cols-2">
                     <div className="sm:col-span-2">
                       <Label htmlFor="quick-location">Ubicación</Label>
-                      <Select id="quick-location" value={resolvedLocationId} onChange={(event) => updateLocation(event.target.value)} className="mt-2" disabled={options.locations.length === 0}>
+                      <Select id="quick-location" value={resolvedLocationId} onChange={(event) => updateLocation(event.target.value)} className="mt-2" disabled={locationSaving || options.locations.length === 0}>
                         {options.locations.length === 0 ? <option value="">{locationEmptyMessage}</option> : null}
                         {options.locations.map((location) => <option key={location.id} value={location.id}>{location.breadcrumb}</option>)}
                       </Select>
@@ -886,6 +925,15 @@ function QuickAddDialog({
                         </p>
                       ) : null}
                       <FieldError errors={state.fieldErrors?.locationId} />
+                      <div className="mt-2 flex flex-wrap gap-2"><Button type="button" variant="ghost" size="sm" disabled={locationSaving} onClick={() => setLocationEditor("create")}>+ Agregar ubicación</Button>{selectedLocation?.kind === "container" ? <Button type="button" variant="ghost" size="sm" disabled={locationSaving} onClick={() => setLocationEditor("edit")}>Editar ubicación</Button> : null}</div>
+                      {locationEditor ? <QuickAddLocationEditor key={`${locationEditor}-${selectedLocation?.id ?? ""}`} location={locationEditor === "edit" ? selectedLocation : undefined} onBusyChange={setLocationSaving} onRefreshed={(next) => { setOptions(next); onOptionsChanged(next); }} onCancel={() => setLocationEditor(null)} onSaved={(next, id) => {
+                        setOptions(next);
+                        onOptionsChanged(next);
+                        if (locationEditor === "create") {
+                          setLocationId(id); setBoxId(""); setBoxMode("existing");
+                        }
+                        setLocationEditor(null);
+                      }} /> : null}
                     </div>
 
                     <div className="sm:col-span-2">
@@ -947,8 +995,8 @@ function QuickAddDialog({
               {step === "place" ? (
                 <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-xs text-muted-foreground">Producto + caja nueva + inventario se guardan juntos.</p>
-                  <Button type="submit" isLoading={pending} loadingLabel="Agregando…" disabled={!resolvedLocationId || quantity < 1 || (boxMode === "existing" ? !resolvedBoxId : !newBoxCode.trim() || !newBoxName.trim())}>
-                    Agregar {Number.isFinite(quantity) && quantity > 0 ? quantity : ""} al inventario
+                  <Button type="submit" isLoading={pending} loadingLabel="Agregando…" disabled={locationSaving || locationEditor !== null || !resolvedLocationId || quantity < 1 || (boxMode === "existing" ? !resolvedBoxId : !newBoxCode.trim() || !newBoxName.trim())}>
+                    {selectedProduct ? `Agregar ${Number.isFinite(quantity) && quantity > 0 ? quantity : ""} al inventario` : "Guardar producto"}
                   </Button>
                 </div>
               ) : null}

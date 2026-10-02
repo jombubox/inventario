@@ -26,6 +26,15 @@ const validExisting = {
 };
 
 describe("quickAddInventoryMutationSchema", () => {
+  it("defaults new publication data to Active, public and MXN using decimal strings", () => {
+    const input = { ...validExisting, productMode: "new", productId: null, brandId: id, componentTypeId: secondId, partNumber: "TEST-PRICE" };
+    expect(quickAddInventoryMutationSchema.parse(input)).toMatchObject({ salePrice: null, currency: "MXN", status: "ACTIVE", isPublic: true });
+    expect(quickAddInventoryMutationSchema.parse({ ...input, salePrice: "1250.01", isPublic: false })).toMatchObject({ salePrice: "1250.01", isPublic: false });
+    expect(quickAddInventoryMutationSchema.parse({ ...input, salePrice: "0.00", status: "DRAFT" })).toMatchObject({ salePrice: "0.00", status: "DRAFT" });
+  });
+  it.each(["-1", "NaN", "Infinity", "1e3", "1,250.00", "12.345", "10000000000.00", "--1", "12abc"])("rejects invalid price %s", (salePrice) => {
+    expect(quickAddInventoryMutationSchema.safeParse({ ...validExisting, salePrice }).success).toBe(false);
+  });
   it("accepts existing products with an existing box and optional bag", () => {
     expect(quickAddInventoryMutationSchema.parse(validExisting)).toMatchObject({
       productId: id,

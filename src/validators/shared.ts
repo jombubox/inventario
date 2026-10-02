@@ -14,7 +14,7 @@ export const optionalDisplayText = z.preprocess(
 
 export const moneyString = z
   .string()
-  .regex(/^\d{1,10}(?:\.\d{1,2})?$/u, "Use a non-negative decimal with at most two places.");
+  .regex(/^\d{1,10}(?:\.\d{1,2})?$/u, "Escribe un precio sin signos ni comas, con hasta 10 dígitos y dos decimales.");
 
 export const currencyCode = z
   .string()

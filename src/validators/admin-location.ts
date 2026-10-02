@@ -22,5 +22,16 @@ export const updateLocationMutationSchema = z.object({
   ...locationFields,
 });
 
+export const createQuickAddLocationSchema = z.object({
+  code: requiredDisplayText,
+  name: requiredDisplayText,
+});
+
+export const renameQuickAddLocationSchema = z.object({
+  id: z.uuid(),
+  expectedUpdatedAt: z.coerce.date(),
+  name: requiredDisplayText,
+});
+
 export type CreateLocationMutationInput = z.infer<typeof createLocationMutationSchema>;
 export type UpdateLocationMutationInput = z.infer<typeof updateLocationMutationSchema>;

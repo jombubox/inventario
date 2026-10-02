@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 
 import { getDb } from "@/db";
 import { requireAdmin } from "@/features/auth/server/admin-auth";
@@ -60,6 +61,8 @@ export async function POST(request: Request) {
       bytes,
     });
     revalidatePublicCatalog();
+    revalidatePath("/admin/productos");
+    revalidatePath(`/admin/productos/${input.productId}`);
     return NextResponse.json({ image }, { status: 201, headers: requestIdHeaders(requestId) });
   } catch (error) {
     return imageErrorResponse(error, { requestId, event: "image_upload_failed" });

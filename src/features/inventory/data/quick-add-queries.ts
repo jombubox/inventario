@@ -53,6 +53,7 @@ export async function listQuickAddOptions(db: Database) {
         type: locations.type,
         parentId: locations.parentId,
         active: locations.active,
+        updatedAt: locations.updatedAt,
       })
       .from(locations)
       .orderBy(asc(locations.name))
@@ -88,6 +89,7 @@ export async function listQuickAddOptions(db: Database) {
         name: location.name,
         breadcrumb: buildLocationBreadcrumb(location.id, locationRows),
         kind: "container" as const,
+        updatedAt: location.updatedAt.toISOString(),
       })),
       ...(unparentedBoxes.length > 0
         ? [{

@@ -3,6 +3,7 @@ import type { MetadataRoute } from "next";
 import { getDb } from "@/db";
 import { getPublicProductSitemapEntries } from "@/features/catalog/data/public-catalog-queries";
 import { getSiteUrl } from "@/lib/site-url";
+import { publicProductPath } from "@/features/products/domain/public-product";
 
 export const dynamic = "force-dynamic";
 
@@ -15,11 +16,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: new URL("/", siteUrl).toString(), changeFrequency: "weekly", priority: 1 },
     { url: new URL("/catalogo", siteUrl).toString(), changeFrequency: "daily", priority: 0.9 },
     ...productRows.map((product) => ({
-      url: new URL(`/catalogo/${product.slug}`, siteUrl).toString(),
+      url: new URL(publicProductPath(product.slug), siteUrl).toString(),
       lastModified: product.updatedAt,
       changeFrequency: "weekly" as const,
       priority: 0.7,
     })),
   ];
 }
-

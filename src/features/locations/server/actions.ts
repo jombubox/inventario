@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 
 import { getDb } from "@/db";
 import { requireAdmin } from "@/features/auth/server/admin-auth";
-import { createLocation, deleteBox, updateLocation } from "@/features/locations/server/location-service";
+import { createLocation, deleteBox, updateLocation, renameQuickAddLocation } from "@/features/locations/server/location-service";
+import { listQuickAddOptions } from "@/features/inventory/data/quick-add-queries";
 import {
   errorState,
   type MutationState,
@@ -13,8 +14,44 @@ import {
 import {
   createLocationMutationSchema,
   updateLocationMutationSchema,
+  createQuickAddLocationSchema,
+  renameQuickAddLocationSchema,
 } from "@/validators/admin-location";
 import { deleteBoxMutationSchema } from "@/validators/quick-add-inventory";
+import { ConcurrentModificationError } from "@/features/shared/domain/service-errors";
+
+type InlineLocationState = MutationState & {
+  selectedLocationId?: string;
+  options?: Awaited<ReturnType<typeof listQuickAddOptions>>;
+};
+
+export async function saveQuickAddLocationAction(formData: FormData): Promise<InlineLocationState> {
+  await requireAdmin();
+  const editing = formData.get("mode") === "edit";
+  const parsed = editing
+    ? renameQuickAddLocationSchema.safeParse({
+        id: formData.get("id"), expectedUpdatedAt: formData.get("expectedUpdatedAt"),
+        name: formData.get("name"),
+      })
+    : createQuickAddLocationSchema.safeParse({ code: formData.get("code"), name: formData.get("name") });
+  if (!parsed.success) return validationState(parsed.error);
+  try {
+    const db = getDb();
+    const location = "id" in parsed.data
+      ? await renameQuickAddLocation(db, parsed.data)
+      : await createLocation(db, { ...parsed.data, type: "WAREHOUSE", parentId: null, active: true, notes: null });
+    revalidatePath("/admin", "layout");
+    revalidatePath("/admin/ubicaciones");
+    revalidatePath("/admin/inventario");
+    return { status: "success", message: editing ? "Ubicación actualizada." : "Ubicación creada.",
+      selectedLocationId: location.id, options: await listQuickAddOptions(db) };
+  } catch (error) {
+    if (error instanceof ConcurrentModificationError) {
+      return { status: "error", message: "Otra persona cambió esta ubicación. Actualizamos las opciones; revisa el nombre antes de volver a guardar.", options: await listQuickAddOptions(getDb()) };
+    }
+    return errorState(error);
+  }
+}
 
 function locationFields(formData: FormData) {
   return {

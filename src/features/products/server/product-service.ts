@@ -12,6 +12,7 @@ import {
 } from "@/db/schema";
 import { createAuditLog } from "@/features/audit/data/audit-log";
 import { CUSTOM_CATALOG_VALUE } from "@/features/products/domain/catalog-selection";
+import { isProductPublic } from "@/features/products/domain/public-product";
 import { buildProductTitle } from "@/features/products/domain/build-product-title";
 import {
   appendSkuCollisionSuffix,
@@ -331,7 +332,7 @@ export async function createProductInTransaction(
     sql`select pg_advisory_xact_lock(hashtextextended(${`product-slug:${baseSlug}`}, 0))`,
   );
   const slug = await resolveAvailableSlug(tx, baseSlug);
-  const isPublic = input.status === "ACTIVE" && input.isPublic;
+  const isPublic = isProductPublic(input);
   const [product] = await tx
     .insert(products)
     .values({
@@ -436,7 +437,7 @@ export async function updateProduct(
         salePrice: input.salePrice,
         currency: input.currency,
         status: input.status,
-        isPublic: input.status === "ACTIVE" && input.isPublic,
+        isPublic: isProductPublic(input),
         updatedAt: nextUpdatedAt,
       })
       .where(

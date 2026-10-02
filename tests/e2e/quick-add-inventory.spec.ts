@@ -148,7 +148,7 @@ test("quick add reuses an existing product, creates a product with multiple comp
   await dialog.getByLabel("Código").fill(newBoxCode);
   await dialog.getByLabel("Nombre").fill(`Caja E2E ${suffix}`);
   await dialog.getByLabel("Cantidad").fill("2");
-  await dialog.getByRole("button", { name: "Agregar 2 al inventario" }).click();
+  await dialog.getByRole("button", { name: "Guardar producto" }).click();
   await expect(dialog.getByText(/2 unidad\(es\) agregadas correctamente/u)).toBeVisible({ timeout: 20_000 });
   await expect(dialog.getByText("Las fotos se guardaron correctamente.", { exact: true })).toBeVisible({ timeout: 20_000 });
   await dialog.getByRole("button", { name: "Cerrar", exact: true }).click();

@@ -54,10 +54,10 @@ async function resolveProduct(
       secondarySerialNumbers: input.secondarySerialNumbers,
       title: input.title,
       description: null,
-      salePrice: null,
-      currency: "MXN",
-      status: "DRAFT",
-      isPublic: false,
+      salePrice: input.salePrice,
+      currency: input.currency,
+      status: input.status,
+      isPublic: input.isPublic,
       compatibilities: input.compatibilities,
     });
     return { product, created: true };

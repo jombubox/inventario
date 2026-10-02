@@ -19,6 +19,7 @@ process.env.R2_ACCESS_KEY_ID ??= "e2e-access-key";
 process.env.R2_SECRET_ACCESS_KEY ??= "e2e-secret-key";
 process.env.R2_BUCKET_NAME ??= "jombubox-e2e";
 process.env.R2_PUBLIC_URL ??= "http://127.0.0.1:5555/jombubox-e2e";
+if (!process.env.PLAYWRIGHT_BASE_URL) process.env.JUMBOBOX_LOCAL_IMAGE_TESTS = "true";
 
 export default defineConfig({
   testDir: "./tests/e2e",

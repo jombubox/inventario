@@ -32,6 +32,11 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   images: {
     remotePatterns: r2Public.remotePatterns,
+    // The disposable Playwright fake R2 is served on loopback; production keeps
+    // Next's private-address protection enabled.
+    dangerouslyAllowLocalIP: process.env.NODE_ENV === "development"
+      && process.env.JUMBOBOX_LOCAL_IMAGE_TESTS === "true"
+      && r2Public.origin === "http://127.0.0.1:5555",
   },
   async headers() {
     const scriptDevelopmentSource = process.env.NODE_ENV === "development"

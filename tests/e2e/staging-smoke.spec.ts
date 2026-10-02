@@ -105,7 +105,7 @@ test.describe("remote staging smoke", () => {
     await dialog.getByLabel("Nombre").fill(boxName);
     await dialog.getByLabel("Bolsa (opcional)").fill(`  Bolsa   ${smokeId}  `);
     await dialog.getByLabel("Cantidad").fill("2");
-    await dialog.getByRole("button", { name: "Agregar 2 al inventario" }).click();
+    await dialog.getByRole("button", { name: "Guardar producto" }).click();
     await expect(dialog.getByText(/2 unidad\(es\) agregadas correctamente/u)).toBeVisible({ timeout: 30_000 });
     await dialog.getByRole("button", { name: "Cerrar", exact: true }).click();
 

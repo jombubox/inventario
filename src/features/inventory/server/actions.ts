@@ -26,10 +26,12 @@ import {
   stockMovementMutationSchema,
 } from "@/validators/admin-inventory";
 import { quickAddInventoryMutationSchema } from "@/validators/quick-add-inventory";
+import { productPublicationPath } from "@/features/products/domain/public-product";
 
 export type QuickAddMutationState = MutationState & {
   productId?: string;
   productCreated?: boolean;
+  publicationPath?: string | null;
 };
 
 function parseStringArray(value: FormDataEntryValue | null): unknown[] {
@@ -58,6 +60,10 @@ export async function quickAddInventoryAction(
     secondarySerialNumbers: parseStringArray(formData.get("secondarySerialNumbers")),
     compatibilities: parseStringArray(formData.get("compatibilities")),
     title: formData.get("title"),
+    salePrice: formData.get("salePrice") ?? "",
+    currency: "MXN",
+    status: formData.get("status") ?? "ACTIVE",
+    isPublic: formData.has("isPublic") ? formData.get("isPublic") === "true" : undefined,
     locationId: formData.get("locationId"),
     boxMode: formData.get("boxMode"),
     boxId: formData.get("boxId"),
@@ -84,6 +90,7 @@ export async function quickAddInventoryAction(
       message: `${parsed.data.quantity} unidad(es) agregadas correctamente a ${result.box.name}${bag}.`,
       productId: result.product.id,
       productCreated: result.productCreated,
+      publicationPath: productPublicationPath(result.product),
     };
   } catch (error) {
     return errorState(error);
