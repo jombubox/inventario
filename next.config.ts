@@ -27,6 +27,11 @@ function getR2PublicConfiguration(): {
 }
 
 const r2Public = getR2PublicConfiguration();
+const accountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
+const r2UploadOrigin = accountId && /^[a-f0-9]{32}$/iu.test(accountId)
+  ? `https://${accountId}.r2.cloudflarestorage.com`
+  : process.env.APP_ENV !== "production" && accountId && /^https?:\/\//u.test(accountId)
+    ? new URL(accountId).origin : null;
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
@@ -54,7 +59,7 @@ const nextConfig: NextConfig = {
           "style-src 'self' 'unsafe-inline'",
           `img-src 'self' data: blob:${r2Public.origin ? ` ${r2Public.origin}` : ""}`,
           "font-src 'self' data:",
-          `connect-src 'self'${connectDevelopmentSources}`,
+          `connect-src 'self'${r2UploadOrigin ? ` ${r2UploadOrigin}` : ""}${connectDevelopmentSources}`,
           "object-src 'none'",
           "base-uri 'self'",
           "frame-ancestors 'none'",

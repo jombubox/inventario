@@ -3,7 +3,8 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Input } from "@/components/ui/input";
+import { AdminListFilters } from "@/components/forms/admin-list-filters";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { getDb } from "@/db";
@@ -58,7 +59,7 @@ export default async function InventoryPage({
         actions={(
           <a
             href="/api/exports/inventory"
-            className="inline-flex h-11 items-center rounded-md bg-card px-4 text-small font-semibold text-navy shadow-sm transition-colors hover:text-primary"
+            className="inline-flex h-11 items-center rounded-md bg-card px-4 text-small font-semibold text-navy shadow-sm transition-colors hover:text-link"
           >
             Exportar inventario
           </a>
@@ -79,17 +80,8 @@ export default async function InventoryPage({
 
       <Card>
         <CardContent className="p-4 sm:p-5">
-          <form
-            method="get"
-            className="grid gap-3 sm:grid-cols-2 lg:grid-cols-7"
-          >
-            <Input
-              name="q"
-              defaultValue={query.q}
-              placeholder="Código, SKU o producto"
-              className="lg:col-span-2"
-            />
-            <Select name="condition" defaultValue={query.condition ?? ""}>
+          <AdminListFilters className="grid gap-3 sm:grid-cols-2 lg:grid-cols-7" label="Buscar inventario" placeholder="Código, SKU, parte, serie, marca, ubicación o caja">
+            <Select aria-label="Condición" name="condition" defaultValue={query.condition ?? ""}>
               <option value="">Cualquier condición</option>
               <option value="NEW">Nuevo</option>
               <option value="USED_EXCELLENT">Usado excelente</option>
@@ -98,7 +90,7 @@ export default async function InventoryPage({
               <option value="FOR_PARTS">Para partes</option>
               <option value="UNKNOWN">Desconocida</option>
             </Select>
-            <Select name="status" defaultValue={query.status ?? ""}>
+            <Select aria-label="Estado" name="status" defaultValue={query.status ?? ""}>
               <option value="">Cualquier estado</option>
               <option value="AVAILABLE">Disponible</option>
               <option value="RESERVED">Reservado</option>
@@ -106,7 +98,7 @@ export default async function InventoryPage({
               <option value="DAMAGED">Dañado</option>
               <option value="SCRAPPED">Desechado</option>
             </Select>
-            <Select name="location" defaultValue={query.location ?? ""}>
+            <Select aria-label="Ubicación" name="location" defaultValue={query.location ?? ""}>
               <option value="">Cualquier ubicación</option>
               {options.locations.map((location) => (
                 <option key={location.id} value={location.code}>
@@ -121,10 +113,8 @@ export default async function InventoryPage({
               <option value="">Con y sin ubicación</option>
               <option value="true">Solo sin ubicación</option>
             </Select>
-            <button className="h-11 rounded-xl bg-brand-navy px-4 text-small font-semibold text-white">
-              Aplicar filtros
-            </button>
-          </form>
+            <Button type="submit">Aplicar filtros</Button>
+          </AdminListFilters>
         </CardContent>
       </Card>
 
@@ -133,7 +123,7 @@ export default async function InventoryPage({
           {rows.length === 0 ? (
             <div className="p-8">
               <EmptyState
-                title="No se encontró inventario"
+                title="No encontramos inventario con esa búsqueda." action={<Link href="/admin/inventario" className="font-semibold text-link">Limpiar búsqueda y filtros</Link>}
                 description="Registra una existencia o ajusta los filtros de búsqueda."
               />
             </div>
@@ -143,7 +133,7 @@ export default async function InventoryPage({
                 <article key={item.id} className="p-4 sm:p-5">
                   <div className="grid gap-3 md:grid-cols-[1fr_1.5fr_0.5fr_0.7fr_1.2fr] md:items-center">
                     <div>
-                      <p className="font-mono text-xs font-bold text-primary">
+                      <p className="font-mono text-xs font-bold text-link">
                         {item.inventoryCode}
                       </p>
                       <p className="mt-1 text-small text-muted-foreground">

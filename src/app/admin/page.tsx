@@ -54,7 +54,7 @@ export default async function AdminPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader className="flex-row items-center justify-between"><CardTitle>Última importación</CardTitle><Link href="/admin/importar" className="text-small font-semibold text-primary hover:underline">Abrir importador</Link></CardHeader>
+          <CardHeader className="flex-row items-center justify-between"><CardTitle>Última importación</CardTitle><Link href="/admin/importar" className="text-small font-semibold text-link hover:underline">Abrir importador</Link></CardHeader>
           <CardContent>{data.latestImport ? <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-navy">{data.latestImport.filename}</p><p className="mt-1 text-small text-muted-foreground">{data.latestImport.successfulRows} válidas · {data.latestImport.warningRows} con avisos · {data.latestImport.failedRows} omitidas/fallidas</p></div><div className="sm:text-right"><Badge variant={data.latestImport.status === "COMPLETED" ? "success" : data.latestImport.status === "FAILED" ? "danger" : "warning"}>{formatImportStatus(data.latestImport.status)}</Badge><p className="mt-2 text-xs text-muted-foreground">{formatDateTime(data.latestImport.completedAt ?? data.latestImport.createdAt)}</p></div></div> : <EmptyState title="Aún no hay importaciones" description="Descarga la plantilla y valida el primer archivo XLSX." />}</CardContent>
         </Card>
         <Card>
@@ -114,7 +114,7 @@ export default async function AdminPage() {
       <Card>
         <CardHeader className="flex-row items-center justify-between">
           <CardTitle>Productos actualizados recientemente</CardTitle>
-          <Link href="/admin/productos" className="text-small font-semibold text-primary hover:underline">Ver productos</Link>
+          <Link href="/admin/productos" className="text-small font-semibold text-link hover:underline">Ver productos</Link>
         </CardHeader>
         <CardContent>
           {data.recentProducts.length === 0 ? (
@@ -126,8 +126,8 @@ export default async function AdminPage() {
                 <tbody className="divide-y divide-border">
                   {data.recentProducts.map((product) => (
                     <tr key={product.id}>
-                      <td className="py-3 font-mono text-xs text-primary">{product.sku}</td>
-                      <td className="py-3"><Link href={`/admin/productos/${product.id}`} className="font-semibold text-navy hover:text-primary">{product.title}</Link></td>
+                      <td className="py-3 font-mono text-xs text-link">{product.sku}</td>
+                      <td className="py-3"><Link href={`/admin/productos/${product.id}`} className="font-semibold text-navy hover:text-link">{product.title}</Link></td>
                       <td className="py-3"><Badge>{formatProductStatus(product.status)}</Badge></td>
                       <td className="py-3 text-right text-muted-foreground">{formatDateTime(product.updatedAt)}</td>
                     </tr>

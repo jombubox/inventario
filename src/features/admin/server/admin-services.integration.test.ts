@@ -32,7 +32,10 @@ import {
   analyzeImportFile,
   confirmImportFile,
 } from "@/features/imports/server/import-service";
-import type { ImageStorage, R2PutObject } from "@/features/images/server/r2";
+import type { DirectImageStorage, ImageStorage, R2PutObject } from "@/features/images/server/r2";
+import { authorizeDirectImageUpload, confirmDirectImageUpload } from "@/features/images/server/direct-upload-service";
+import { temporaryImageKey } from "@/features/images/server/upload-authorization";
+import { directImageUploadSchema, type DirectImageUploadInput } from "@/validators/image";
 import {
   createProductImage,
   deleteProductImage,
@@ -79,9 +82,10 @@ import { buildInventoryExport } from "@/features/exports/server/inventory-export
 import { consumeOperationalRateLimit } from "@/features/security/server/rate-limit";
 import type { CreateProductMutationInput } from "@/validators/admin-product";
 import { quickAddInventoryMutationSchema } from "@/validators/quick-add-inventory";
-import { productListQuerySchema } from "@/validators/admin-query";
+import { inventoryListQuerySchema, productListQuerySchema } from "@/validators/admin-query";
+import { listAdminInventory } from "@/features/inventory/data/admin-inventory-queries";
 import { getAdminProductDetail, getAdminProductReview, listAdminProducts } from "@/features/products/data/admin-product-queries";
-import { getPublicProductBySlug } from "@/features/catalog/data/public-catalog-queries";
+import { getPublicProductBySlug, getPublicProducts } from "@/features/catalog/data/public-catalog-queries";
 import { productPublicationPath } from "@/features/products/domain/public-product";
 import { ConcurrentModificationError } from "@/features/shared/domain/service-errors";
 
@@ -979,6 +983,163 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     expect(remaining[0]).toMatchObject({ id: first.id, isPrimary: true, sortOrder: 0 });
     expect(deleted).toEqual([second.storageKey]);
     expect(objects.has(second.storageKey!)).toBe(false);
+  });
+
+  for (const kind of ["products", "inventory"] as const) {
+    it(`${kind} search matches domain identifiers, filters and pagination with bounded SQL`, async () => {
+      const { brand, componentType } = await catalogIds();
+      const product = await createTestProduct({ title: "Search capacitor", primarySerialNumber: "MAIN-SEARCH", secondarySerialNumbers: ["SECOND-SEARCH", "SECOND-SEARCH-B"] });
+      const root = await createLocation(db, { code: "SEARCH-WH", name: "Almacén norte", type: "WAREHOUSE", parentId: null, active: true, notes: null });
+      const box = await createLocation(db, { code: "SEARCH-BOX", name: "Caja azul", type: "BOX", parentId: root.id, active: true, notes: null });
+      await quickAddInventory(db, quickAddInventoryMutationSchema.parse({ productMode: "existing", productId: product.id, compatibilities: [], locationId: root.id, boxMode: "existing", boxId: box.id, quantity: 1 }));
+      const statements: string[] = [];
+      const logged = drizzle(pool, { schema, logger: { logQuery(query) { statements.push(query); } } }) as unknown as Database;
+      const run = (raw: Record<string, string>) => kind === "products" ? listAdminProducts(logged, productListQuerySchema.parse(raw)) : listAdminInventory(logged, inventoryListQuerySchema.parse(raw));
+      const terms = ["", "capaci", product.sku, product.sku.toLowerCase(), "  Search capacitor  ", "bn94-07820f", "BN9407820F", brand.name, componentType.name, "main-search", "second-search", "UN58H5200SXZX", "un58h5200sxzx"];
+      if (kind === "inventory") terms.push("Almacén norte", "Caja azul", "SEARCH-BOX", "SEARCH-WH");
+      for (const q of terms) {
+        statements.length = 0;
+        const result = await run({ q });
+        expect(result.total, q).toBe(1); expect(result.rows, q).toHaveLength(1);
+        expect(statements, q).toHaveLength(kind === "products" ? 2 : 3);
+      }
+      expect((await run({ q: "does-not-exist" })).total).toBe(0);
+      expect((await run({ q: "%" })).total).toBe(0);
+      expect((await run({ q: "Search", status: kind === "products" ? "ARCHIVED" : "SOLD" })).total).toBe(0);
+      expect((await run({ q: "Search", page: "2" })).rows).toHaveLength(0);
+      expect((await run({ q: "Search", page: "1" })).rows).toHaveLength(1);
+    });
+  }
+
+  it("keeps primary first through three-image reorder, promotion, deletion and failed writes", async () => {
+    const product = await createTestProduct();
+    const objects = new Map<string, R2PutObject>();
+    const storage: ImageStorage = { async putObject(input) { objects.set(input.objectKey, input); }, async deleteObject(key) { objects.delete(key); } };
+    const input = { productId: product.id, filename: "photo.png", mimeType: "image/png", bytes: Buffer.from("89504e470d0a1a0a00000000", "hex") };
+    const photos = [];
+    for (let index = 0; index < 3; index++) photos.push(await createProductImage(db, storage, { ...input, uploadId: crypto.randomUUID() }));
+    const ids = [photos[2]!.id, photos[0]!.id, photos[1]!.id];
+    await reorderProductImages(db, product.id, ids);
+    const read = () => nodeDb.select().from(productImages).where(eq(productImages.productId, product.id)).orderBy(asc(productImages.sortOrder));
+    expect((await read()).map(({ id, isPrimary, sortOrder }) => ({ id, isPrimary, sortOrder }))).toEqual(ids.map((id, sortOrder) => ({ id, sortOrder, isPrimary: sortOrder === 0 })));
+    await expect(reorderProductImages(db, product.id, [ids[0]!, ids[0]!, ids[2]!])).rejects.toThrow();
+    await expect(reorderProductImages(db, product.id, [crypto.randomUUID(), ids[1]!, ids[2]!])).rejects.toThrow();
+    expect((await read()).map(({ id }) => id)).toEqual(ids);
+    await updateProductImage(db, { imageId: ids[2]!, makePrimary: true });
+    expect((await read()).map(({ id }) => id)).toEqual([ids[2], ids[0], ids[1]]);
+    expect((await read()).filter(({ isPrimary }) => isPrimary)).toHaveLength(1);
+    const admin = await listAdminProducts(db, productListQuerySchema.parse({ q: product.sku }));
+    const publication = await getPublicProductBySlug(db, product.slug);
+    expect(admin.rows[0]!.primaryImage).toBe(publication!.images[0]!.url);
+    expect(publication!.images[0]!.url).toContain(photos[1]!.storageKey!);
+    const catalog = await getPublicProducts(db, { q: product.sku, sort: "recientes", page: 1 });
+    expect(catalog.products[0]!.primaryImage?.url).toBe(publication!.images[0]!.url);
+    await deleteProductImage(db, storage, ids[2]!);
+    expect((await read())[0]).toMatchObject({ id: ids[0], isPrimary: true, sortOrder: 0 });
+    expect(objects.size).toBe(2);
+  });
+
+  it("replays successful uploads without duplicates and rejects changed content for the same selection", async () => {
+    const product = await createTestProduct();
+    let writes = 0;
+    const storage: ImageStorage = { async putObject() { writes++; }, async deleteObject() {} };
+    const input = { productId: product.id, uploadId: crypto.randomUUID(), filename: "photo.png", mimeType: "image/png", bytes: Buffer.from("89504e470d0a1a0a00000000", "hex") };
+    const first = await createProductImage(db, storage, input);
+    const repeat = await createProductImage(db, storage, input);
+    expect(repeat.id).toBe(first.id); expect(writes).toBe(1);
+    const concurrentInput = { ...input, uploadId: crypto.randomUUID() };
+    const [left, right] = await Promise.all([createProductImage(db, storage, concurrentInput), createProductImage(db, storage, concurrentInput)]);
+    expect(left.id).toBe(right.id); expect(writes).toBe(2);
+    await expect(createProductImage(db, storage, { ...input, bytes: Buffer.from("89504e470d0a1a0a01000000", "hex") })).rejects.toThrow();
+    expect(writes).toBe(2);
+    expect(await nodeDb.select().from(productImages).where(eq(productImages.productId, product.id))).toHaveLength(2);
+  });
+
+  async function directImageFixture() {
+    const product = await createTestProduct();
+    const secret = "disposable-direct-upload-secret";
+    const objects = new Map<string, R2PutObject>();
+    let copies = 0;
+    const storage: DirectImageStorage = {
+      async putObject(input) { objects.set(input.objectKey, input); },
+      async deleteObject(key) { objects.delete(key); },
+      async authorizePut(key) { return `https://local.invalid/${key}`; },
+      async inspectTemporary(key) { const object = objects.get(key); if (!object) throw new Error("Missing staged image"); return { size: object.body.byteLength, contentType: object.contentType, etag: "verified-etag" }; },
+      async readTemporary(key) { const object = objects.get(key); if (!object) throw new Error("Missing staged image"); return object.body; },
+      async copyTemporary(key, finalKey) { const object = objects.get(key); if (!object) throw new Error("Missing staged image"); copies++; objects.set(finalKey, { ...object, objectKey: finalKey }); },
+      async deleteTemporary(key) { objects.delete(key); },
+    };
+    const bytes = Buffer.from("89504e470d0a1a0a00000000", "hex");
+    const fingerprint = Buffer.from(await crypto.subtle.digest("SHA-256", bytes)).toString("hex");
+    const base = directImageUploadSchema.parse({ productId: product.id, uploadId: crypto.randomUUID(), batchId: crypto.randomUUID(), position: 0,
+      filename: "photo.png", mimeType: "image/png", size: bytes.length, signatureHex: bytes.subarray(0, 12).toString("hex"), fingerprint });
+    async function stage(input: DirectImageUploadInput = base, content = bytes) {
+      const authorization = await authorizeDirectImageUpload(db, storage, input, secret);
+      if (!("token" in authorization) || !authorization.token) throw new Error("Expected new authorization");
+      const key = temporaryImageKey(input, secret);
+      objects.set(key, { objectKey: key, body: content, contentType: input.mimeType });
+      return authorization.token;
+    }
+    return { product, secret, objects, storage, bytes, base, stage, copies: () => copies };
+  }
+
+  it("authorizes without a DB association, verifies R2, and concurrently replays confirmation once", async () => {
+    const f = await directImageFixture();
+    await authorizeDirectImageUpload(db, f.storage, f.base, f.secret);
+    expect(await nodeDb.select().from(productImages)).toHaveLength(0); expect(f.objects.size).toBe(0);
+    const token = await f.stage();
+    const [left, right] = await Promise.all([confirmDirectImageUpload(db, f.storage, token, f.secret), confirmDirectImageUpload(db, f.storage, token, f.secret)]);
+    expect(left.id).toBe(right.id); expect(f.copies()).toBe(1); expect(f.objects.size).toBe(1);
+    expect(left.storageKey).toMatch(/^products\//u); expect(left.metadata?.fingerprint).toBe(f.base.fingerprint);
+    expect((await authorizeDirectImageUpload(db, f.storage, f.base, f.secret)).image?.id).toBe(left.id);
+    const other = await createTestProduct({ partNumber: "OTHER-UPLOAD" });
+    await expect(authorizeDirectImageUpload(db, f.storage, { ...f.base, productId: other.id }, f.secret)).rejects.toThrow();
+    await expect(authorizeDirectImageUpload(db, f.storage, { ...f.base, fingerprint: "a".repeat(64) }, f.secret)).rejects.toThrow();
+  });
+
+  it("rejects missing, wrong-size, wrong-content, wrong-MIME and invalid-signature R2 objects before registration", async () => {
+    const f = await directImageFixture();
+    const authorization = await authorizeDirectImageUpload(db, f.storage, f.base, f.secret);
+    if (!("token" in authorization) || !authorization.token) throw new Error();
+    await expect(confirmDirectImageUpload(db, f.storage, authorization.token, f.secret)).rejects.toThrow();
+    for (const bytes of [Buffer.alloc(f.bytes.length + 1), Buffer.alloc(f.bytes.length), Buffer.alloc(10 * 1024 * 1024 + 1)]) {
+      const token = await f.stage(f.base, bytes);
+      await expect(confirmDirectImageUpload(db, f.storage, token, f.secret)).rejects.toThrow();
+      expect(f.objects.size).toBe(0);
+    }
+    const token = await f.stage();
+    f.objects.get(temporaryImageKey(f.base, f.secret))!.contentType = "image/jpeg";
+    await expect(confirmDirectImageUpload(db, f.storage, token, f.secret)).rejects.toThrow();
+    const badBytes = Buffer.alloc(f.bytes.length);
+    const badFingerprint = Buffer.from(await crypto.subtle.digest("SHA-256", badBytes)).toString("hex");
+    const invalidSignatureToken = await f.stage({ ...f.base, fingerprint: badFingerprint }, badBytes);
+    await expect(confirmDirectImageUpload(db, f.storage, invalidSignatureToken, f.secret)).rejects.toThrow(/firma/);
+    expect(await nodeDb.select().from(productImages)).toHaveLength(0); expect(f.copies()).toBe(0); expect(f.objects.size).toBe(0);
+  });
+
+  it("rolls back DB registration and safely cleans the copied final object before retry", async () => {
+    const f = await directImageFixture(); const token = await f.stage();
+    // Fail the audit insert after image/storage creation to exercise actual DB rollback.
+    await pool.query("create function fail_direct_image_audit() returns trigger language plpgsql as $$ begin if NEW.action = 'PRODUCT_IMAGE_ADDED' then raise exception 'test registration failure'; end if; return NEW; end $$");
+    await pool.query("create trigger direct_image_audit_failure before insert on audit_logs for each row execute function fail_direct_image_audit()");
+    try { await expect(confirmDirectImageUpload(db, f.storage, token, f.secret)).rejects.toThrow(); }
+    finally { await pool.query("drop trigger direct_image_audit_failure on audit_logs"); await pool.query("drop function fail_direct_image_audit()"); }
+    expect(await nodeDb.select().from(productImages)).toHaveLength(0); expect(f.objects.size).toBe(0);
+    const retry = await f.stage(); await confirmDirectImageUpload(db, f.storage, retry, f.secret);
+    expect(await nodeDb.select().from(productImages)).toHaveLength(1); expect(f.objects.size).toBe(1);
+  });
+
+  it("restores selected primary-first order when later photos finish before a failed photo retries", async () => {
+    const f = await directImageFixture();
+    const inputs = [0, 1, 2].map(position => ({ ...f.base, uploadId: crypto.randomUUID(), position }));
+    for (const index of [1, 2, 0]) {
+      const confirmed = await confirmDirectImageUpload(db, f.storage, await f.stage(inputs[index]!), f.secret);
+      if (index === 0) expect(confirmed).toMatchObject({ sortOrder: 0, isPrimary: true });
+    }
+    const saved = await nodeDb.select().from(productImages).orderBy(asc(productImages.sortOrder));
+    expect(saved.map(({ id }) => id)).toEqual(inputs.map(({ uploadId }) => uploadId));
+    expect(saved.map(({ sortOrder, isPrimary }) => ({ sortOrder, isPrimary }))).toEqual(inputs.map((_, sortOrder) => ({ sortOrder, isPrimary: sortOrder === 0 })));
+    expect(f.objects.size).toBe(3);
   });
 
   it("creates and edits locations while rejecting self-parent and cycles", async () => {

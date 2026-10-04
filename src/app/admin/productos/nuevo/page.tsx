@@ -12,7 +12,7 @@ export default async function NewProductPage() {
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
-      <PageHeader eyebrow="Catálogo" title="Nuevo producto" description="Define la identidad comercial. El inventario físico se registra por separado." actions={<Link href="/admin/productos" className="text-small font-semibold text-primary hover:underline">Volver a productos</Link>} />
+      <PageHeader eyebrow="Catálogo" title="Nuevo producto" description="Define la identidad comercial. El inventario físico se registra por separado." actions={<Link href="/admin/productos" className="text-small font-semibold text-link hover:underline">Volver a productos</Link>} />
       <ProductForm brands={options.brands} componentTypes={options.componentTypes} />
     </div>
   );

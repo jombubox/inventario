@@ -1,3 +1,4 @@
+import { directUpload } from "./helpers/direct-upload";
 import { expect, test, type Page } from "@playwright/test";
 import ExcelJS from "exceljs";
 import { createReadStream } from "node:fs";
@@ -105,7 +106,7 @@ test("the administrator exports inventory and completes the legacy import workfl
   await expect(page.getByText("Completado", { exact: true }).first()).toBeVisible();
 });
 
-test("the administrator uploads an image through the server-side fake R2 boundary", async ({ page }, testInfo) => {
+test("the administrator uploads an image directly through the signed fake R2 boundary", async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   test.skip(testInfo.project.name.startsWith("mobile"), "State-changing workflow runs once against the shared E2E database.");
   const jsonSyntaxErrors: string[] = [];
@@ -125,7 +126,7 @@ test("the administrator uploads an image through the server-side fake R2 boundar
   const productId = editHref!.split("/").at(-1)!;
   const health = await page.request.get("http://127.0.0.1:5555/health");
   expect(health.ok()).toBe(true);
-  const uploadResponse = await page.request.post("/api/products/images/upload", {
+  const uploadResponse = await directUpload(page, {
     headers: { Origin: currentOrigin(page) },
     multipart: {
       productId,
@@ -143,7 +144,7 @@ test("the administrator uploads an image through the server-side fake R2 boundar
   await expect(page.getByLabel("Texto alternativo")).toHaveValue("tiny");
   await expect(page.getByText("Principal", { exact: true })).toBeVisible();
 
-  const secondUpload = await page.request.post("/api/products/images/upload", {
+  const secondUpload = await directUpload(page, {
     headers: { Origin: currentOrigin(page) },
     multipart: {
       productId,
@@ -159,7 +160,7 @@ test("the administrator uploads an image through the server-side fake R2 boundar
 
   const largePng = Buffer.alloc(10 * 1024 * 1024);
   Buffer.from("89504e470d0a1a0a00000000", "hex").copy(largePng);
-  const largeUpload = await page.request.post("/api/products/images/upload", {
+  const largeUpload = await directUpload(page, {
     headers: { Origin: currentOrigin(page) },
     multipart: {
       productId,
@@ -169,7 +170,7 @@ test("the administrator uploads an image through the server-side fake R2 boundar
   });
   expect(largeUpload.status(), await largeUpload.text()).toBe(201);
 
-  const invalidUpload = await page.request.post("/api/products/images/upload", {
+  const invalidUpload = await directUpload(page, {
     headers: { Origin: currentOrigin(page) },
     multipart: {
       productId,
@@ -183,7 +184,7 @@ test("the administrator uploads an image through the server-side fake R2 boundar
 
   const tooLargePng = Buffer.alloc(10 * 1024 * 1024 + 1);
   Buffer.from("89504e470d0a1a0a00000000", "hex").copy(tooLargePng);
-  const tooLargeUpload = await page.request.post("/api/products/images/upload", {
+  const tooLargeUpload = await directUpload(page, {
     headers: { Origin: currentOrigin(page) },
     multipart: {
       productId,
@@ -191,9 +192,9 @@ test("the administrator uploads an image through the server-side fake R2 boundar
       file: { name: "too-large.png", mimeType: "image/png", buffer: tooLargePng },
     },
   });
-  expect(tooLargeUpload.status()).toBe(413);
+  expect(tooLargeUpload.status()).toBe(400);
   expect(tooLargeUpload.headers()["content-type"]).toContain("application/json");
-  await expect(tooLargeUpload.json()).resolves.toMatchObject({ code: "IMAGE_TOO_LARGE" });
+  await expect(tooLargeUpload.json()).resolves.toMatchObject({ code: "INVALID_IMAGE" });
 
   await page.reload();
   await expect(page.getByLabel("Texto alternativo")).toHaveCount(3);
@@ -233,15 +234,16 @@ test("the administrator uploads an image through the server-side fake R2 boundar
     });
   });
   const proxyTestImage = Buffer.from("89504e470d0a1a0a00000000", "hex");
-  for (const name of ["proxy-text.png", "proxy-html.png"]) {
-    await imageInput.setInputFiles({
-      name,
+  for (const attempt of [0, 1]) {
+    if (attempt === 0) await imageInput.setInputFiles({
+      name: "proxy.png",
       mimeType: "image/png",
       buffer: proxyTestImage,
     });
+    else await page.getByRole("button", { name: "Reintentar subida de proxy.png", exact: true }).click();
     await expect(
       page.getByText(
-        "La imagen es demasiado grande para el servidor. El máximo permitido es 10 MB.",
+        "El servidor rechazó el tamaño de esta foto. Intenta con una versión más pequeña.",
         { exact: true },
       ),
     ).toBeVisible();
@@ -367,7 +369,7 @@ test("ADMIN completes product, stock, location, movement, image and publication"
   await move.getByRole("button", { name: "Mover inventario" }).click();
   await expect(page.getByText("Inventario movido.", { exact: true })).toBeVisible({ timeout: 20_000 });
 
-  const uploadResponse = await page.request.post("/api/products/images/upload", {
+  const uploadResponse = await directUpload(page, {
     headers: { Origin: currentOrigin(page) },
     multipart: {
       productId,

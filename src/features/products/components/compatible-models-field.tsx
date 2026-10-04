@@ -306,7 +306,7 @@ export function CompatibleModelsField({
             }
             className="pr-10"
           />
-          {searching ? <Spinner className="absolute right-3 top-3.5 text-primary" /> : null}
+          {searching ? <Spinner className="absolute right-3 top-3.5 text-link" /> : null}
         </div>
 
         {expanded && query.trim().length >= 2 ? (
@@ -334,7 +334,7 @@ export function CompatibleModelsField({
                 }
               >
                 <span><strong>{result.brandName}</strong> {result.model}</span>
-                <span className="text-primary">Agregar</span>
+                <span className="text-link">Agregar</span>
               </button>
             ))}
 

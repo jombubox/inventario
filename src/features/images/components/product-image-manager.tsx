@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { parseApiResponse } from "@/features/images/domain/api-response";
-import { MAX_IMAGE_BYTES, MAX_PRODUCT_IMAGES } from "@/features/images/domain/image-policy";
+import { PhotoSelection, photoUploadId } from "./photo-selection";
+import { usePhotoUploads } from "./use-photo-uploads";
 
 type ProductImage = {
   id: string;
@@ -30,15 +31,6 @@ async function jsonRequest<T>(path: string, init: RequestInit): Promise<T> {
   });
 }
 
-async function uploadRequest<T>(body: FormData): Promise<T> {
-  const response = await fetch("/api/products/images/upload", { method: "POST", body });
-  return parseApiResponse<T>(response, {
-    fallbackError: "No fue posible subir la imagen. Intenta de nuevo.",
-    payloadTooLargeError:
-      "La imagen es demasiado grande para el servidor. El máximo permitido es 10 MB.",
-  });
-}
-
 export function ProductImageManager({
   productId,
   images,
@@ -49,41 +41,18 @@ export function ProductImageManager({
   canManage: boolean;
 }) {
   const router = useRouter();
-  const ordered = [...images].sort((left, right) => left.sortOrder - right.sortOrder);
+  const ordered = [...images].sort((left, right) => Number(right.isPrimary) - Number(left.isPrimary) || left.sortOrder - right.sortOrder);
   const [altValues, setAltValues] = useState<Record<string, string>>(
     Object.fromEntries(images.map((image) => [image.id, image.alt ?? ""])),
   );
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function uploadFiles(files: FileList | null) {
-    if (!files?.length) return;
-    if (images.length + files.length > MAX_PRODUCT_IMAGES) {
-      setError("Un producto puede tener como máximo 10 imágenes.");
-      return;
-    }
-    setBusy("upload");
-    setError(null);
-    try {
-      for (const file of Array.from(files)) {
-        if (file.size > MAX_IMAGE_BYTES) throw new Error(`${file.name} supera 10 MB.`);
-        if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-          throw new Error(`${file.name} no es JPEG, PNG ni WEBP.`);
-        }
-        const uploadBody = new FormData();
-        uploadBody.set("productId", productId);
-        uploadBody.set("file", file);
-        uploadBody.set("alt", file.name.replace(/\.[^.]+$/u, ""));
-        await uploadRequest(uploadBody);
-      }
-      router.refresh();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "No fue posible subir las imágenes.");
-    } finally {
-      setBusy(null);
-      router.refresh();
-    }
-  }
+  const [files, setFiles] = useState<File[]>([]);
+  const { states, uploadState, retry } = usePhotoUploads(files, productId, canManage);
+  const uploadedIds = files.filter((file) => states[photoUploadId(file)]?.status === "uploaded").map(photoUploadId);
+  const accounted = new Set([...images.map(({ id }) => id), ...uploadedIds]).size;
+  useEffect(() => { if (uploadState === "done" || uploadState === "error") router.refresh(); }, [router, uploadState]);
 
   async function mutate(label: string, callback: () => Promise<unknown>) {
     setBusy(label);
@@ -117,13 +86,15 @@ export function ProductImageManager({
       <CardContent className="space-y-5 p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div><h2 className="font-semibold text-navy">Imágenes del producto</h2><p className="mt-1 text-small text-muted-foreground">Hasta 10 archivos JPEG, PNG o WEBP de 10 MB. La primera imagen queda como principal.</p></div>
-          {canManage ? <div><Label htmlFor="product-images" className="sr-only">Subir imágenes</Label><Input id="product-images" type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={busy !== null || images.length >= MAX_PRODUCT_IMAGES} onChange={(event) => { void uploadFiles(event.target.files); event.target.value = ""; }}/></div> : null}
+
         </div>
         {error ? <p role="alert" className="rounded-lg bg-danger/10 px-3 py-2 text-small text-danger">{error}</p> : null}
-        {busy === "upload" ? <p role="status" className="text-small font-semibold text-primary">Subiendo y verificando imágenes…</p> : null}
+        {canManage ? <PhotoSelection id="product-images" files={files} onChange={setFiles} states={states}
+          locked={uploadState === "uploading" || uploadState === "error"}
+          existingCount={accounted - uploadedIds.length} onRetry={uploadState === "error" ? () => void retry() : undefined} /> : null}
         {ordered.length === 0 ? <p className="rounded-xl border border-dashed border-border p-6 text-center text-small text-muted-foreground">Este producto todavía no tiene imágenes.</p> : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {ordered.map((image, index) => <article key={image.id} className="overflow-hidden rounded-xl border border-border bg-background"><div className="relative aspect-[4/3] bg-muted">{image.url ? <Image src={image.url} alt={image.alt ?? "Imagen del producto"} fill sizes="(max-width: 640px) 100vw, 33vw" className="object-contain" /> : <div className="grid h-full place-items-center text-small text-muted-foreground">Sin URL</div>}{image.isPrimary ? <Badge variant="primary" className="absolute left-2 top-2">Principal</Badge> : null}</div><div className="space-y-3 p-3"><div><Label htmlFor={`alt-${image.id}`}>Texto alternativo</Label><Input id={`alt-${image.id}`} className="mt-1" value={altValues[image.id] ?? ""} disabled={!canManage} onChange={(event) => setAltValues((current) => ({ ...current, [image.id]: event.target.value }))}/></div>{canManage ? <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void mutate(`alt-${image.id}`, () => jsonRequest(`/api/products/images/${image.id}`, { method: "PATCH", body: JSON.stringify({ alt: altValues[image.id] ?? "" }) }))}>Guardar alt</Button>{!image.isPrimary ? <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void mutate(`primary-${image.id}`, () => jsonRequest(`/api/products/images/${image.id}`, { method: "PATCH", body: JSON.stringify({ makePrimary: true }) }))}>Hacer principal</Button> : null}<Button size="sm" variant="ghost" aria-label="Mover imagen a la izquierda" disabled={busy !== null || index === 0} onClick={() => void move(image.id, -1)}>←</Button><Button size="sm" variant="ghost" aria-label="Mover imagen a la derecha" disabled={busy !== null || index === ordered.length - 1} onClick={() => void move(image.id, 1)}>→</Button><Button size="sm" variant="destructive" disabled={busy !== null} onClick={() => { if (window.confirm("¿Eliminar esta imagen de R2 y JombuBox?")) void mutate(`delete-${image.id}`, () => jsonRequest(`/api/products/images/${image.id}`, { method: "DELETE" })); }}>Eliminar</Button></div> : null}</div></article>)}
+            {ordered.map((image, index) => <article key={image.id} className="overflow-hidden rounded-xl border border-border bg-background"><div className="relative aspect-[4/3] bg-muted">{image.url ? <Image src={image.url} alt={image.alt ?? "Imagen del producto"} fill sizes="(max-width: 640px) 100vw, 33vw" className="object-contain" /> : <div className="grid h-full place-items-center text-small text-muted-foreground">Sin URL</div>}{image.isPrimary ? <Badge variant="primary" className="absolute left-2 top-2">Principal</Badge> : null}</div><div className="space-y-3 p-3"><div><Label htmlFor={`alt-${image.id}`}>Texto alternativo</Label><Input id={`alt-${image.id}`} className="mt-1" value={altValues[image.id] ?? image.alt ?? ""} disabled={!canManage} onChange={(event) => setAltValues((current) => ({ ...current, [image.id]: event.target.value }))}/></div>{canManage ? <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={uploadState === "uploading" || busy !== null} onClick={() => void mutate(`alt-${image.id}`, () => jsonRequest(`/api/products/images/${image.id}`, { method: "PATCH", body: JSON.stringify({ alt: altValues[image.id] ?? "" }) }))}>Guardar alt</Button>{!image.isPrimary ? <Button size="sm" variant="outline" aria-label="Hacer foto principal" disabled={uploadState === "uploading" || busy !== null} onClick={() => void mutate(`primary-${image.id}`, () => jsonRequest(`/api/products/images/${image.id}`, { method: "PATCH", body: JSON.stringify({ makePrimary: true }) }))}>Hacer principal</Button> : null}<Button size="sm" variant="ghost" aria-label="Mover foto a la izquierda" disabled={uploadState === "uploading" || busy !== null || index === 0} onClick={() => void move(image.id, -1)}>←</Button><Button size="sm" variant="ghost" aria-label="Mover foto a la derecha" disabled={uploadState === "uploading" || busy !== null || index === ordered.length - 1} onClick={() => void move(image.id, 1)}>→</Button><Button size="sm" variant="destructive" aria-label="Eliminar foto" disabled={uploadState === "uploading" || busy !== null} onClick={() => { if (window.confirm("¿Eliminar esta imagen de R2 y JombuBox?")) void mutate(`delete-${image.id}`, () => jsonRequest(`/api/products/images/${image.id}`, { method: "DELETE" })); }}>Eliminar</Button></div> : null}</div></article>)}
           </div>
         )}
       </CardContent>

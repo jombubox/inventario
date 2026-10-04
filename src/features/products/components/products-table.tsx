@@ -47,7 +47,7 @@ function ProductReviewModal({ selection, onClose }: { selection: Selection; onCl
         <div><dt className="text-muted-foreground">Número de parte</dt><dd>{product.partNumber ?? "—"}</dd></div>
         <div><dt className="text-muted-foreground">Existencias</dt><dd>{product.physicalStock} piezas · {product.availableStock} disponibles</dd></div>
       </dl>
-      {publicationPath ? <a href={publicationPath} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex min-h-11 items-center font-semibold text-primary hover:underline">Ver publicación</a> : null}
+      {publicationPath ? <a href={publicationPath} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex min-h-11 items-center font-semibold text-link hover:underline">Ver publicación</a> : null}
     </> : error ? <div role="alert"><p className="text-danger">{error}</p><Button type="button" variant="outline" onClick={() => { setError(""); setAttempt((value) => value + 1); }}>Reintentar</Button></div>
       : !review ? <p role="status">Cargando…</p>
       : kind === "images" ? <ImagePreview images={review.images} title={product.title} />
@@ -58,7 +58,7 @@ function ProductReviewModal({ selection, onClose }: { selection: Selection; onCl
 
 export function ProductsTable({ products }: { products: ProductRow[] }) {
   const [selection, setSelection] = useState<Selection | null>(null);
-  const actionClass = "min-h-11 text-small font-semibold text-primary hover:underline";
+  const actionClass = "min-h-11 text-small font-semibold text-link hover:underline";
   const secondary = "hidden px-3 py-3 xl:table-cell";
   return <>
     <div className="max-w-full overflow-x-auto">

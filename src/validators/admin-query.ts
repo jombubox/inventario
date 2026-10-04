@@ -7,18 +7,20 @@ import {
   productStatusValues,
 } from "@/db/schema/enums";
 
-const optionalBooleanParam = z
+const emptyToUndefined = (value: unknown) => value === "" ? undefined : value;
+
+const optionalBooleanParam = z.preprocess(emptyToUndefined, z
   .enum(["true", "false"])
   .transform((value) => value === "true")
-  .optional();
+  .optional());
 
 export const productListQuerySchema = z.object({
   q: z.string().trim().max(100).catch("").default(""),
   brand: z.string().trim().max(100).optional(),
   type: z.string().trim().max(100).optional(),
-  status: z.enum(productStatusValues).optional(),
+  status: z.preprocess(emptyToUndefined, z.enum(productStatusValues).optional()),
   public: optionalBooleanParam,
-  stock: z.enum(["in-stock", "out-of-stock", "unlocated"]).optional(),
+  stock: z.preprocess(emptyToUndefined, z.enum(["in-stock", "out-of-stock", "unlocated"]).optional()),
   page: z.coerce.number().int().positive().catch(1).default(1),
   pageSize: z.coerce.number().pipe(z.union([z.literal(20), z.literal(50), z.literal(100)])).catch(20).default(20),
   sort: z.enum(["updatedAt", "title", "sku", "createdAt"]).catch("updatedAt").default("updatedAt"),
@@ -27,8 +29,8 @@ export const productListQuerySchema = z.object({
 
 export const inventoryListQuerySchema = z.object({
   q: z.string().trim().max(100).catch("").default(""),
-  condition: z.enum(inventoryConditionValues).optional(),
-  status: z.enum(inventoryStatusValues).optional(),
+  condition: z.preprocess(emptyToUndefined, z.enum(inventoryConditionValues).optional()),
+  status: z.preprocess(emptyToUndefined, z.enum(inventoryStatusValues).optional()),
   location: z.string().trim().max(100).optional(),
   unlocated: optionalBooleanParam,
   page: z.coerce.number().int().positive().catch(1).default(1),

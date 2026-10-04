@@ -4,9 +4,7 @@ import {
   count,
   desc,
   eq,
-  ilike,
   isNull,
-  or,
   sql,
   type SQL,
 } from "drizzle-orm";
@@ -22,6 +20,7 @@ import {
   products,
 } from "@/db/schema";
 import { getR2PublicUrl } from "@/features/images/server/r2-public-url";
+import { productSearchCondition } from "./product-search";
 import type { ProductListQuery } from "@/validators/admin-query";
 
 export async function listProductCatalogOptions(db: Database) {
@@ -65,19 +64,7 @@ export async function listAdminProducts(db: Database, query: ProductListQuery) {
     .as("stock_summary");
 
   const conditions: SQL[] = [isNull(products.deletedAt)];
-  if (query.q) {
-    const pattern = `%${query.q}%`;
-    conditions.push(
-      or(
-        ilike(products.sku, pattern),
-        ilike(products.title, pattern),
-        ilike(products.partNumber, pattern),
-        sql`exists (select 1 from ${productSerialNumbers} psn where psn.product_id = ${products.id} and psn.serial_number ilike ${pattern})`,
-        ilike(brands.name, pattern),
-        sql`exists (select 1 from ${productCompatibilities} pc where pc.product_id = ${products.id} and pc.model ilike ${pattern})`,
-      )!,
-    );
-  }
+  if (query.q) conditions.push(productSearchCondition(query.q));
   if (query.brand) conditions.push(eq(brands.slug, query.brand));
   if (query.type) conditions.push(eq(componentTypes.slug, query.type));
   if (query.status) conditions.push(eq(products.status, query.status));
@@ -133,7 +120,7 @@ export async function listAdminProducts(db: Database, query: ProductListQuery) {
     .leftJoin(stockSummary, eq(products.id, stockSummary.productId));
 
   const [rows, totalResult] = await Promise.all([
-    baseQuery.where(where).orderBy(orderBy).limit(query.pageSize).offset(offset),
+    baseQuery.where(where).orderBy(orderBy, asc(products.id)).limit(query.pageSize).offset(offset),
     db
       .select({ value: count() })
       .from(products)

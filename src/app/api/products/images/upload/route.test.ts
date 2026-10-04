@@ -1,147 +1,60 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MAX_IMAGE_BYTES } from "@/features/images/domain/image-policy";
+import { UnauthorizedError } from "@/features/auth/domain/auth-errors";
+import { InvalidRequestOriginError } from "@/lib/request-security";
 
-import {
-  MAX_IMAGE_BYTES,
-  MAX_IMAGE_REQUEST_BYTES,
-} from "@/features/images/domain/image-policy";
-import { InvalidOperationError } from "@/features/shared/domain/service-errors";
-
-const createProductImage = vi.fn();
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-
+const { authorize, confirm, requireAdmin, sameOrigin } = vi.hoisted(() => ({ authorize: vi.fn(), confirm: vi.fn(), requireAdmin: vi.fn(), sameOrigin: vi.fn() }));
 vi.mock("@/db", () => ({ getDb: () => ({}) }));
-vi.mock("@/features/auth/server/admin-auth", () => ({ requireAdmin: vi.fn() }));
-vi.mock("@/features/catalog/server/revalidation", () => ({
-  revalidatePublicCatalog: vi.fn(),
-}));
-vi.mock("@/features/images/server/image-service", () => ({
-  createProductImage,
-}));
+vi.mock("@/features/auth/server/admin-auth", () => ({ requireAdmin }));
+vi.mock("@/features/images/server/direct-upload-service", () => ({ authorizeDirectImageUpload: authorize, confirmDirectImageUpload: confirm }));
 vi.mock("@/features/images/server/r2", () => ({ createR2Storage: () => ({}) }));
-vi.mock("@/features/security/server/rate-limit", () => ({
-  consumeOperationalRateLimit: vi.fn(),
-}));
-vi.mock("@/lib/request-security", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/request-security")>()),
-  assertSameOriginMutation: vi.fn(),
-}));
+vi.mock("@/features/images/server/revalidation", () => ({ revalidateProductImages: vi.fn() }));
+vi.mock("@/features/security/server/rate-limit", () => ({ consumeOperationalRateLimit: vi.fn() }));
+vi.mock("@/lib/env", () => ({ getServerEnv: () => ({ R2_SECRET_ACCESS_KEY: "local-fixture" }) }));
+vi.mock("@/lib/request-security", async (original) => ({ ...(await original<typeof import("@/lib/request-security")>()), assertSameOriginMutation: sameOrigin }));
 
-describe("product image upload route", () => {
-  beforeEach(() => {
-    createProductImage.mockReset();
+const input = { productId: "10000000-0000-4000-8000-000000000001", uploadId: "10000000-0000-4000-8000-000000000002", batchId: "10000000-0000-4000-8000-000000000003",
+  position: 0, filename: "photo.png", mimeType: "image/png", size: 6 * 1024 * 1024, signatureHex: "89504e470d0a1a0a00000000", fingerprint: "a".repeat(64) };
+function request(value: unknown, path = "upload") {
+  return new Request(`http://localhost/api/products/images/${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(value) });
+}
+describe("direct image endpoints", () => {
+  beforeEach(() => { vi.resetAllMocks(); authorize.mockResolvedValue({ token: "signed", uploadUrl: "https://r2.invalid/temporary" }); confirm.mockResolvedValue({ id: input.uploadId, productId: input.productId }); });
+  it("authorizes a 6 MiB image using only a small JSON description", async () => {
+    const { POST } = await import("./route"); const req = request(input);
+    expect((await req.clone().text()).length).toBeLessThan(1024);
+    const response = await POST(req); expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(authorize).toHaveBeenCalledWith(expect.anything(), expect.anything(), input, "local-fixture");
   });
-
-  it("returns a JSON 413 before reading an oversized multipart request", async () => {
-    const { POST } = await import("@/app/api/products/images/upload/route");
-    const request = new Request("http://localhost/api/products/images/upload", {
-      method: "POST",
-      headers: { "Content-Length": String(MAX_IMAGE_REQUEST_BYTES + 1) },
-    });
-
-    const response = await POST(request);
-
-    expect(response.status).toBe(413);
-    expect(response.headers.get("content-type")).toContain("application/json");
-    await expect(response.json()).resolves.toMatchObject({
-      code: "IMAGE_TOO_LARGE",
-      error: "Cada imagen debe pesar como máximo 10 MB.",
-    });
-    expect(createProductImage).not.toHaveBeenCalled();
+  it.each([MAX_IMAGE_BYTES, 1])("allows the valid size %i", async (size) => {
+    const { POST } = await import("./route"); expect((await POST(request({ ...input, size }))).status).toBe(200);
   });
-
-  it("returns a JSON 413 when the file exceeds the application limit", async () => {
-    const { POST } = await import("@/app/api/products/images/upload/route");
-    const bytes = new Uint8Array(MAX_IMAGE_BYTES + 1);
-    bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-    const body = new FormData();
-    body.set("productId", "10000000-0000-4000-8000-000000000001");
-    body.set("file", new File([bytes], "too-large.png", { type: "image/png" }));
-
-    const response = await POST(new Request("http://localhost/api/products/images/upload", {
-      method: "POST",
-      body,
-    }));
-
-    expect(response.status).toBe(413);
-    await expect(response.json()).resolves.toMatchObject({ code: "IMAGE_TOO_LARGE" });
-    expect(createProductImage).not.toHaveBeenCalled();
+  it.each([{ size: MAX_IMAGE_BYTES + 1 }, { size: 0 }, { mimeType: "image/svg+xml" }, { objectKey: "products/arbitrary/key.png" }, { position: 10 }])("rejects invalid description %j before signing", async (changes) => {
+    const { POST } = await import("./route"); expect((await POST(request({ ...input, ...changes }))).status).toBe(400); expect(authorize).not.toHaveBeenCalled();
   });
-
-  it("accepts a valid multipart request and serializes the result as JSON", async () => {
-    createProductImage.mockResolvedValue({ id: "image-1" });
-    const { POST } = await import("@/app/api/products/images/upload/route");
-    const body = new FormData();
-    body.set("productId", "10000000-0000-4000-8000-000000000001");
-    body.set(
-      "file",
-      new File([Uint8Array.from([0x89, 0x50, 0x4e, 0x47])], "image.png", {
-        type: "image/png",
-      }),
-    );
-    const request = new Request("http://localhost/api/products/images/upload", {
-      method: "POST",
-      body,
-    });
-
-    const response = await POST(request);
-
-    expect(response.status).toBe(201);
-    await expect(response.json()).resolves.toEqual({ image: { id: "image-1" } });
-    expect(createProductImage).toHaveBeenCalledOnce();
+  it("rejects the old multipart byte transport", async () => {
+    const { POST } = await import("./route"); const body = new FormData(); body.set("file", new File(["bytes"], "photo.png"));
+    expect((await POST(new Request("http://localhost/api/products/images/upload", { method: "POST", body }))).status).toBe(400);
+    expect(authorize).not.toHaveBeenCalled();
   });
-
-  it("rejects a multipart request without a file", async () => {
-    const { POST } = await import("@/app/api/products/images/upload/route");
-    const body = new FormData();
-    body.set("productId", "10000000-0000-4000-8000-000000000001");
-
-    const response = await POST(new Request("http://localhost/api/products/images/upload", {
-      method: "POST",
-      body,
-    }));
-
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toMatchObject({ code: "INVALID_IMAGE" });
-    expect(createProductImage).not.toHaveBeenCalled();
+  it("bounds chunked JSON requests", async () => {
+    const { POST } = await import("./route"); expect((await POST(request({ padding: "x".repeat(8193) }))).status).toBe(400); expect(authorize).not.toHaveBeenCalled();
   });
-
-  it("serializes unsupported image errors as JSON", async () => {
-    createProductImage.mockRejectedValue(
-      new InvalidOperationError("Solo se permiten imágenes JPEG, PNG o WEBP."),
-    );
-    const { POST } = await import("@/app/api/products/images/upload/route");
-    const body = new FormData();
-    body.set("productId", "10000000-0000-4000-8000-000000000001");
-    body.set("file", new File(["not an image"], "invalid.txt", { type: "text/plain" }));
-
-    const response = await POST(new Request("http://localhost/api/products/images/upload", {
-      method: "POST",
-      body,
-    }));
-
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toMatchObject({ code: "INVALID_IMAGE" });
+  it.each(["upload", "confirm"])("requires an authenticated admin for %s", async (path) => {
+    requireAdmin.mockRejectedValue(new UnauthorizedError("Required"));
+    const { POST } = path === "upload" ? await import("./route") : await import("../confirm/route");
+    expect((await POST(request(path === "upload" ? input : { token: "token" }, path))).status).toBe(401);
+    expect(authorize).not.toHaveBeenCalled(); expect(confirm).not.toHaveBeenCalled();
   });
-
-  it("parses a valid image at the 10 MiB application limit", async () => {
-    createProductImage.mockResolvedValue({ id: "large-image" });
-    const { POST } = await import("@/app/api/products/images/upload/route");
-    const bytes = new Uint8Array(MAX_IMAGE_BYTES);
-    bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-    const body = new FormData();
-    body.set("productId", "10000000-0000-4000-8000-000000000001");
-    body.set("file", new File([bytes], "large.png", { type: "image/png" }));
-
-    const response = await POST(new Request("http://localhost/api/products/images/upload", {
-      method: "POST",
-      body,
-    }));
-
-    expect(response.status).toBe(201);
-    expect(createProductImage).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.anything(),
-      expect.objectContaining({ bytes: expect.objectContaining({ byteLength: MAX_IMAGE_BYTES }) }),
-    );
+  it("rejects a cross-origin authorization", async () => {
+    sameOrigin.mockImplementation(() => { throw new InvalidRequestOriginError("Rejected"); });
+    const { POST } = await import("./route"); expect((await POST(request(input))).status).toBe(403); expect(authorize).not.toHaveBeenCalled();
+  });
+  it("confirms only a token and revalidates the product", async () => {
+    const { POST } = await import("../confirm/route");
+    expect((await POST(request({ token: "signed" }, "confirm"))).status).toBe(201);
+    expect(confirm).toHaveBeenCalledWith(expect.anything(), expect.anything(), "signed", "local-fixture");
+    expect((await POST(request({ token: "signed", productId: crypto.randomUUID(), objectKey: "arbitrary" }, "confirm"))).status).toBe(400);
   });
 });

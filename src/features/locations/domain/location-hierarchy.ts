@@ -30,7 +30,15 @@ export function buildLocationBreadcrumb(
   targetId: string,
   locations: readonly LocationNode[],
 ): string {
+  return createLocationBreadcrumbResolver(locations)(targetId);
+}
+
+export function createLocationBreadcrumbResolver(locations: readonly LocationNode[]) {
   const byId = indexLocations(locations);
+  return (targetId: string) => locationBreadcrumb(targetId, byId);
+}
+
+function locationBreadcrumb(targetId: string, byId: Map<string, LocationNode>): string {
   const path: string[] = [];
   const visited = new Set<string>();
   let current = byId.get(targetId);

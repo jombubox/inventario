@@ -90,7 +90,7 @@ export function CatalogEntryEditor({ entry, kind }: { entry: CatalogEntry; kind:
       </div>
 
       <details className="mt-4">
-        <summary className="cursor-pointer py-2 text-small font-semibold text-primary">
+        <summary className="cursor-pointer py-2 text-small font-semibold text-link">
           Editar {noun}
         </summary>
         <form

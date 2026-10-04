@@ -222,7 +222,7 @@ export function ProductForm({
 
       <section className="grid gap-5 rounded-md bg-card p-5 shadow-sm sm:grid-cols-2 sm:p-6">
         <div className="sm:col-span-2">
-          <div className="flex items-center justify-between gap-3"><Label htmlFor="title">Título administrativo</Label>{titleOverridden ? <button type="button" className="text-small font-semibold text-primary hover:underline" onClick={() => setTitleOverridden(false)}>Usar sugerencia</button> : <span className="text-xs text-muted-foreground">Sugerencia automática</span>}</div>
+          <div className="flex items-center justify-between gap-3"><Label htmlFor="title">Título administrativo</Label>{titleOverridden ? <button type="button" className="text-small font-semibold text-link hover:underline" onClick={() => setTitleOverridden(false)}>Usar sugerencia</button> : <span className="text-xs text-muted-foreground">Sugerencia automática</span>}</div>
           <Input id="title" name="title" value={title} onChange={(event) => { setTitleOverridden(true); setManualTitle(event.target.value); }} className="mt-2" />
           <FieldError errors={state.fieldErrors?.title} />
         </div>

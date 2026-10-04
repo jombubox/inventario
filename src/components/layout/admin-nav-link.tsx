@@ -51,7 +51,7 @@ export function AdminNavLink({
       <span
         className={cn(
           "grid size-7 shrink-0 place-items-center rounded-lg",
-          active ? "text-primary" : "text-muted-foreground group-hover:text-navy",
+          active ? "text-link" : "text-muted-foreground group-hover:text-navy",
         )}
         aria-hidden="true"
       >

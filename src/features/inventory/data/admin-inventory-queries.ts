@@ -1,21 +1,31 @@
-import { and, asc, count, desc, eq, ilike, isNull, or, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, isNull, or, type SQL } from "drizzle-orm";
 
 import type { Database } from "@/db/connection";
 import { inventoryItems, locations, products } from "@/db/schema";
-import { buildLocationBreadcrumb } from "@/features/locations/domain/location-hierarchy";
+import { buildLocationBreadcrumb, createLocationBreadcrumbResolver } from "@/features/locations/domain/location-hierarchy";
+import { productSearchCondition, searchPattern } from "@/features/products/data/product-search";
 import type { InventoryListQuery } from "@/validators/admin-query";
 
 export async function listAdminInventory(db: Database, query: InventoryListQuery) {
-  const conditions: SQL[] = [];
+  // Reuse the bounded hierarchy read already needed for breadcrumbs; inventory rows stay SQL-filtered.
+  const locationNodes = await db.select({ id: locations.id, name: locations.name, code: locations.code, parentId: locations.parentId }).from(locations);
+  const breadcrumb = createLocationBreadcrumbResolver(locationNodes);
+  const codePath = createLocationBreadcrumbResolver(locationNodes.map((location) => ({ ...location, name: location.code })));
+  const conditions: SQL[] = [isNull(products.deletedAt)];
   if (query.q) {
-    const pattern = `%${query.q}%`;
-    conditions.push(
-      or(
-        ilike(inventoryItems.inventoryCode, pattern),
-        ilike(products.sku, pattern),
-        ilike(products.title, pattern),
-      )!,
-    );
+    const pattern = searchPattern(query.q);
+    const needle = query.q.toLocaleLowerCase("es-MX");
+    const matchingLocations = locationNodes.filter((location) =>
+      breadcrumb(location.id).toLocaleLowerCase("es-MX").includes(needle) ||
+      codePath(location.id).toLocaleLowerCase("es-MX").includes(needle),
+    ).map(({ id }) => id);
+    conditions.push(or(
+      ilike(inventoryItems.inventoryCode, pattern),
+      ilike(inventoryItems.legacyBagNumber, pattern),
+      ilike(inventoryItems.legacyLocationCode, pattern),
+      productSearchCondition(query.q),
+      matchingLocations.length ? inArray(inventoryItems.locationId, matchingLocations) : undefined,
+    )!);
   }
   if (query.condition) conditions.push(eq(inventoryItems.condition, query.condition));
   if (query.status) conditions.push(eq(inventoryItems.status, query.status));
@@ -24,7 +34,7 @@ export async function listAdminInventory(db: Database, query: InventoryListQuery
   const where = conditions.length > 0 ? and(...conditions) : undefined;
   const offset = (query.page - 1) * query.pageSize;
 
-  const [rows, totalResult, locationNodes] = await Promise.all([
+  const [rows, totalResult] = await Promise.all([
     db
       .select({
         id: inventoryItems.id,
@@ -49,7 +59,7 @@ export async function listAdminInventory(db: Database, query: InventoryListQuery
       .innerJoin(products, eq(inventoryItems.productId, products.id))
       .leftJoin(locations, eq(inventoryItems.locationId, locations.id))
       .where(where)
-      .orderBy(desc(inventoryItems.updatedAt))
+      .orderBy(desc(inventoryItems.updatedAt), asc(inventoryItems.id))
       .limit(query.pageSize)
       .offset(offset),
     db
@@ -58,15 +68,12 @@ export async function listAdminInventory(db: Database, query: InventoryListQuery
       .innerJoin(products, eq(inventoryItems.productId, products.id))
       .leftJoin(locations, eq(inventoryItems.locationId, locations.id))
       .where(where),
-    db
-      .select({ id: locations.id, name: locations.name, parentId: locations.parentId })
-      .from(locations),
   ]);
 
   const rowsWithBreadcrumb = rows.map((row) => ({
     ...row,
     locationBreadcrumb: row.locationId
-      ? buildLocationBreadcrumb(row.locationId, locationNodes)
+      ? breadcrumb(row.locationId)
       : null,
   }));
   const total = totalResult[0]?.value ?? 0;

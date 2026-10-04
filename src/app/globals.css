@@ -21,21 +21,24 @@
 
 :root {
   color-scheme: light;
-  --background: #fcfcfc;
+  --background: #F1F3F4;
   --foreground: #141414;
-  --primary: #2868dc;
+  --primary: #2F73F2;
   --primary-hover: #225ac0;
   --primary-active: #1d4fa9;
-  --primary-foreground: #ffffff;
-  --action: #2868dc;
-  --action-hover: #225ac0;
-  --action-active: #1d4fa9;
-  --action-foreground: #ffffff;
+  --link: #225ac0;
+  --primary-foreground: #050505;
+  --action: #2F73F2;
+  --action-hover: #4385f5;
+  --action-active: #629bfa;
+  --action-foreground: #050505;
   --accent: #46c4ff;
   --accent-foreground: #000f30;
   --navy: #000f30;
   --brand-navy: #000f30;
-  --card: #ffffff;
+  --overlay: #000000;
+  --card: #FFFFFF;
+  --field: #F8FAFB;
   --card-foreground: #141414;
   --muted: #f2f5f9;
   --muted-foreground: #5d6777;
@@ -48,7 +51,7 @@
   --danger-action-hover: #b72f37;
   --danger-action-active: #a92830;
   --danger-action-foreground: #ffffff;
-  --ring: #2868dc;
+  --ring: #2F73F2;
   --primary-soft: #eaf1ff;
   --accent-soft: #e9f8ff;
   --navy-soft: #e9edf4;
@@ -56,26 +59,28 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --background: #000f30;
+  --background: #0D0F11;
   --foreground: #fcfcfc;
-  --primary: #46c4ff;
-  --primary-hover: #75d2ff;
-  --primary-active: #8ad9ff;
-  --primary-foreground: #000f30;
+  --primary: #2F73F2;
+  --primary-hover: #a7c6ff;
+  --primary-active: #98bbff;
+  --link: #a7c6ff;
+  --primary-foreground: #050505;
   --action: #2f73f2;
   --action-hover: #4385f5;
-  --action-active: #2f73f2;
-  --action-foreground: #000f30;
+  --action-active: #629bfa;
+  --action-foreground: #050505;
   --accent: #46c4ff;
   --accent-foreground: #000f30;
   --navy: #fcfcfc;
   --brand-navy: #000f30;
-  --card: #141414;
+  --card: #191D23;
+  --field: #11151A;
   --card-foreground: #fcfcfc;
-  --muted: #1a243b;
+  --muted: #252B33;
   --muted-foreground: #aebbd0;
-  --border: #33415d;
-  --input: #465570;
+  --border: #3B444F;
+  --input: #586574;
   --success: #57d49b;
   --warning: #ffba70;
   --danger: #ff858a;
@@ -83,16 +88,17 @@
   --danger-action-hover: #d8464e;
   --danger-action-active: #b82e36;
   --danger-action-foreground: #ffffff;
-  --ring: #46c4ff;
+  --ring: #2F73F2;
   --primary-soft: #102b61;
   --accent-soft: #0b3049;
-  --navy-soft: #1b2945;
+  --navy-soft: #252B33;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-primary: var(--primary);
+  --color-link: var(--link);
   --color-primary-hover: var(--primary-hover);
   --color-primary-active: var(--primary-active);
   --color-primary-foreground: var(--primary-foreground);
@@ -106,8 +112,10 @@
   --color-accent-soft: var(--accent-soft);
   --color-navy: var(--navy);
   --color-brand-navy: var(--brand-navy);
+  --color-overlay: var(--overlay);
   --color-navy-soft: var(--navy-soft);
   --color-card: var(--card);
+  --color-field: var(--field);
   --color-card-foreground: var(--card-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);

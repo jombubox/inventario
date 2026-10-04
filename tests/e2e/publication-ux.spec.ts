@@ -82,7 +82,7 @@ test("Quick Add publishes price and photos, manages locations inline, and review
   await dialog.getByRole("button", { name: "← Cambiar producto" }).click();
   await expect(dialog.getByLabel("Número de parte", { exact: true })).toHaveValue(part);
   await expect(dialog.getByLabel("Precio de venta")).toHaveValue("1250.01");
-  await expect(dialog.getByRole("button", { name: "Quitar frente.png" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Eliminar foto: frente.png" })).toBeVisible();
   await expect(dialog.getByRole("list", { name: "Modelos compatibles seleccionados" }).getByRole("listitem")).toHaveCount(2);
   await dialog.getByRole("button", { name: "Continuar con ubicación" }).click();
   await dialog.getByRole("button", { name: "Crear caja" }).click();
@@ -92,7 +92,8 @@ test("Quick Add publishes price and photos, manages locations inline, and review
   const uploadGate = new Promise<void>((resolve) => { releaseUpload = resolve; });
   await page.route("**/api/products/images/upload", async (route) => { await uploadGate; await route.continue(); });
   await dialog.getByRole("button", { name: "Guardar producto" }).click();
-  await expect(dialog.getByText("Subiendo foto 1 de 2…")).toBeVisible({ timeout: 30_000 });
+  await expect(dialog.locator('[data-photo-state="uploading"]')).toHaveCount(1, { timeout: 30_000 });
+  await expect(dialog.locator('[data-photo-state="selected"]')).toHaveCount(1);
   await expect(dialog.getByText("Las fotos se guardaron correctamente.")).toHaveCount(0);
   const publicationLink = dialog.getByRole("link", { name: "Ver publicación" });
   await expect(publicationLink).toHaveAttribute("target", "_blank");

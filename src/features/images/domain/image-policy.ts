@@ -53,7 +53,7 @@ export function imageSignatureHex(bytes: Uint8Array): string {
     .join("");
 }
 
-export function createProductImageObjectKey(sku: string, mimeType: AllowedImageMimeType): string {
+export function createProductImageObjectKey(sku: string, mimeType: AllowedImageMimeType, uploadId = crypto.randomUUID()): string {
   const productSegment = sku
     .trim()
     .replace(/[^a-zA-Z0-9_-]+/gu, "-")
@@ -62,7 +62,9 @@ export function createProductImageObjectKey(sku: string, mimeType: AllowedImageM
     .slice(0, 100);
   if (!productSegment) throw new Error("El SKU no permite crear una ruta de imagen segura.");
 
-  return `products/${productSegment}/${crypto.randomUUID()}.${objectExtensionsByMime[mimeType]}`;
+  const objectKey = `products/${productSegment}/${uploadId}.${objectExtensionsByMime[mimeType]}`;
+  assertProductImageObjectKey(objectKey);
+  return objectKey;
 }
 
 export function assertProductImageObjectKey(objectKey: string): void {

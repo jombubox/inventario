@@ -23,7 +23,7 @@ export function Modal({ title, onClose, children }: {
   return <dialog ref={ref} aria-labelledby={titleId}
     onCancel={(event) => { event.preventDefault(); onClose(); }}
     onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
-    className="m-auto max-h-[92dvh] w-[calc(100%-2rem)] max-w-3xl overflow-y-auto rounded-xl border border-border bg-card p-0 text-foreground shadow-xl backdrop:bg-navy/65">
+    className="m-auto max-h-[92dvh] w-[calc(100%-2rem)] max-w-3xl overflow-y-auto rounded-xl border border-border bg-card p-0 text-foreground shadow-xl backdrop:bg-overlay/65">
     <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-border bg-card p-4">
       <h2 id={titleId} className="min-w-0 break-words text-h3">{title}</h2>
       <Button type="button" variant="ghost" size="icon" aria-label="Cerrar ventana" onClick={onClose}>×</Button>

@@ -128,8 +128,8 @@ test("quick add reuses an existing product, creates a product with multiple comp
     { name: `reverso-${suffix}.webp`, mimeType: "image/webp", buffer: Buffer.from("UklGRiIAAABXRUJQVlA4ICAAAADQAQCdASoBAAEAAUAmJaQAA3AA/v89WAAAAA==", "base64") },
   ]);
   await expect(dialog.getByText("Foto principal", { exact: true })).toBeVisible();
-  await dialog.getByRole("button", { name: `Quitar quitar-${suffix}.jpg` }).click();
-  await expect(dialog.getByRole("button", { name: `Quitar quitar-${suffix}.jpg` })).toHaveCount(0);
+  await dialog.getByRole("button", { name: `Eliminar foto: quitar-${suffix}.jpg` }).click();
+  await expect(dialog.getByRole("button", { name: `Eliminar foto: quitar-${suffix}.jpg` })).toHaveCount(0);
   await expect(dialog.getByText("Foto principal", { exact: true })).toBeVisible();
   await dialog.getByRole("button", {
     name: "Eliminar modelo compatible Samsung UN55NU7100FXZX",

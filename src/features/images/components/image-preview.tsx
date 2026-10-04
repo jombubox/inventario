@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useState } from "react";
+import { CursorZoom } from "./cursor-zoom";
 import { Button } from "@/components/ui/button";
 import { ProductImagePlaceholder } from "@/features/catalog/components/product-image";
 
@@ -28,9 +29,10 @@ export function ImagePreview({ images, initialIndex = 0, title }: {
       event.preventDefault(); move(event.key === "ArrowLeft" ? -1 : 1);
     }
   }}>
-    <div className="relative h-[min(55dvh,32rem)] overflow-hidden rounded-md bg-white" aria-label={`Imagen ${selectedIndex + 1} de ${images.length}`}>
+    <CursorZoom key={image.url} className="h-[min(55dvh,32rem)] rounded-md bg-white" label={`Imagen ${selectedIndex + 1} de ${images.length}`}>
       <PreviewPhoto key={image.url} image={{ ...image, alt: image.alt || title }} sizes="(max-width: 768px) 90vw, 700px" className="p-2" />
-    </div>
+    </CursorZoom>
+    <p className="mt-2 text-xs text-muted-foreground">En computadora, mueve el cursor sobre la foto para acercar.</p>
     <div className="mt-3 flex items-center justify-between gap-2">
       <Button type="button" variant="outline" size="sm" disabled={images.length < 2} onClick={() => move(-1)}>Anterior</Button>
       <p role="status" className="text-small">{selectedIndex + 1} de {images.length}</p>

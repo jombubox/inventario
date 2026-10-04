@@ -1,8 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Modal } from "@/components/ui/modal";
+import { CursorZoom } from "@/features/images/components/cursor-zoom";
 import { ImagePreview } from "@/features/images/components/image-preview";
 
 import { ProductImagePlaceholder } from "@/features/catalog/components/product-image";
@@ -18,7 +19,6 @@ export function ProductGallery({
 }) {
   const supported = images;
   const [selectedUrl, setSelectedUrl] = useState(supported[0]?.url ?? null);
-  const zoomRef = useRef<HTMLDivElement>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const selected = supported.find(({ url }) => url === selectedUrl) ?? supported[0] ?? null;
@@ -30,17 +30,8 @@ export function ProductGallery({
   return (
     <div>
       <button type="button" aria-label={`Ampliar fotos de ${title}`} onClick={() => setViewerOpen(true)}
-        onPointerMove={(event) => {
-          if (event.pointerType !== "mouse" || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
-          const bounds = event.currentTarget.getBoundingClientRect();
-          const element = zoomRef.current;
-          if (!element) return;
-          element.style.transformOrigin = `${Math.max(0, Math.min(100, (event.clientX - bounds.left) / bounds.width * 100))}% ${Math.max(0, Math.min(100, (event.clientY - bounds.top) / bounds.height * 100))}%`;
-          element.style.transform = "scale(2.25)";
-        }}
-        onPointerLeave={() => { if (zoomRef.current) zoomRef.current.style.transform = "scale(1)"; }}
         className="relative block aspect-square w-full cursor-zoom-in overflow-hidden rounded-2xl border border-border bg-white focus-visible:ring-2 focus-visible:ring-ring">
-        <div key={selected.url} ref={zoomRef} data-product-zoom className="absolute inset-0 transition-transform duration-150 ease-out motion-reduce:transition-none">
+        <CursorZoom key={selected.url} className="aspect-square w-full">
         {failedUrl === selected.url ? <ProductImagePlaceholder className="h-full w-full" /> :
         <Image
           key={selected.url}
@@ -52,7 +43,7 @@ export function ProductGallery({
           onError={() => setFailedUrl(selected.url)}
           className="object-contain p-5 sm:p-8"
         />}
-        </div>
+        </CursorZoom>
       </button>
       <p className="mt-2 text-xs text-muted-foreground">Abre la foto para verla más grande. En computadora, pasa el cursor para acercar.</p>
       {viewerOpen ? <Modal title={`Fotos de ${title}`} onClose={() => setViewerOpen(false)}><ImagePreview images={supported} title={title} initialIndex={Math.max(0, supported.findIndex((image) => image.url === selected.url))} /></Modal> : null}

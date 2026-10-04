@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getDb } from "@/db";
 import { requireAdmin } from "@/features/auth/server/admin-auth";
-import { revalidatePublicCatalog } from "@/features/catalog/server/revalidation";
+import { revalidateProductImages } from "@/features/images/server/revalidation";
 import { imageErrorResponse } from "@/features/images/server/image-http";
 import { deleteProductImage, updateProductImage } from "@/features/images/server/image-service";
 import { createR2Storage } from "@/features/images/server/r2";
@@ -27,8 +27,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     const db = await authorizeMutation(request);
     const { id } = await context.params;
     const input = imageUpdateRequestSchema.parse(await request.json());
-    await updateProductImage(db, { imageId: id, ...input });
-    revalidatePublicCatalog();
+    const productId = await updateProductImage(db, { imageId: id, ...input });
+    revalidateProductImages(productId);
     return NextResponse.json({ ok: true }, { headers: requestIdHeaders(requestId) });
   } catch (error) {
     return imageErrorResponse(error, { requestId, event: "image_update_failed" });
@@ -40,8 +40,8 @@ export async function DELETE(request: Request, context: RouteContext) {
   try {
     const db = await authorizeMutation(request);
     const { id } = await context.params;
-    await deleteProductImage(db, createR2Storage(), id);
-    revalidatePublicCatalog();
+    const productId = await deleteProductImage(db, createR2Storage(), id);
+    revalidateProductImages(productId);
     return NextResponse.json({ ok: true }, { headers: requestIdHeaders(requestId) });
   } catch (error) {
     return imageErrorResponse(error, { requestId, event: "image_delete_failed" });

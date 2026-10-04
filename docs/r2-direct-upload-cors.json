@@ -1,0 +1,15 @@
+{
+  "rules": [
+    {
+      "allowed": {
+        "origins": [
+          "https://inventario-five-mu.vercel.app",
+          "https://inventario-jombubox1.vercel.app"
+        ],
+        "methods": ["PUT"],
+        "headers": ["Content-Type"]
+      },
+      "maxAgeSeconds": 300
+    }
+  ]
+}

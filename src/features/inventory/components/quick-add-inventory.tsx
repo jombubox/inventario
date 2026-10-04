@@ -18,7 +18,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { MAX_IMAGE_BYTES, MAX_PRODUCT_IMAGES } from "@/features/images/domain/image-policy";
+import { PhotoSelection } from "@/features/images/components/photo-selection";
+import { usePhotoUploads } from "@/features/images/components/use-photo-uploads";
 import { UNPARENTED_BOXES_LOCATION_ID } from "@/features/locations/domain/quick-add-location";
 import { QuickAddLocationEditor } from "@/features/locations/components/quick-add-location-editor";
 import { productPublicationFields } from "@/validators/admin-product";
@@ -179,7 +180,7 @@ function ProductResult({
           {product.brand} · {product.componentType}
           {product.compatibleModel ? ` · ${product.compatibleModel}` : ""}
         </span>
-        <span className="mt-1 block font-mono text-xs text-primary">
+        <span className="mt-1 block font-mono text-xs text-link">
           {product.sku}
           {product.status === "ARCHIVED" ? " · Archivado" : ""}
         </span>
@@ -196,7 +197,7 @@ function ProductResult({
           </span>
         ) : null}
       </span>
-      <span className="shrink-0 text-small font-semibold text-primary group-hover:underline">
+      <span className="shrink-0 text-small font-semibold text-link group-hover:underline">
         Seleccionar
       </span>
     </button>
@@ -304,79 +305,6 @@ function QuickCatalogField({
   );
 }
 
-function ProductPhotoPicker({
-  files,
-  onChange,
-}: {
-  files: File[];
-  onChange: (files: File[]) => void;
-}) {
-  const [error, setError] = useState("");
-  const previews = useMemo(() => files.map((file) => URL.createObjectURL(file)), [files]);
-
-  useEffect(() => () => previews.forEach((url) => URL.revokeObjectURL(url)), [previews]);
-
-  const addFiles = (selected: FileList | null) => {
-    if (!selected?.length) return;
-    const next = [...files, ...Array.from(selected)];
-    if (next.length > MAX_PRODUCT_IMAGES) {
-      setError("Puedes agregar como máximo 10 fotos.");
-      return;
-    }
-    const invalid = next.find((file) => !["image/jpeg", "image/png", "image/webp"].includes(file.type));
-    if (invalid) {
-      setError(`${invalid.name} no es una imagen JPEG, PNG o WEBP.`);
-      return;
-    }
-    const oversized = next.find((file) => file.size > MAX_IMAGE_BYTES);
-    if (oversized) {
-      setError(`${oversized.name} supera el límite de 10 MB.`);
-      return;
-    }
-    setError("");
-    onChange(next);
-  };
-
-  return (
-    <div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <Label htmlFor="quick-product-photos">Fotos del producto</Label>
-          <p className="mt-1 text-xs text-muted-foreground">La primera foto será la principal.</p>
-        </div>
-        <label className="inline-flex min-h-11 cursor-pointer items-center rounded-md bg-muted px-4 text-small font-semibold text-navy hover:bg-primary-soft">
-          + Agregar fotos
-          <input
-            id="quick-product-photos"
-            type="file"
-            multiple
-            accept="image/jpeg,image/png,image/webp"
-            className="sr-only"
-            onChange={(event) => { addFiles(event.target.files); event.target.value = ""; }}
-          />
-        </label>
-      </div>
-      {error ? <p role="alert" className="mt-2 text-small text-danger">{error}</p> : null}
-      {files.length > 0 ? (
-        <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-5">
-          {files.map((file, index) => (
-            <div key={`${file.name}-${file.lastModified}-${index}`} className="relative aspect-square overflow-hidden rounded-md bg-muted shadow-sm">
-              <div className="h-full w-full bg-contain bg-center bg-no-repeat" style={{ backgroundImage: `url(${previews[index]})` }} />
-              {index === 0 ? <span className="absolute bottom-1 left-1 rounded-sm bg-navy px-1.5 py-1 text-[0.65rem] font-semibold text-white">Foto principal</span> : null}
-              <button
-                type="button"
-                aria-label={`Quitar ${file.name}`}
-                className="absolute right-1 top-1 grid size-8 place-items-center rounded-full bg-background/95 text-lg font-bold shadow"
-                onClick={() => onChange(files.filter((_, fileIndex) => fileIndex !== index))}
-              >×</button>
-            </div>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 function QuickAddDialog({
   options: initialOptions,
   onClose,
@@ -425,11 +353,11 @@ function QuickAddDialog({
   const [status, setStatus] = useState<"ACTIVE" | "DRAFT" | "ARCHIVED">("ACTIVE");
   const [isPublic, setIsPublic] = useState(true);
   const [photos, setPhotos] = useState<File[]>([]);
-  const [uploadState, setUploadState] = useState<"idle" | "uploading" | "done" | "error">("idle");
-  const [uploadAttempt, setUploadAttempt] = useState(0);
-  const [uploadedPhotoCount, setUploadedPhotoCount] = useState(0);
-  const uploadedPhotoCountRef = useRef(0);
-  const [uploadError, setUploadError] = useState("");
+  const [photosValidating, setPhotosValidating] = useState(false);
+  const { states: photoStates, uploadState, uploadError, retry: retryPhotos } = usePhotoUploads(
+    photos, state.productId, state.status === "success" && !!state.productCreated,
+  );
+  const photosBusy = uploadState === "uploading" || (uploadState === "idle" && state.status === "success" && !!state.productCreated && photos.length > 0);
   const [createError, setCreateError] = useState("");
   const initialLocationId = options.locations[0]?.id ?? "";
   const initialBox = options.boxes.find((box) => box.parentId === initialLocationId);
@@ -466,41 +394,6 @@ function QuickAddDialog({
     requestAnimationFrame(() => searchRef.current?.focus());
   }, []);
 
-  useEffect(() => {
-    if (
-      state.status !== "success" ||
-      !state.productCreated ||
-      !state.productId ||
-      photos.length === 0
-    ) return;
-
-    let cancelled = false;
-    const upload = async () => {
-      setUploadState("uploading");
-      for (let index = uploadedPhotoCountRef.current; index < photos.length; index += 1) {
-        const body = new FormData();
-        body.set("productId", state.productId!);
-        body.set("file", photos[index]!);
-        body.set("alt", photos[index]!.name.replace(/\.[^.]+$/u, ""));
-        try {
-          const response = await fetch("/api/products/images/upload", { method: "POST", body });
-          const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-          if (!response.ok) throw new Error(payload?.error ?? "No fue posible subir la foto.");
-          if (cancelled) return;
-          uploadedPhotoCountRef.current = index + 1;
-          setUploadedPhotoCount(index + 1);
-        } catch (caught) {
-          if (cancelled) return;
-          setUploadError(caught instanceof Error ? caught.message : "No fue posible subir las fotos.");
-          setUploadState("error");
-          return;
-        }
-      }
-      if (!cancelled) setUploadState("done");
-    };
-    void upload();
-    return () => { cancelled = true; };
-  }, [photos, state.productCreated, state.productId, state.status, uploadAttempt]);
 
   useEffect(() => {
     const trimmed = query.trim();
@@ -558,13 +451,14 @@ function QuickAddDialog({
   };
 
   const close = () => {
-    if (pending || locationSaving || uploadState === "uploading") return;
+    if (pending || photosValidating || locationSaving || photosBusy) return;
     dialogRef.current?.close();
     onClose();
   };
 
   const selectProduct = (product: QuickAddProductResult) => {
     setSelectedProduct(product);
+    setPhotos([]);
     setPrimarySerialNumber("");
     setSecondarySerialNumbers([]);
     setCompatibilities([]);
@@ -651,10 +545,13 @@ function QuickAddDialog({
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) close();
       }}
-      className="m-0 h-svh max-h-svh w-full max-w-none overflow-hidden bg-transparent p-0 text-foreground backdrop:bg-navy/55 sm:m-auto sm:h-auto sm:max-h-[92dvh] sm:w-[min(52rem,calc(100%-2rem))] sm:rounded-md"
+      className="m-0 h-svh max-h-svh w-full max-w-none overflow-hidden bg-transparent p-0 text-foreground backdrop:bg-overlay/55 sm:m-auto sm:h-auto sm:max-h-[92dvh] sm:w-[min(52rem,calc(100%-2rem))] sm:rounded-md"
     >
       <form
         action={formAction}
+        onSubmit={(event) => {
+          if (step !== "place" || pending || photosValidating || locationSaving || photosBusy || state.status === "success") event.preventDefault();
+        }}
         className="flex h-full min-h-0 flex-col overflow-hidden bg-background sm:max-h-[92dvh] sm:rounded-md sm:shadow-lg"
         noValidate
       >
@@ -686,7 +583,7 @@ function QuickAddDialog({
 
         <header className="shrink-0 flex items-start justify-between gap-4 border-b border-border px-5 py-4 sm:px-7 sm:py-5">
           <div>
-            <p className="text-label font-semibold text-primary">
+            <p className="text-label font-semibold text-link">
               Entrada rápida
             </p>
             <h2 id="quick-add-title" className="mt-1 text-h3 text-navy">
@@ -698,7 +595,7 @@ function QuickAddDialog({
             variant="ghost"
             size="icon"
             onClick={close}
-            disabled={pending || locationSaving || uploadState === "uploading"}
+            disabled={pending || photosValidating || locationSaving || photosBusy}
             aria-label="Cerrar flujo"
             className="-mr-2 -mt-1"
           >
@@ -717,11 +614,6 @@ function QuickAddDialog({
               {state.productCreated ? <p className="mt-3 text-small">{state.publicationPath ? "Publicación: visible en el catálogo público." : "Publicación: este producto no está visible en el catálogo público."}</p> : null}
               {state.productCreated && photos.length === 0 ? <p className="mt-2 text-small text-muted-foreground">Sin fotos agregadas.</p> : null}
               {state.productCreated && photos.length > 0 && uploadState === "idle" ? <p role="status" className="mt-2 text-small">Preparando las fotos…</p> : null}
-              {uploadState === "uploading" ? (
-                <p role="status" className="mt-3 text-small font-semibold text-primary">
-                  Subiendo foto {Math.min(uploadedPhotoCount + 1, photos.length)} de {photos.length}…
-                </p>
-              ) : null}
               {uploadState === "done" ? (
                 <p role="status" className="mt-3 text-small text-success">Las fotos se guardaron correctamente.</p>
               ) : null}
@@ -734,20 +626,17 @@ function QuickAddDialog({
                     variant="outline"
                     size="sm"
                     className="mt-3"
-                    onClick={() => {
-                      setUploadError("");
-                      setUploadState("idle");
-                      setUploadAttempt((attempt) => attempt + 1);
-                    }}
+                    onClick={() => void retryPhotos()}
                   >
                     Reintentar fotos pendientes
                   </Button>
                 </div>
               ) : null}
+              {photos.length > 0 ? <div className="mt-4"><PhotoSelection id="quick-uploaded-photos" files={photos} onChange={setPhotos} states={photoStates} locked onRetry={uploadState === "error" ? () => void retryPhotos() : undefined} /></div> : null}
               <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
                 {state.publicationPath ? <a href={state.publicationPath} target="_blank" rel="noopener noreferrer" className={buttonStyles({ variant: "outline" })}>Ver publicación</a> : null}
-                <Button type="button" variant="outline" onClick={close} disabled={uploadState === "uploading"}>Cerrar</Button>
-                <Button type="button" onClick={onRestart} disabled={uploadState === "uploading"}>Agregar otro producto</Button>
+                <Button type="button" variant="outline" onClick={close} disabled={photosBusy}>Cerrar</Button>
+                <Button type="button" onClick={onRestart} disabled={photosBusy}>Agregar otro producto</Button>
               </div>
             </div>
           </div>
@@ -775,7 +664,7 @@ function QuickAddDialog({
                       autoComplete="off"
                       className="h-12 pr-11"
                     />
-                    {searching ? <Spinner className="absolute right-4 top-4 text-primary" /> : null}
+                    {searching ? <Spinner className="absolute right-4 top-4 text-link" /> : null}
                   </div>
                   {searchError ? <p role="alert" className="mt-3 text-small text-danger">{searchError}</p> : null}
 
@@ -816,7 +705,7 @@ function QuickAddDialog({
 
               {step === "create" ? (
                 <section aria-labelledby="create-model-title">
-                  <button type="button" className="text-small font-semibold text-primary hover:underline" onClick={() => setStep("search")}>← Volver a buscar</button>
+                  <button type="button" className="text-small font-semibold text-link hover:underline" onClick={() => setStep("search")}>← Volver a buscar</button>
                   <h3 id="create-model-title" className="mt-4 text-h2 text-navy">Crear producto nuevo</h3>
                   <p className="mt-2 text-small text-muted-foreground">Completa los datos principales y agrega fotos sin salir de este flujo.</p>
                   {createError ? <p role="alert" className="mt-4 rounded-md bg-danger/5 p-3 text-small text-danger">{createError}</p> : null}
@@ -891,7 +780,7 @@ function QuickAddDialog({
                     <label className="flex min-h-11 items-center gap-3 self-end rounded-md border border-border p-3 text-small font-semibold"><input type="checkbox" checked={isPublic} onChange={(event) => setIsPublic(event.target.checked)} className="size-5 accent-primary" />Visible en el catálogo público</label>
                     {status !== "ACTIVE" ? <p role="status" className="text-small text-muted-foreground sm:col-span-2">Solo los productos activos pueden aparecer en el catálogo. Se guardará sin visibilidad pública.</p> : null}
                     <div className="sm:col-span-2">
-                      <ProductPhotoPicker files={photos} onChange={setPhotos} />
+                      <PhotoSelection id="quick-product-photos" files={photos} onChange={setPhotos} onValidating={setPhotosValidating} />
                     </div>
                   </div>
                 </section>
@@ -899,9 +788,9 @@ function QuickAddDialog({
 
               {step === "place" ? (
                 <section aria-labelledby="place-model-title">
-                  <button type="button" className="text-small font-semibold text-primary hover:underline" onClick={() => setStep(selectedProduct ? "search" : "create")}>← Cambiar producto</button>
+                  <button type="button" className="text-small font-semibold text-link hover:underline" onClick={() => setStep(selectedProduct ? "search" : "create")}>← Cambiar producto</button>
                   <div className="mt-4 rounded-md bg-primary-soft/50 p-4">
-                    <p className="text-xs font-semibold text-primary">{selectedProduct ? "Producto encontrado" : "Producto nuevo"}</p>
+                    <p className="text-xs font-semibold text-link">{selectedProduct ? "Producto encontrado" : "Producto nuevo"}</p>
                     <p className="mt-1 font-semibold text-navy">{modelSummary}</p>
                     <p className="mt-1 text-small text-muted-foreground">
                       {selectedProduct
@@ -939,7 +828,7 @@ function QuickAddDialog({
                     <div className="sm:col-span-2">
                       <div className="flex items-center justify-between gap-3">
                         <Label htmlFor="quick-box">Caja</Label>
-                        {boxMode === "new" && boxes.length > 0 ? <button type="button" className="text-small font-semibold text-primary hover:underline" onClick={() => { setBoxMode("existing"); setBoxId(boxes[0]?.id ?? ""); }}>Seleccionar existente</button> : null}
+                        {boxMode === "new" && boxes.length > 0 ? <button type="button" className="text-small font-semibold text-link hover:underline" onClick={() => { setBoxMode("existing"); setBoxId(boxes[0]?.id ?? ""); }}>Seleccionar existente</button> : null}
                       </div>
                       {boxMode === "existing" ? (
                         <>
@@ -990,7 +879,7 @@ function QuickAddDialog({
 
             <footer className="relative z-10 shrink-0 border-t border-border bg-card px-5 py-4 sm:px-7">
               {step === "create" ? (
-                <div className="flex justify-end"><Button type="button" onClick={continueNewProduct}>Continuar con ubicación</Button></div>
+                <div className="flex justify-end"><Button type="button" disabled={photosValidating} onClick={continueNewProduct}>Continuar con ubicación</Button></div>
               ) : null}
               {step === "place" ? (
                 <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
