@@ -4,11 +4,13 @@ import type { Database } from "@/db/connection";
 import { inventoryItems, locations, products } from "@/db/schema";
 import { buildLocationBreadcrumb, createLocationBreadcrumbResolver } from "@/features/locations/domain/location-hierarchy";
 import { productSearchCondition, searchPattern } from "@/features/products/data/product-search";
+import { createInventoryPlacementResolver } from "@/features/inventory/domain/inventory-placement";
 import type { InventoryListQuery } from "@/validators/admin-query";
 
 export async function listAdminInventory(db: Database, query: InventoryListQuery) {
   // Reuse the bounded hierarchy read already needed for breadcrumbs; inventory rows stay SQL-filtered.
-  const locationNodes = await db.select({ id: locations.id, name: locations.name, code: locations.code, parentId: locations.parentId }).from(locations);
+  const locationNodes = await db.select({ id: locations.id, name: locations.name, code: locations.code, parentId: locations.parentId, type: locations.type }).from(locations);
+  const placement = createInventoryPlacementResolver(locationNodes);
   const breadcrumb = createLocationBreadcrumbResolver(locationNodes);
   const codePath = createLocationBreadcrumbResolver(locationNodes.map((location) => ({ ...location, name: location.code })));
   const conditions: SQL[] = [isNull(products.deletedAt)];
@@ -72,6 +74,7 @@ export async function listAdminInventory(db: Database, query: InventoryListQuery
 
   const rowsWithBreadcrumb = rows.map((row) => ({
     ...row,
+    placement: placement(row.locationId, row.legacyBagNumber),
     locationBreadcrumb: row.locationId
       ? breadcrumb(row.locationId)
       : null,

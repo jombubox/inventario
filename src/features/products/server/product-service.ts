@@ -262,6 +262,7 @@ function productSnapshot(product: {
   title: string;
   description: string | null;
   salePrice: string | null;
+  condition: "NEW" | "USED" | null;
   currency: string;
   status: string;
   isPublic: boolean;
@@ -276,6 +277,7 @@ function productSnapshot(product: {
     title: product.title,
     description: product.description,
     salePrice: product.salePrice,
+    condition: product.condition,
     currency: product.currency,
     status: product.status,
     isPublic: product.isPublic,
@@ -345,6 +347,7 @@ export async function createProductInTransaction(
       title,
       description: input.description,
       salePrice: input.salePrice,
+      condition: input.condition ?? null,
       currency: input.currency,
       status: input.status,
       isPublic,
@@ -435,6 +438,7 @@ export async function updateProduct(
         title: input.title ?? generatedTitle,
         description: input.description,
         salePrice: input.salePrice,
+        condition: input.condition,
         currency: input.currency,
         status: input.status,
         isPublic: isProductPublic(input),

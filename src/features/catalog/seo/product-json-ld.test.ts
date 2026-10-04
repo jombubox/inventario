@@ -15,6 +15,7 @@ const product: PublicProductDetailDTO = {
   partNumber: "BN94",
   description: "Tarjeta <principal>",
   salePrice: "1200.00",
+  condition: null,
   currency: "MXN",
   primaryImage: null,
   availability: { key: "LOW_STOCK", label: "Pocas piezas" },
@@ -40,4 +41,3 @@ describe("product structured data", () => {
     expect(serializeJsonLd(buildProductJsonLd(product))).toContain("\\u003cprincipal>");
   });
 });
-

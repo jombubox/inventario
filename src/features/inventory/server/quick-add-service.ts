@@ -55,6 +55,7 @@ async function resolveProduct(
       title: input.title,
       description: null,
       salePrice: input.salePrice,
+      condition: input.condition ?? "NEW",
       currency: input.currency,
       status: input.status,
       isPublic: input.isPublic,

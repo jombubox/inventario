@@ -23,6 +23,7 @@ import { usePhotoUploads } from "@/features/images/components/use-photo-uploads"
 import { UNPARENTED_BOXES_LOCATION_ID } from "@/features/locations/domain/quick-add-location";
 import { QuickAddLocationEditor } from "@/features/locations/components/quick-add-location-editor";
 import { productPublicationFields } from "@/validators/admin-product";
+import { productConditionLabels, type ProductCondition } from "@/features/products/domain/product-condition";
 import { CUSTOM_CATALOG_VALUE } from "@/features/products/domain/catalog-selection";
 import {
   CompatibleModelsField,
@@ -350,6 +351,7 @@ function QuickAddDialog({
   const [compatibilities, setCompatibilities] = useState<CompatibilityValue[]>([]);
   const [title, setTitle] = useState("");
   const [salePrice, setSalePrice] = useState("");
+  const [condition, setCondition] = useState<ProductCondition>("NEW");
   const [status, setStatus] = useState<"ACTIVE" | "DRAFT" | "ARCHIVED">("ACTIVE");
   const [isPublic, setIsPublic] = useState(true);
   const [photos, setPhotos] = useState<File[]>([]);
@@ -571,6 +573,7 @@ function QuickAddDialog({
         <input type="hidden" name="compatibilities" value={JSON.stringify(compatibilities)} />
         <input type="hidden" name="title" value={title} />
         <input type="hidden" name="salePrice" value={salePrice} />
+        <input type="hidden" name="condition" value={condition} />
         <input type="hidden" name="status" value={status} />
         <input type="hidden" name="isPublic" value={String(isPublic)} />
         <input type="hidden" name="locationId" value={resolvedLocationId} />
@@ -773,6 +776,11 @@ function QuickAddDialog({
                       <div className="mt-2 flex items-center gap-3"><Input id="quick-sale-price" inputMode="decimal" value={salePrice} onChange={(event) => setSalePrice(event.target.value)} placeholder="1250.00" aria-describedby="quick-price-help" /><span className="font-semibold">MXN</span></div>
                       <p id="quick-price-help" className="mt-1 text-xs text-muted-foreground">Hasta dos decimales, sin comas. Si lo dejas vacío, se mostrará «Consultar precio».</p>
                       <FieldError errors={state.fieldErrors?.salePrice} />
+                    </div>
+                    <div>
+                      <Label htmlFor="quick-condition">Condición</Label>
+                      <Select id="quick-condition" value={condition} onChange={(event) => setCondition(event.target.value as ProductCondition)} className="mt-2" aria-invalid={Boolean(state.fieldErrors?.condition)}>{Object.entries(productConditionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select>
+                      <FieldError errors={state.fieldErrors?.condition} />
                     </div>
                     <div>
                       <Label htmlFor="quick-status">Estado</Label><Select id="quick-status" value={status} onChange={(event) => setStatus(event.target.value as typeof status)} className="mt-2"><option value="ACTIVE">Activo</option><option value="DRAFT">Borrador</option><option value="ARCHIVED">Archivado</option></Select>

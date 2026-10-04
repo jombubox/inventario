@@ -1,0 +1,2 @@
+ALTER TABLE "products" ADD COLUMN "condition" text;--> statement-breakpoint
+ALTER TABLE "products" ADD CONSTRAINT "products_condition_values" CHECK ("products"."condition" is null or "products"."condition" in ('NEW', 'USED'));

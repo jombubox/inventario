@@ -24,6 +24,7 @@ import {
 } from "@/features/catalog/seo/product-json-ld";
 import { absoluteSiteUrl } from "@/lib/site-url";
 import { publicProductPath } from "@/features/products/domain/public-product";
+import { formatProductCondition } from "@/features/products/domain/product-condition";
 
 export const dynamic = "force-dynamic";
 
@@ -150,6 +151,10 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 <dd className="mt-1 text-lg font-semibold text-navy">
                   {formatPublicPrice(product.salePrice, product.currency)}
                 </dd>
+              </div>
+              <div className="col-span-2 border-t border-border pt-3">
+                <dt className="text-label uppercase tracking-wide text-muted-foreground">Condición</dt>
+                <dd className="mt-1 font-semibold text-navy">{formatProductCondition(product.condition)}</dd>
               </div>
             </dl>
 

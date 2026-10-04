@@ -140,7 +140,7 @@ export const modelSearchQuerySchema = z.object({
   q: requiredDisplayText.pipe(z.string().min(2).max(100)),
 });
 
-export type QuickAddInventoryMutationInput = z.infer<
-  typeof quickAddInventoryMutationSchema
->;
+export type QuickAddInventoryMutationInput = Omit<z.infer<typeof quickAddInventoryMutationSchema>, "condition"> & {
+  condition?: "NEW" | "USED";
+};
 export type DeleteBoxMutationInput = z.infer<typeof deleteBoxMutationSchema>;

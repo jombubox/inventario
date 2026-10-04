@@ -50,6 +50,7 @@ function productFields(formData: FormData) {
     title: formData.get("title"),
     description: formData.get("description"),
     salePrice: formData.get("salePrice"),
+    condition: formData.get("condition") ?? undefined,
     currency: formData.get("currency") ?? "MXN",
     status: formData.get("status"),
     isPublic: formData.get("isPublic") === "on",

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { CUSTOM_CATALOG_VALUE } from "@/features/products/domain/catalog-selection";
-import { createProductMutationSchema } from "@/validators/admin-product";
+import { createProductMutationSchema, updateProductMutationSchema } from "@/validators/admin-product";
+import { formatProductCondition } from "@/features/products/domain/product-condition";
 
 const catalogId = "10000000-0000-4000-8000-000000000001";
 const baseInput = {
@@ -16,6 +17,23 @@ const baseInput = {
   isPublic: false,
   compatibilities: [],
 };
+
+describe("product condition", () => {
+  it("defaults new products to Nuevo and accepts Usado", () => {
+    expect(createProductMutationSchema.parse(baseInput).condition).toBe("NEW");
+    expect(createProductMutationSchema.parse({ ...baseInput, condition: "USED" }).condition).toBe("USED");
+  });
+  it.each(["ACTIVE", "AVAILABLE", "USED_GOOD", "custom", null, ""])("rejects condition %s during creation", condition => {
+    expect(createProductMutationSchema.safeParse({ ...baseInput, condition }).success).toBe(false);
+  });
+  it("supports edits and keeps unclassified older products unclassified", () => {
+    const edit = { ...baseInput, id: catalogId, expectedUpdatedAt: new Date() };
+    expect(updateProductMutationSchema.parse({ ...edit, condition: "USED" }).condition).toBe("USED");
+    expect(updateProductMutationSchema.parse({ ...edit, condition: "" }).condition).toBeNull();
+    expect(updateProductMutationSchema.parse(edit).condition).toBeUndefined();
+    expect(formatProductCondition(null)).toBe("Sin especificar");
+  });
+});
 
 describe("product custom catalog validation", () => {
   it("keeps existing catalog selections compatible", () => {

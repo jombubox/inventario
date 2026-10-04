@@ -58,7 +58,7 @@ export function CreateInventoryForm({ products, locations }: { products: Product
   );
 }
 
-type InventoryRowValue = {
+export type InventoryRowValue = {
   id: string;
   quantity: number;
   condition: (typeof conditionOptions)[number][0];
@@ -81,7 +81,17 @@ export function InventoryRowActions({ item, locations }: { item: InventoryRowVal
   const [outState, outAction] = useActionState(stockMovementAction, initialMutationState);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2">
+      <form action={detailsAction} className="sm:col-span-2 space-y-3 rounded-md bg-muted/45 p-4">
+        <input type="hidden" name="id" value={item.id} /><input type="hidden" name="expectedUpdatedAt" value={item.updatedAt} /><h3 className="font-semibold text-navy">Datos físicos</h3>
+        <div><Label htmlFor={`condition-${item.id}`}>Condición</Label><Select id={`condition-${item.id}`} name="condition" defaultValue={item.condition} className="mt-2">{conditionOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></div>
+        <div className="grid grid-cols-2 gap-3"><div><Label htmlFor={`acquired-${item.id}`}>Adquisición</Label><Input id={`acquired-${item.id}`} name="acquiredAt" type="date" defaultValue={item.acquiredAt ?? ""} className="mt-2" /></div><div><Label htmlFor={`cost-${item.id}`}>Costo</Label><Input id={`cost-${item.id}`} name="purchaseCost" defaultValue={item.purchaseCost ?? ""} className="mt-2" /></div></div>
+        <div><Label htmlFor={`source-${item.id}`}>Origen</Label><Input id={`source-${item.id}`} name="acquisitionSource" defaultValue={item.acquisitionSource ?? ""} className="mt-2" /></div>
+        <div className="grid grid-cols-2 gap-3"><div><Label htmlFor={`bag-${item.id}`}>N° Bolsa</Label><Input id={`bag-${item.id}`} name="legacyBagNumber" defaultValue={item.legacyBagNumber ?? ""} className="mt-2" /></div><div><Label htmlFor={`legacy-${item.id}`}>Código legacy</Label><Input id={`legacy-${item.id}`} name="legacyLocationCode" defaultValue={item.legacyLocationCode ?? ""} className="mt-2" /></div></div>
+        <div><Label htmlFor={`notes-${item.id}`}>Notas</Label><Textarea id={`notes-${item.id}`} name="notes" defaultValue={item.notes ?? ""} rows={2} className="mt-2" /></div>
+        <FormFeedback state={detailsState} /><SubmitButton size="sm" pendingLabel="Actualizando…">Actualizar datos</SubmitButton>
+      </form>
+
       <form action={inAction} className="space-y-3 rounded-md bg-muted/45 p-4">
         <input type="hidden" name="id" value={item.id} /><h3 className="font-semibold text-navy">Entrada o devolución</h3>
         <div className="grid grid-cols-2 gap-3"><div><Label htmlFor={`in-type-${item.id}`}>Operación</Label><Select id={`in-type-${item.id}`} name="type" className="mt-2"><option value="IN">Entrada</option><option value="RETURN">Devolución</option></Select></div><div><Label htmlFor={`in-quantity-${item.id}`}>Cantidad</Label><Input id={`in-quantity-${item.id}`} name="quantity" type="number" min="1" step="1" defaultValue="1" className="mt-2" /></div></div>
@@ -111,15 +121,7 @@ export function InventoryRowActions({ item, locations }: { item: InventoryRowVal
         <FormFeedback state={adjustState} /><SubmitButton size="sm" pendingLabel="Ajustando…">Registrar ajuste</SubmitButton>
       </form>
 
-      <form action={detailsAction} className="space-y-3 rounded-md bg-muted/45 p-4">
-        <input type="hidden" name="id" value={item.id} /><input type="hidden" name="expectedUpdatedAt" value={item.updatedAt} /><h3 className="font-semibold text-navy">Datos físicos</h3>
-        <div><Label htmlFor={`condition-${item.id}`}>Condición</Label><Select id={`condition-${item.id}`} name="condition" defaultValue={item.condition} className="mt-2">{conditionOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></div>
-        <div className="grid grid-cols-2 gap-3"><div><Label htmlFor={`acquired-${item.id}`}>Adquisición</Label><Input id={`acquired-${item.id}`} name="acquiredAt" type="date" defaultValue={item.acquiredAt ?? ""} className="mt-2" /></div><div><Label htmlFor={`cost-${item.id}`}>Costo</Label><Input id={`cost-${item.id}`} name="purchaseCost" defaultValue={item.purchaseCost ?? ""} className="mt-2" /></div></div>
-        <div><Label htmlFor={`source-${item.id}`}>Origen</Label><Input id={`source-${item.id}`} name="acquisitionSource" defaultValue={item.acquisitionSource ?? ""} className="mt-2" /></div>
-        <div className="grid grid-cols-2 gap-3"><div><Label htmlFor={`bag-${item.id}`}>N° Bolsa</Label><Input id={`bag-${item.id}`} name="legacyBagNumber" defaultValue={item.legacyBagNumber ?? ""} className="mt-2" /></div><div><Label htmlFor={`legacy-${item.id}`}>Código legacy</Label><Input id={`legacy-${item.id}`} name="legacyLocationCode" defaultValue={item.legacyLocationCode ?? ""} className="mt-2" /></div></div>
-        <div><Label htmlFor={`notes-${item.id}`}>Notas</Label><Textarea id={`notes-${item.id}`} name="notes" defaultValue={item.notes ?? ""} rows={2} className="mt-2" /></div>
-        <FormFeedback state={detailsState} /><SubmitButton size="sm" pendingLabel="Actualizando…">Actualizar datos</SubmitButton>
-      </form>
+
     </div>
   );
 }

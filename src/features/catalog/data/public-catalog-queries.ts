@@ -76,6 +76,7 @@ export type PublicProductDetailDTO = Omit<
   PublicProductCardDTO,
   "compatibilityPreview" | "compatibilityCount"
 > & {
+  condition: "NEW" | "USED" | null;
   description: string | null;
   images: PublicProductImageDTO[];
   compatibilities: PublicCompatibilityDTO[];
@@ -420,6 +421,7 @@ export async function getPublicProductBySlug(
     .select({
       ...cardSelection(stock),
       description: products.description,
+      condition: products.condition,
       updatedAt: products.updatedAt,
     })
     .from(products)
@@ -457,6 +459,7 @@ export async function getPublicProductBySlug(
   return {
     ...card,
     description: row.description,
+    condition: row.condition,
     images: imageRows.flatMap((image) =>
       image.storageKey
         ? [{ url: getR2PublicUrl(image.storageKey), alt: image.alt?.trim() || row.title }]

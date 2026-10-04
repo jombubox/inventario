@@ -50,6 +50,13 @@
       "when": 1790756753777,
       "tag": "0006_eminent_lilith",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791093055726,
+      "tag": "0007_shiny_sunfire",
+      "breakpoints": true
     }
   ]
 }

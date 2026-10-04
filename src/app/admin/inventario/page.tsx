@@ -9,12 +9,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { getDb } from "@/db";
 import { requireAdmin } from "@/features/auth/server/admin-auth";
-import { CreateInventoryForm, InventoryRowActions } from "@/features/inventory/components/inventory-forms";
+import { CreateInventoryForm } from "@/features/inventory/components/inventory-forms";
+import { InventoryEditor } from "@/features/inventory/components/inventory-editor";
 import {
   listAdminInventory,
   listInventoryFormOptions,
 } from "@/features/inventory/data/admin-inventory-queries";
-import { formatDateTime, formatInventoryCondition, formatInventoryStatus } from "@/lib/format";
+import { formatInventoryCondition, formatInventoryStatus } from "@/lib/format";
 import { inventoryListQuerySchema } from "@/validators/admin-query";
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -131,56 +132,35 @@ export default async function InventoryPage({
             <div className="divide-y divide-border">
               {rows.map((item) => (
                 <article key={item.id} className="p-4 sm:p-5">
-                  <div className="grid gap-3 md:grid-cols-[1fr_1.5fr_0.5fr_0.7fr_1.2fr] md:items-center">
-                    <div>
-                      <p className="font-mono text-xs font-bold text-link">
-                        {item.inventoryCode}
-                      </p>
-                      <p className="mt-1 text-small text-muted-foreground">
-                        {item.sku}
-                      </p>
+                  <div className="grid min-w-0 grid-cols-2 gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_auto_minmax(0,0.8fr)_minmax(0,1fr)_auto] lg:items-center">
+                    <div className="col-span-2 min-w-0 lg:col-span-1">
+                      <p className="break-words font-semibold text-navy">{item.productTitle}</p>
+                      <p className="mt-2 text-xs text-muted-foreground">SKU</p>
+                      <p data-inventory-sku className="mt-0.5 select-all break-all font-mono text-small font-semibold text-link">{item.sku}</p>
+                    </div>
+                    <div className="col-span-2 min-w-0 lg:col-span-1">
+                      <div className="flex flex-wrap gap-2 text-small font-semibold">
+                        <span className="break-words rounded-md bg-primary-soft px-2.5 py-1.5 text-primary-active">{item.placement.boxLabel}</span>
+                        <span className="break-words rounded-md bg-muted px-2.5 py-1.5 text-foreground">{item.placement.bagLabel}</span>
+                      </div>
                     </div>
                     <div>
-                      <p className="font-semibold text-navy">{item.productTitle}</p>
-                      <p className="mt-1 text-small text-muted-foreground">
-                        {item.legacyBagNumber
-                          ? item.legacyBagNumber
-                          : "Sin bolsa"}{" "}
-                        · {item.legacyLocationCode ?? "sin código legacy"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xl font-semibold text-navy">
-                        {item.quantity}
-                      </p>
+                      <p className="text-xl font-semibold text-navy">{item.quantity}</p>
                       <p className="text-xs text-muted-foreground">unidades</p>
                     </div>
-                    <div className="flex flex-col items-start gap-1">
-                      <Badge
-                        variant={item.status === "AVAILABLE" ? "success" : "neutral"}
-                      >
-                        {formatInventoryStatus(item.status)}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        {formatInventoryCondition(item.condition)}
-                      </span>
+                    <div className="flex flex-col items-start gap-1.5">
+                      <Badge variant={item.status === "AVAILABLE" ? "success" : "neutral"}>{formatInventoryStatus(item.status)}</Badge>
+                      <span className="text-xs text-muted-foreground">{formatInventoryCondition(item.condition)}</span>
                     </div>
-                    <div>
-                      <p className="text-small font-semibold text-navy">
-                        {item.locationBreadcrumb ?? "Sin ubicación"}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {formatDateTime(item.updatedAt)}
-                      </p>
+                    <div className="col-span-2 min-w-0 lg:col-span-1">
+                      <p className="text-xs text-muted-foreground">Ubicación</p>
+                      <p className="mt-1 break-words text-small text-navy">{item.placement.parentLocation}</p>
                     </div>
-                  </div>
-
-                  <details className="mt-4">
-                      <summary className="cursor-pointer rounded-lg bg-muted px-3 py-2 text-small font-semibold text-navy">
-                        Mover, ajustar o editar este registro
-                      </summary>
-                      <div className="mt-3">
-                        <InventoryRowActions
+                    <div className="col-span-2 lg:col-span-1">
+                        <InventoryEditor
+                          sku={item.sku}
+                          title={item.productTitle}
+                          inventoryCode={item.inventoryCode}
                           item={{
                             id: item.id,
                             quantity: item.quantity,
@@ -199,8 +179,8 @@ export default async function InventoryPage({
                           }}
                           locations={options.locations}
                         />
-                      </div>
-                  </details>
+                    </div>
+                  </div>
                 </article>
               ))}
             </div>

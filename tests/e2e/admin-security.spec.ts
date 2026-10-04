@@ -351,8 +351,8 @@ test("ADMIN completes product, stock, location, movement, image and publication"
 
   await page.goto("/admin/inventario?q=E2E-FULL-001");
   let item = page.locator("article").filter({ hasText: "E2E-FULL-001" }).first();
-  await item.getByText("Mover, ajustar o editar este registro", { exact: true }).click();
-  const adjustment = item.locator("form").filter({ hasText: "Ajustar cantidad" });
+  await item.getByRole("button", { name: /^Editar inventario/ }).click();
+  const adjustment = page.getByRole("dialog", { name: "Editar inventario" }).locator("form").filter({ hasText: "Ajustar cantidad" });
   await adjustment.getByLabel("Nueva cantidad").fill("3");
   await adjustment.getByLabel("Motivo").fill("Conteo físico E2E");
   await adjustment.getByRole("button", { name: "Registrar ajuste" }).click();
@@ -360,8 +360,8 @@ test("ADMIN completes product, stock, location, movement, image and publication"
 
   await page.goto("/admin/inventario?q=E2E-FULL-001");
   item = page.locator("article").filter({ hasText: "E2E-FULL-001" }).first();
-  await item.getByText("Mover, ajustar o editar este registro", { exact: true }).click();
-  const move = item.locator("form").filter({ hasText: "Mover ubicación" });
+  await item.getByRole("button", { name: /^Editar inventario/ }).click();
+  const move = page.getByRole("dialog", { name: "Editar inventario" }).locator("form").filter({ hasText: "Mover ubicación" });
   const locationOption = move.getByLabel("Destino").locator("option").filter({ hasText: "Ubicación integral E2E" });
   await move.getByLabel("Destino").selectOption((await locationOption.getAttribute("value"))!);
   await move.getByLabel("Motivo").fill("Asignación inicial E2E");

@@ -61,6 +61,7 @@ export async function quickAddInventoryAction(
     compatibilities: parseStringArray(formData.get("compatibilities")),
     title: formData.get("title"),
     salePrice: formData.get("salePrice") ?? "",
+    condition: formData.get("condition") ?? undefined,
     currency: "MXN",
     status: formData.get("status") ?? "ACTIVE",
     isPublic: formData.has("isPublic") ? formData.get("isPublic") === "true" : undefined,

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { productStatusValues } from "@/db/schema/enums";
 import { CUSTOM_CATALOG_VALUE } from "@/features/products/domain/catalog-selection";
+import { productConditionValues } from "@/features/products/domain/product-condition";
 import {
   currencyCode,
   moneyString,
@@ -20,6 +21,7 @@ export const compatibilityMutationSchema = z.object({
 });
 
 export const productPublicationFields = {
+  condition: z.enum(productConditionValues, { error: "Selecciona Nuevo o Usado." }).default("NEW"),
   salePrice: z.union([moneyString, z.literal(""), z.null()]).transform((value) => value || null),
   currency: currencyCode.default("MXN"),
   status: z.enum(productStatusValues),
@@ -89,6 +91,7 @@ export const updateProductMutationSchema = z
     id: z.uuid(),
     expectedUpdatedAt: z.coerce.date(),
     ...productFields,
+    condition: z.preprocess((value) => value === "" ? null : value, z.enum(productConditionValues).nullable().optional()),
   })
   .superRefine((value, context) => {
     validateCatalogSelections(value, context);
@@ -100,5 +103,8 @@ export const archiveProductMutationSchema = z.object({
   expectedUpdatedAt: z.coerce.date(),
 });
 
-export type CreateProductMutationInput = z.infer<typeof createProductMutationSchema>;
+// Older internal import callers can leave condition unclassified; UI schemas default new creations to NEW.
+export type CreateProductMutationInput = Omit<z.infer<typeof createProductMutationSchema>, "condition"> & {
+  condition?: "NEW" | "USED" | null;
+};
 export type UpdateProductMutationInput = z.infer<typeof updateProductMutationSchema>;

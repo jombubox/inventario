@@ -18,6 +18,7 @@ import {
 import { brands, componentTypes } from "@/db/schema/catalog";
 import { createdAtColumn, updatedAtColumn } from "@/db/schema/columns";
 import { productStatusEnum } from "@/db/schema/enums";
+import type { ProductCondition } from "@/features/products/domain/product-condition";
 
 export const products = pgTable(
   "products",
@@ -40,6 +41,7 @@ export const products = pgTable(
     description: text("description"),
     salePrice: numeric("sale_price", { precision: 12, scale: 2, mode: "string" }),
     currency: char("currency", { length: 3 }).default("MXN").notNull(),
+    condition: text("condition").$type<ProductCondition>(),
     status: productStatusEnum("status").default("DRAFT").notNull(),
     isPublic: boolean("is_public").default(false).notNull(),
     createdAt: createdAtColumn(),
@@ -72,6 +74,7 @@ export const products = pgTable(
     ),
     check("products_sale_price_non_negative", sql`${table.salePrice} is null or ${table.salePrice} >= 0`),
     check("products_currency_format", sql`${table.currency} ~ '^[A-Z]{3}$'`),
+    check("products_condition_values", sql`${table.condition} is null or ${table.condition} in ('NEW', 'USED')`),
   ],
 );
 

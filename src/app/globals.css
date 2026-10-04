@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+.hero-board-image { opacity: 0.16; }
+:root[data-theme="dark"] .hero-board-image { opacity: 0.28; }
+
 /* Keep the main product information together on narrow screens. */
 @media (max-width: 639px) {
   .products-table, .products-table tbody { display: block; }

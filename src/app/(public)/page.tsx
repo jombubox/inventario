@@ -4,6 +4,7 @@ import Link from "next/link";
 import { buttonStyles } from "@/components/ui/button";
 import { getDb } from "@/db";
 import { ProductCard } from "@/features/catalog/components/product-card";
+import { HeroBoardBackground } from "@/features/catalog/components/hero-board-background";
 import {
   getPublicBrands,
   getPublicComponentTypes,
@@ -43,6 +44,7 @@ export default async function HomePage() {
     <>
       <section className="relative isolate overflow-hidden border-b border-border bg-background">
         <div className="surface-grid pointer-events-none absolute inset-0 -z-10 opacity-60" />
+        <HeroBoardBackground />
         <div className="mx-auto grid w-full max-w-7xl gap-10 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)] lg:items-end lg:px-10 lg:py-24">
           <div className="max-w-3xl">
             <p className="text-label uppercase tracking-[0.16em] text-primary">

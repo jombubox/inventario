@@ -80,7 +80,7 @@ import {
 } from "@/features/shared/domain/service-errors";
 import { buildInventoryExport } from "@/features/exports/server/inventory-export";
 import { consumeOperationalRateLimit } from "@/features/security/server/rate-limit";
-import type { CreateProductMutationInput } from "@/validators/admin-product";
+import { createProductMutationSchema, type CreateProductMutationInput } from "@/validators/admin-product";
 import { quickAddInventoryMutationSchema } from "@/validators/quick-add-inventory";
 import { inventoryListQuerySchema, productListQuerySchema } from "@/validators/admin-query";
 import { listAdminInventory } from "@/features/inventory/data/admin-inventory-queries";
@@ -152,6 +152,32 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
       ...overrides,
     });
   }
+
+  it("persists product condition separately from inventory grading through Quick Add, edit and public reads", async () => {
+    const { brand, componentType } = await catalogIds();
+    const warehouse = await createLocation(db, { code: "COND-WH", name: "Almacén norte", type: "WAREHOUSE", parentId: null, active: true, notes: null });
+    const box = await createLocation(db, { code: "COND-BOX", name: "Caja 18", type: "BOX", parentId: warehouse.id, active: true, notes: null });
+    for (const condition of ["NEW", "USED"] as const) {
+      const input = quickAddInventoryMutationSchema.parse({ productMode: "new", brandId: brand.id, componentTypeId: componentType.id, partNumber: `COND-${condition}`, condition, compatibilities: [], locationId: warehouse.id, boxMode: "existing", boxId: box.id, bagLabel: "7", quantity: 2 });
+      const created = await quickAddInventory(db, input);
+      expect(created.product.condition).toBe(condition);
+      expect(created.item.condition).toBe("UNKNOWN");
+      expect(await getAdminProductDetail(db, created.product.id)).toMatchObject({ condition });
+      expect(await getPublicProductBySlug(db, created.product.slug)).toMatchObject({ condition });
+      await quickAddInventory(db, { ...input, productMode: "existing", productId: created.product.id, condition: condition === "NEW" ? "USED" : "NEW" });
+      expect((await nodeDb.query.products.findFirst({ where: eq(products.id, created.product.id) }))?.condition).toBe(condition);
+      const edited = await updateProduct(db, { ...createProductMutationSchema.parse({ ...input, title: created.product.title, description: null }), id: created.product.id, expectedUpdatedAt: created.product.updatedAt, condition: condition === "NEW" ? "USED" : "NEW" });
+      expect(edited.sku).toBe(created.product.sku);
+      expect((await getPublicProductBySlug(db, created.product.slug))?.condition).toBe(edited.condition);
+    }
+    const statements: string[] = [];
+    const logged = drizzle(pool, { schema, logger: { logQuery(query) { statements.push(query); } } }) as unknown as Database;
+    const listing = await listAdminInventory(logged, inventoryListQuerySchema.parse({}));
+    expect(statements).toHaveLength(3);
+    expect(listing.rows.every(row => row.placement.boxLabel === "Caja 18" && row.placement.bagLabel === "Bolsa 7" && row.placement.parentLocation === "Almacén norte")).toBe(true);
+    const legacy = await createTestProduct({ partNumber: "COND-LEGACY", condition: null });
+    expect((await getPublicProductBySlug(db, legacy.slug))?.condition).toBeNull();
+  });
 
   it("persists Quick Add publication fields through edit, catalog and bounded list queries", async () => {
     const { brand, componentType } = await catalogIds();
