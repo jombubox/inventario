@@ -131,6 +131,7 @@ export type CompatibleModelSearchResult = {
 export async function searchCompatibleModels(
   db: Database,
   rawQuery: string,
+  brandId?: string,
 ): Promise<CompatibleModelSearchResult[]> {
   const query = rawQuery.trim();
   const pattern = `%${query}%`;
@@ -149,6 +150,7 @@ export async function searchCompatibleModels(
     .where(
       and(
         eq(brands.active, true),
+        brandId ? eq(brands.id, brandId) : undefined,
         or(
           ilike(productCompatibilities.model, pattern),
           normalized

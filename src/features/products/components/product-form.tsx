@@ -79,6 +79,7 @@ export function ProductForm({
   const [compatibilities, setCompatibilities] = useState<CompatibilityValue[]>(
     product?.compatibilities ?? [],
   );
+  const [modelSaving, setModelSaving] = useState(false);
   const [manualTitle, setManualTitle] = useState(product?.title ?? "");
   const [titleOverridden, setTitleOverridden] = useState(Boolean(product));
 
@@ -213,6 +214,7 @@ export function ProductForm({
 
       <section className="rounded-md bg-card p-5 shadow-sm sm:p-6">
         <CompatibleModelsField
+          onBusyChange={setModelSaving}
           idPrefix="product"
           brands={brands}
           value={compatibilities}
@@ -236,7 +238,7 @@ export function ProductForm({
         <label className="flex min-h-11 items-center gap-3 self-end rounded-xl border border-border px-4 text-small font-semibold"><input type="checkbox" name="isPublic" defaultChecked={product?.isPublic ?? false} className="size-4 accent-primary" /> Visible en el catálogo público</label>
       </section>
 
-      <div className="flex justify-end"><SubmitButton pendingLabel={product ? "Actualizando…" : "Creando…"}>{product ? "Guardar cambios" : "Crear producto"}</SubmitButton></div>
+      <div className="flex justify-end"><SubmitButton disabled={modelSaving} pendingLabel={product ? "Actualizando…" : "Creando…"}>{product ? "Guardar cambios" : "Crear producto"}</SubmitButton></div>
     </form>
   );
 }

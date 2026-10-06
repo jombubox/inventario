@@ -20,7 +20,7 @@ import {
   normalizeComparableText,
   normalizeWhitespace,
 } from "@/features/shared/domain/text-normalization";
-import type { QuickAddInventoryMutationInput } from "@/validators/quick-add-inventory";
+import { quickAddInventoryMutationSchema, type QuickAddInventoryMutationInput } from "@/validators/quick-add-inventory";
 
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
@@ -32,7 +32,7 @@ async function resolveProduct(
     const [product] = await tx
       .select()
       .from(products)
-      .where(and(eq(products.id, input.productId!), sql`${products.deletedAt} is null`))
+      .where(and(eq(products.id, input.productId), sql`${products.deletedAt} is null`))
       .for("update")
       .limit(1);
     if (!product) throw new EntityNotFoundError("El producto seleccionado ya no existe.");
@@ -241,6 +241,8 @@ export async function quickAddInventory(
   db: Database,
   input: QuickAddInventoryMutationInput,
 ) {
+  // Also enforce the contract for service callers outside the Server Action.
+  input = quickAddInventoryMutationSchema.parse(input);
   return db.transaction(async (tx) => {
     const { product, created: productCreated } = await resolveProduct(tx, input);
     const { box, created: boxCreated } = await resolveBox(tx, input);
@@ -251,6 +253,9 @@ export async function quickAddInventory(
       box.id,
     );
 
+    const parent = box.parentId
+      ? await tx.query.locations.findFirst({ columns: { name: true }, where: eq(locations.id, box.parentId) })
+      : null;
     return {
       product,
       box,
@@ -258,6 +263,7 @@ export async function quickAddInventory(
       productCreated,
       boxCreated,
       inventoryCreated,
+      locationName: parent?.name ?? "Cajas sin ubicación padre",
     };
   });
 }

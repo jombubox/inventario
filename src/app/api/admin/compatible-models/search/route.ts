@@ -16,6 +16,7 @@ export async function GET(request: Request) {
     await requireAdmin(request.headers);
     const parsed = modelSearchQuerySchema.safeParse({
       q: new URL(request.url).searchParams.get("q"),
+      brandId: new URL(request.url).searchParams.get("brandId") ?? undefined,
     });
     if (!parsed.success) {
       return Response.json(
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
         { status: 400, headers: privateHeaders },
       );
     }
-    const results = await searchCompatibleModels(getDb(), parsed.data.q);
+    const results = await searchCompatibleModels(getDb(), parsed.data.q, parsed.data.brandId);
     return Response.json({ results }, { headers: privateHeaders });
   } catch (error) {
     if (error instanceof UnauthorizedError) {

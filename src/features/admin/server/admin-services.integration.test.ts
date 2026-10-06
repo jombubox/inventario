@@ -49,6 +49,7 @@ import {
   renameQuickAddLocation,
 } from "@/features/locations/server/location-service";
 import { quickAddInventory } from "@/features/inventory/server/quick-add-service";
+import { resolveCompatibleModel } from "@/features/products/server/compatible-model-service";
 import {
   listQuickAddOptions,
   searchCompatibleModels,
@@ -164,7 +165,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
       expect(created.item.condition).toBe("UNKNOWN");
       expect(await getAdminProductDetail(db, created.product.id)).toMatchObject({ condition });
       expect(await getPublicProductBySlug(db, created.product.slug)).toMatchObject({ condition });
-      await quickAddInventory(db, { ...input, productMode: "existing", productId: created.product.id, condition: condition === "NEW" ? "USED" : "NEW" });
+      await quickAddInventory(db, quickAddInventoryMutationSchema.parse({ ...input, productMode: "existing", productId: created.product.id, condition: condition === "NEW" ? "USED" : "NEW" }));
       expect((await nodeDb.query.products.findFirst({ where: eq(products.id, created.product.id) }))?.condition).toBe(condition);
       const edited = await updateProduct(db, { ...createProductMutationSchema.parse({ ...input, title: created.product.title, description: null }), id: created.product.id, expectedUpdatedAt: created.product.updatedAt, condition: condition === "NEW" ? "USED" : "NEW" });
       expect(edited.sku).toBe(created.product.sku);
@@ -177,6 +178,71 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     expect(listing.rows.every(row => row.placement.boxLabel === "Caja 18" && row.placement.bagLabel === "Bolsa 7" && row.placement.parentLocation === "Almacén norte")).toBe(true);
     const legacy = await createTestProduct({ partNumber: "COND-LEGACY", condition: null });
     expect((await getPublicProductBySlug(db, legacy.slug))?.condition).toBeNull();
+  });
+
+  it("adds inventory-only stock at the same and different boxes without rewriting any product metadata", async () => {
+    const product = await createTestProduct({ condition: "USED", primarySerialNumber: "MASTER-SERIAL", secondarySerialNumbers: ["MASTER-ALT"] });
+    const parent = await createLocation(db, { code: "REG-WH", name: "Almacén", type: "WAREHOUSE", parentId: null, active: true, notes: null });
+    const boxes = await Promise.all(["A", "B"].map(code => createLocation(db, { code: `REG-${code}`, name: `Caja ${code}`, type: "BOX", parentId: parent.id, active: true, notes: null })));
+    const input = { productMode: "existing", productId: product.id, locationId: parent.id, boxMode: "existing", boxId: boxes[0]!.id, bagLabel: "Bolsa 2", quantity: 5 };
+    const compatibilitiesBefore = await nodeDb.select().from(productCompatibilities).where(eq(productCompatibilities.productId, product.id));
+    const serialsBefore = await nodeDb.select().from(productSerialNumbers).where(eq(productSerialNumbers.productId, product.id));
+    const initial = await quickAddInventory(db, quickAddInventoryMutationSchema.parse(input));
+    const same = await quickAddInventory(db, quickAddInventoryMutationSchema.parse({ ...input, bagLabel: " bolsa   2 ", quantity: 3, salePrice: "bad", condition: "NEW", title: "Overwrite attempt", compatibilities: [] }));
+    const other = await quickAddInventory(db, quickAddInventoryMutationSchema.parse({ ...input, boxId: boxes[1]!.id, quantity: 3 }));
+    expect(same.item).toMatchObject({ id: initial.item.id, quantity: 8 });
+    expect(same).toMatchObject({ productCreated: false, inventoryCreated: false });
+    expect(other.item).toMatchObject({ locationId: boxes[1]!.id, quantity: 3 });
+    const stock = await nodeDb.select().from(inventoryItems).where(eq(inventoryItems.productId, product.id));
+    expect(stock).toHaveLength(2);
+    expect(stock.find(row => row.id === initial.item.id)?.quantity).toBe(8);
+    expect(await nodeDb.query.products.findFirst({ where: eq(products.id, product.id) })).toEqual(product);
+    expect(await nodeDb.select().from(products)).toHaveLength(1);
+    expect(await nodeDb.select().from(productCompatibilities).where(eq(productCompatibilities.productId, product.id))).toEqual(compatibilitiesBefore);
+    expect(await nodeDb.select().from(productSerialNumbers).where(eq(productSerialNumbers.productId, product.id))).toEqual(serialsBefore);
+    const movements = await nodeDb.select().from(inventoryMovements);
+    expect(movements.map(({ type, quantity }) => ({ type, quantity }))).toEqual(expect.arrayContaining([{ type: "INITIAL", quantity: 5 }, { type: "IN", quantity: 3 }, { type: "INITIAL", quantity: 3 }]));
+    expect(movements).toHaveLength(3);
+  });
+
+  it("revalidates deleted products, inactive parents, inactive boxes and mismatched box parents", async () => {
+    const product = await createTestProduct();
+    const parent = await createLocation(db, { code: "STALE-WH", name: "Almacén", type: "WAREHOUSE", parentId: null, active: true, notes: null });
+    const otherParent = await createLocation(db, { code: "STALE-OTHER", name: "Otro almacén", type: "WAREHOUSE", parentId: null, active: true, notes: null });
+    const box = await createLocation(db, { code: "STALE-BOX", name: "Caja", type: "BOX", parentId: parent.id, active: true, notes: null });
+    const input = quickAddInventoryMutationSchema.parse({ productMode: "existing", productId: product.id, locationId: parent.id, boxMode: "existing", boxId: box.id, quantity: 3 });
+    await expect(quickAddInventory(db, { ...input, locationId: otherParent.id })).rejects.toThrow();
+    await nodeDb.update(locations).set({ active: false }).where(eq(locations.id, parent.id));
+    await expect(quickAddInventory(db, input)).rejects.toThrow();
+    await nodeDb.update(locations).set({ active: true }).where(eq(locations.id, parent.id));
+    await nodeDb.update(locations).set({ active: false }).where(eq(locations.id, box.id));
+    await expect(quickAddInventory(db, input)).rejects.toThrow();
+    await nodeDb.update(locations).set({ active: true }).where(eq(locations.id, box.id));
+    await nodeDb.update(products).set({ deletedAt: new Date() }).where(eq(products.id, product.id));
+    await expect(quickAddInventory(db, input)).rejects.toThrow();
+    expect(await nodeDb.select().from(inventoryItems)).toHaveLength(0);
+    expect(await nodeDb.select().from(inventoryMovements)).toHaveLength(0);
+  });
+
+  it("resolves inline model drafts server-side, reuses normalized matches, and persists them only with the product", async () => {
+    const { brand, componentType } = await catalogIds();
+    const drafts = await Promise.all(["Samsung 75H78G", " SAMSUNG   75h78g "].map(model => resolveCompatibleModel(db, { brandId: brand.id, model })));
+    expect(drafts[0]?.compatibility).toMatchObject({ brandId: brand.id, model: "75H78G" });
+    expect(await nodeDb.select().from(productCompatibilities)).toHaveLength(0);
+    const parent = await createLocation(db, { code: "MODEL-WH", name: "Almacén", type: "WAREHOUSE", parentId: null, active: true, notes: null });
+    const input = quickAddInventoryMutationSchema.parse({ productMode: "new", brandId: brand.id, componentTypeId: componentType.id, partNumber: "MODEL-REG", compatibilities: [drafts[0]!.compatibility], salePrice: "1250.01", condition: "USED", locationId: parent.id, boxMode: "new", newBoxCode: "MODEL-BOX", newBoxName: "Caja", quantity: 3 });
+    const created = await quickAddInventory(db, input);
+    expect(created.product).toMatchObject({ salePrice: "1250.01", currency: "MXN", condition: "USED", status: "ACTIVE", isPublic: true });
+    expect(created.item.quantity).toBe(3);
+    expect(await nodeDb.select().from(inventoryMovements)).toHaveLength(1);
+    const equivalent = await resolveCompatibleModel(db, { brandId: brand.id, model: " SAMSUNG   75h78g " });
+    expect(equivalent).toMatchObject({ reused: true, compatibility: drafts[0]!.compatibility });
+    await expect(quickAddInventory(db, quickAddInventoryMutationSchema.parse({ ...input, partNumber: "MODEL-DUP", compatibilities: drafts.map(draft => draft.compatibility) }))).rejects.toThrow(/misma identidad/u);
+    expect(await nodeDb.select().from(products)).toHaveLength(1);
+    expect(await nodeDb.select().from(productCompatibilities)).toHaveLength(1);
+    expect(await searchCompatibleModels(db, "75h", brand.id)).toHaveLength(1);
+    await nodeDb.update(brands).set({ active: false }).where(eq(brands.id, brand.id));
+    await expect(resolveCompatibleModel(db, { brandId: brand.id, model: "75H78G" })).rejects.toThrow(/marca/u);
   });
 
   it("persists Quick Add publication fields through edit, catalog and bounded list queries", async () => {
@@ -1395,6 +1461,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     });
 
     const result = await quickAddInventory(db, {
+      condition: "NEW",
       salePrice: null, currency: "MXN", status: "ACTIVE" as const, isPublic: true,
       productMode: "new",
       productId: null,
@@ -1423,6 +1490,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     await expect(quickAddInventory(db, {
       salePrice: null, currency: "MXN", status: "ACTIVE" as const, isPublic: true,
       productMode: "new",
+      condition: "NEW",
       productId: null,
       brandId: brand.id,
       customBrandName: null,
@@ -1611,6 +1679,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
         componentTypeId: componentType.id,
         customComponentTypeName: null,
         partNumber: "QA-ROLLBACK-01",
+        condition: "NEW",
         primarySerialNumber: "QA-ROLLBACK-MAIN",
         secondarySerialNumbers: ["QA-ROLLBACK-ALT"],
         compatibilities: [],

@@ -356,6 +356,7 @@ function QuickAddDialog({
   const [isPublic, setIsPublic] = useState(true);
   const [photos, setPhotos] = useState<File[]>([]);
   const [photosValidating, setPhotosValidating] = useState(false);
+  const [modelSaving, setModelSaving] = useState(false);
   const { states: photoStates, uploadState, uploadError, retry: retryPhotos } = usePhotoUploads(
     photos, state.productId, state.status === "success" && !!state.productCreated,
   );
@@ -453,7 +454,7 @@ function QuickAddDialog({
   };
 
   const close = () => {
-    if (pending || photosValidating || locationSaving || photosBusy) return;
+    if (pending || photosValidating || modelSaving || locationSaving || photosBusy) return;
     dialogRef.current?.close();
     onClose();
   };
@@ -552,13 +553,14 @@ function QuickAddDialog({
       <form
         action={formAction}
         onSubmit={(event) => {
-          if (step !== "place" || pending || photosValidating || locationSaving || photosBusy || state.status === "success") event.preventDefault();
+          if (step !== "place" || pending || photosValidating || modelSaving || locationSaving || photosBusy || state.status === "success") event.preventDefault();
         }}
         className="flex h-full min-h-0 flex-col overflow-hidden bg-background sm:max-h-[92dvh] sm:rounded-md sm:shadow-lg"
         noValidate
       >
         <input type="hidden" name="productMode" value={productMode} />
         <input type="hidden" name="productId" value={selectedProduct?.id ?? ""} />
+        {productMode === "new" ? <>
         <input type="hidden" name="brandId" value={brandId} />
         <input type="hidden" name="customBrandName" value={customBrandName} />
         <input type="hidden" name="componentTypeId" value={componentTypeId} />
@@ -576,6 +578,7 @@ function QuickAddDialog({
         <input type="hidden" name="condition" value={condition} />
         <input type="hidden" name="status" value={status} />
         <input type="hidden" name="isPublic" value={String(isPublic)} />
+        </> : null}
         <input type="hidden" name="locationId" value={resolvedLocationId} />
         <input type="hidden" name="boxMode" value={boxMode} />
         <input type="hidden" name="boxId" value={resolvedBoxId} />
@@ -598,7 +601,7 @@ function QuickAddDialog({
             variant="ghost"
             size="icon"
             onClick={close}
-            disabled={pending || photosValidating || locationSaving || photosBusy}
+            disabled={pending || photosValidating || modelSaving || locationSaving || photosBusy}
             aria-label="Cerrar flujo"
             className="-mr-2 -mt-1"
           >
@@ -611,7 +614,7 @@ function QuickAddDialog({
             <div className="w-full max-w-lg text-center">
               <div className="mx-auto grid size-14 place-items-center rounded-full bg-success/10 text-2xl text-success" aria-hidden="true">✓</div>
               <h3 className="mt-5 text-h2 text-navy">
-                {uploadState === "uploading" ? "Subiendo fotos…" : state.productCreated ? "Producto agregado correctamente" : "Inventario actualizado"}
+                {uploadState === "uploading" ? "Subiendo fotos…" : state.productCreated ? "Producto agregado correctamente" : "Existencias agregadas correctamente"}
               </h3>
               <div className="mt-4"><FormFeedback state={state} /></div>
               {state.productCreated ? <p className="mt-3 text-small">{state.publicationPath ? "Publicación: visible en el catálogo público." : "Publicación: este producto no está visible en el catálogo público."}</p> : null}
@@ -708,7 +711,7 @@ function QuickAddDialog({
 
               {step === "create" ? (
                 <section aria-labelledby="create-model-title">
-                  <button type="button" className="text-small font-semibold text-link hover:underline" onClick={() => setStep("search")}>← Volver a buscar</button>
+                  <button type="button" disabled={modelSaving} className="text-small font-semibold text-link hover:underline" onClick={() => setStep("search")}>← Volver a buscar</button>
                   <h3 id="create-model-title" className="mt-4 text-h2 text-navy">Crear producto nuevo</h3>
                   <p className="mt-2 text-small text-muted-foreground">Completa los datos principales y agrega fotos sin salir de este flujo.</p>
                   {createError ? <p role="alert" className="mt-4 rounded-md bg-danger/5 p-3 text-small text-danger">{createError}</p> : null}
@@ -765,6 +768,7 @@ function QuickAddDialog({
                             : brandId
                         }
                         errors={state.fieldErrors?.compatibilities}
+                        onBusyChange={setModelSaving}
                       />
                     </div>
                     <div className="sm:col-span-2">
@@ -887,11 +891,11 @@ function QuickAddDialog({
 
             <footer className="relative z-10 shrink-0 border-t border-border bg-card px-5 py-4 sm:px-7">
               {step === "create" ? (
-                <div className="flex justify-end"><Button type="button" disabled={photosValidating} onClick={continueNewProduct}>Continuar con ubicación</Button></div>
+                <div className="flex justify-end"><Button type="button" disabled={photosValidating || modelSaving} onClick={continueNewProduct}>Continuar con ubicación</Button></div>
               ) : null}
               {step === "place" ? (
                 <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-xs text-muted-foreground">Producto + caja nueva + inventario se guardan juntos.</p>
+                  <p className="text-xs text-muted-foreground">{selectedProduct ? "Estas existencias se agregarán aquí; las existencias en otras ubicaciones se conservan." : "Producto + caja nueva + inventario se guardan juntos."}</p>
                   <Button type="submit" isLoading={pending} loadingLabel="Agregando…" disabled={locationSaving || locationEditor !== null || !resolvedLocationId || quantity < 1 || (boxMode === "existing" ? !resolvedBoxId : !newBoxCode.trim() || !newBoxName.trim())}>
                     {selectedProduct ? `Agregar ${Number.isFinite(quantity) && quantity > 0 ? quantity : ""} al inventario` : "Guardar producto"}
                   </Button>

@@ -33,7 +33,7 @@ describe("quickAddInventoryMutationSchema", () => {
     expect(quickAddInventoryMutationSchema.parse({ ...input, salePrice: "0.00", status: "DRAFT" })).toMatchObject({ salePrice: "0.00", status: "DRAFT" });
   });
   it.each(["-1", "NaN", "Infinity", "1e3", "1,250.00", "12.345", "10000000000.00", "--1", "12abc"])("rejects invalid price %s", (salePrice) => {
-    expect(quickAddInventoryMutationSchema.safeParse({ ...validExisting, salePrice }).success).toBe(false);
+    expect(quickAddInventoryMutationSchema.safeParse({ ...validExisting, productMode: "new", brandId: id, componentTypeId: secondId, partNumber: "TEST-PRICE", salePrice }).success).toBe(false);
   });
   it("accepts existing products with an existing box and optional bag", () => {
     expect(quickAddInventoryMutationSchema.parse(validExisting)).toMatchObject({
@@ -42,6 +42,13 @@ describe("quickAddInventoryMutationSchema", () => {
       quantity: 10,
     });
     expect(quickAddInventoryMutationSchema.parse({ ...validExisting, bagLabel: " Bolsa 4 " })).toMatchObject({ bagLabel: "Bolsa 4" });
+  });
+
+  it("accepts an inventory-only payload without any new-product fields", () => {
+    expect(quickAddInventoryMutationSchema.parse({
+      productMode: "existing", productId: id, locationId: secondId,
+      boxMode: "existing", boxId: thirdId, quantity: "3",
+    })).toMatchObject({ productMode: "existing", productId: id, quantity: 3 });
   });
 
   it.each(["Bolsa 1", "B-14", "A", "12", "Bolsa azul"])(
@@ -91,7 +98,7 @@ describe("quickAddInventoryMutationSchema", () => {
       compatibilities: [],
     });
     expect(result.success).toBe(false);
-    if (!result.success) expect(result.error.flatten().fieldErrors.partNumber).toBeTruthy();
+    if (!result.success) expect(result.error.flatten().fieldErrors).toHaveProperty("partNumber");
   });
 
   it.each([0, 1, 3])(
@@ -111,6 +118,7 @@ describe("quickAddInventoryMutationSchema", () => {
         partNumber: "PRODUCT-IDENTITY",
         compatibilities,
       });
+      if (parsed.productMode !== "new") throw new Error("Expected new product input");
       expect(parsed.compatibilities).toHaveLength(count);
       if (count > 0) expect(parsed.compatibilities[0]?.model).toBe("MODEL-1");
     },
@@ -126,6 +134,7 @@ describe("quickAddInventoryMutationSchema", () => {
       partNumber: "",
       compatibilities: [{ brandId: id, model: "MODEL-ONLY", notes: null }],
     });
+    if (parsed.productMode !== "new") throw new Error("Expected new product input");
     expect(parsed.partNumber).toBeNull();
     expect(parsed.compatibilities).toEqual([
       { brandId: id, model: "MODEL-ONLY", notes: null },
@@ -143,6 +152,7 @@ describe("quickAddInventoryMutationSchema", () => {
       primarySerialNumber: "  MAIN-1 ",
       secondarySerialNumbers: [" ALT-1 ", "   "],
     });
+    if (parsed.productMode !== "new") throw new Error("Expected new product input");
     expect(parsed.primarySerialNumber).toBe("MAIN-1");
     expect(parsed.secondarySerialNumbers).toEqual(["ALT-1"]);
   });

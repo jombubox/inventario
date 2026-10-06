@@ -85,10 +85,13 @@ export async function quickAddInventoryAction(
     revalidatePath("/admin/productos");
     revalidatePath("/admin/ubicaciones");
     revalidatePublicCatalog(result.product.slug);
-    const bag = parsed.data.bagLabel ? ` · ${parsed.data.bagLabel}` : "";
+    const bag = parsed.data.bagLabel ? ` · Bolsa: ${parsed.data.bagLabel}` : "";
+    const success = result.productCreated
+      ? "Producto agregado correctamente."
+      : "Existencias agregadas correctamente.";
     return {
       status: "success",
-      message: `${parsed.data.quantity} unidad(es) agregadas correctamente a ${result.box.name}${bag}.`,
+      message: `${success} ${parsed.data.quantity} unidad(es) agregadas correctamente a ${result.locationName ?? ""} · ${result.box.name}${bag}.`,
       productId: result.product.id,
       productCreated: result.productCreated,
       publicationPath: productPublicationPath(result.product),

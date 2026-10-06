@@ -11,7 +11,7 @@ import {
 
 const catalogSelection = z.union([z.uuid(), z.literal(CUSTOM_CATALOG_VALUE)]);
 
-export const quickAddInventoryMutationSchema = z
+const quickAddFieldsSchema = z
   .object({
     productMode: z.enum(["existing", "new"]),
     productId: z.preprocess(
@@ -53,19 +53,14 @@ export const quickAddInventoryMutationSchema = z
       .int("La cantidad debe ser un número entero.")
       .positive("La cantidad debe ser mayor que cero.")
       .max(1_000_000, "La cantidad es demasiado grande."),
-  })
+  });
+
+const newProductSchema = quickAddFieldsSchema
+  .extend({ productMode: z.literal("new") })
   .superRefine((value, context) => {
     if (value.productMode === "new") {
       validateProductSerialFields(value, context);
     }
-    if (value.productMode === "existing" && !value.productId) {
-      context.addIssue({
-        code: "custom",
-        path: ["productId"],
-        message: "Selecciona un producto existente.",
-      });
-    }
-
     if (value.productMode === "new") {
       if (!value.brandId) {
         context.addIssue({ code: "custom", path: ["brandId"], message: "Selecciona una marca." });
@@ -131,6 +126,28 @@ export const quickAddInventoryMutationSchema = z
     }
   });
 
+// Inventory entry never validates, defaults or forwards product master data.
+const inventoryEntrySchema = quickAddFieldsSchema.pick({
+  locationId: true, boxMode: true, boxId: true, newBoxCode: true,
+  newBoxName: true, bagLabel: true, quantity: true,
+});
+
+export const quickAddInventoryMutationSchema = z.discriminatedUnion("productMode", [
+  inventoryEntrySchema.extend({
+    productMode: z.literal("existing"),
+    productId: z.uuid("Selecciona un producto existente."),
+  }).superRefine((value, context) => {
+    if (value.boxMode === "existing" && !value.boxId) {
+      context.addIssue({ code: "custom", path: ["boxId"], message: "Selecciona una caja." });
+    }
+    if (value.boxMode === "new") {
+      if (!value.newBoxCode) context.addIssue({ code: "custom", path: ["newBoxCode"], message: "Escribe el código de la caja." });
+      if (!value.newBoxName) context.addIssue({ code: "custom", path: ["newBoxName"], message: "Escribe el nombre de la caja." });
+    }
+  }),
+  newProductSchema,
+]);
+
 export const deleteBoxMutationSchema = z.object({
   id: z.uuid(),
   expectedUpdatedAt: z.coerce.date(),
@@ -138,9 +155,8 @@ export const deleteBoxMutationSchema = z.object({
 
 export const modelSearchQuerySchema = z.object({
   q: requiredDisplayText.pipe(z.string().min(2).max(100)),
+  brandId: z.uuid().optional(),
 });
 
-export type QuickAddInventoryMutationInput = Omit<z.infer<typeof quickAddInventoryMutationSchema>, "condition"> & {
-  condition?: "NEW" | "USED";
-};
+export type QuickAddInventoryMutationInput = z.infer<typeof quickAddInventoryMutationSchema>;
 export type DeleteBoxMutationInput = z.infer<typeof deleteBoxMutationSchema>;

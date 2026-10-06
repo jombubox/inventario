@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useTransition,
 } from "react";
 
 import { FieldError } from "@/components/forms/form-feedback";
@@ -18,6 +19,8 @@ import { Spinner } from "@/components/ui/spinner";
 import type { CompatibleModelSearchResult } from "@/features/inventory/data/quick-add-queries";
 import { normalizeModel } from "@/features/products/domain/product-normalization";
 import { normalizeWhitespace } from "@/features/shared/domain/text-normalization";
+import { modelFromQuery } from "@/features/products/domain/compatible-model";
+import { addCompatibleModelInlineAction } from "@/features/products/server/compatible-model-actions";
 
 export type CompatibilityValue = {
   brandId: string;
@@ -31,14 +34,6 @@ function compatibilityKey(value: Pick<CompatibilityValue, "brandId" | "model">):
   return `${value.brandId}:${normalizeModel(value.model)}`;
 }
 
-function modelFromQuery(query: string, brandName: string): string {
-  const cleaned = normalizeWhitespace(query);
-  const prefix = `${normalizeWhitespace(brandName)} `;
-  return cleaned.toLocaleUpperCase("es-MX").startsWith(prefix.toLocaleUpperCase("es-MX"))
-    ? cleaned.slice(prefix.length).trim()
-    : cleaned;
-}
-
 export function CompatibleModelsField({
   idPrefix,
   brands,
@@ -46,6 +41,7 @@ export function CompatibleModelsField({
   onChange,
   defaultBrandId,
   errors,
+  onBusyChange,
 }: {
   idPrefix: string;
   brands: BrandOption[];
@@ -53,18 +49,21 @@ export function CompatibleModelsField({
   onChange: (value: CompatibilityValue[]) => void;
   defaultBrandId: string;
   errors?: string[];
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const generatedId = useId();
   const listboxId = `${idPrefix}-${generatedId.replaceAll(":", "")}-results`;
   const inputRef = useRef<HTMLInputElement>(null);
-  const [brandId, setBrandId] = useState(
-    brands.some((brand) => brand.id === defaultBrandId)
-      ? defaultBrandId
-      : brands[0]?.id ?? "",
-  );
+  const [brandOverride, setBrandId] = useState<string | null>(null);
+  const brandId = brands.some((brand) => brand.id === (brandOverride ?? defaultBrandId))
+    ? brandOverride ?? defaultBrandId : brands[0]?.id ?? "";
+  const [saving, startTransition] = useTransition();
+  const [modelMessage, setModelMessage] = useState("");
+  useEffect(() => { onBusyChange?.(saving); }, [saving, onBusyChange]);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<CompatibleModelSearchResult[]>([]);
   const [searchedQuery, setSearchedQuery] = useState("");
+  const [searchedBrandId, setSearchedBrandId] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [expanded, setExpanded] = useState(false);
@@ -85,7 +84,7 @@ export function CompatibleModelsField({
           ? modelFromQuery(trimmed, selectedBrand.name)
           : trimmed;
         const response = await fetch(
-          `/api/admin/compatible-models/search?q=${encodeURIComponent(searchTerm)}`,
+          `/api/admin/compatible-models/search?q=${encodeURIComponent(searchTerm)}&brandId=${encodeURIComponent(brandId)}`,
           { signal: controller.signal, cache: "no-store" },
         );
         const body = (await response.json()) as {
@@ -97,6 +96,7 @@ export function CompatibleModelsField({
         }
         setResults(body.results ?? []);
         setSearchedQuery(trimmed);
+        setSearchedBrandId(brandId);
         setExpanded(true);
         setActiveIndex(0);
       } catch (error) {
@@ -122,12 +122,12 @@ export function CompatibleModelsField({
     [value],
   );
   const availableResults = useMemo(
-    () => results.filter(
+    () => (searchedQuery === query.trim() && searchedBrandId === brandId ? results : []).filter(
       (result) =>
         result.brandId === brandId &&
         !selectedKeys.has(compatibilityKey(result)),
     ),
-    [brandId, results, selectedKeys],
+    [brandId, results, selectedKeys, searchedQuery, searchedBrandId, query],
   );
   const selectedBrand = brands.find((brand) => brand.id === brandId);
   const candidateModel = selectedBrand ? modelFromQuery(query, selectedBrand.name) : "";
@@ -138,10 +138,12 @@ export function CompatibleModelsField({
   );
   const canCreate = Boolean(
     selectedBrand &&
-      candidateModel &&
+      normalizeModel(candidateModel) &&
       query.trim().length >= 2 &&
       searchedQuery === query.trim() &&
+      searchedBrandId === brandId &&
       !searching &&
+      !searchError && !saving &&
       !selectedKeys.has(compatibilityKey({ brandId, model: candidateModel })) &&
       !exactExisting,
   );
@@ -162,16 +164,25 @@ export function CompatibleModelsField({
   };
 
   const createCompatibility = () => {
-    if (!selectedBrand || !candidateModel) return;
-    if (exactExisting) {
-      selectCompatibility({
-        brandId: exactExisting.brandId,
-        model: exactExisting.model,
-        notes: null,
-      });
-      return;
-    }
-    selectCompatibility({ brandId, model: candidateModel, notes: null });
+    if (!selectedBrand || !candidateModel || saving) return;
+    setSearchError("");
+    setModelMessage("");
+    startTransition(async () => {
+      try {
+        const body = new FormData();
+        body.set("brandId", brandId);
+        body.set("model", candidateModel);
+        const result = await addCompatibleModelInlineAction(body);
+        if (result.status !== "success" || !result.compatibility) {
+          setSearchError(result.message ?? "No pudimos agregar el modelo.");
+          return;
+        }
+        selectCompatibility(result.compatibility);
+        setModelMessage(result.message ?? "Modelo agregado.");
+      } catch {
+        setSearchError("No pudimos agregar el modelo. Vuelve a intentarlo.");
+      }
+    });
   };
 
   const onSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -231,6 +242,7 @@ export function CompatibleModelsField({
                   type="button"
                   className="grid size-6 shrink-0 place-items-center rounded-full hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   aria-label={`Eliminar modelo compatible ${label}`}
+                  disabled={saving}
                   onClick={() =>
                     onChange(value.filter((entry) => compatibilityKey(entry) !== compatibilityKey(item)))
                   }
@@ -257,9 +269,10 @@ export function CompatibleModelsField({
             value={brandId}
             onChange={(event) => {
               setBrandId(event.target.value);
+              setSearchedQuery("");
               setActiveIndex(0);
             }}
-            disabled={brands.length === 0}
+            disabled={saving || brands.length === 0}
           >
             {brands.map((brand) => (
               <option key={brand.id} value={brand.id}>{brand.name}</option>
@@ -274,9 +287,16 @@ export function CompatibleModelsField({
             ref={inputRef}
             id={`${idPrefix}-compatible-model-search`}
             value={query}
+            disabled={saving}
             onChange={(event) => {
               const nextQuery = event.target.value;
               setQuery(nextQuery);
+              setSearchedQuery("");
+              setModelMessage("");
+              // A pasted brand + model carries explicit brand context.
+              const prefixedBrand = [...brands].sort((a, b) => b.name.length - a.name.length)
+                .find((brand) => modelFromQuery(nextQuery, brand.name) !== normalizeWhitespace(nextQuery));
+              if (prefixedBrand) setBrandId(prefixedBrand.id);
               const shouldSearch = nextQuery.trim().length >= 2;
               setExpanded(shouldSearch);
               if (!shouldSearch) {
@@ -340,7 +360,7 @@ export function CompatibleModelsField({
 
             {searchedQuery && !searching && availableResults.length === 0 ? (
               <p className="px-3 py-2 text-small text-muted-foreground">
-                {results.some((result) => result.brandId === brandId)
+                {selectedKeys.has(compatibilityKey({ brandId, model: candidateModel })) || results.some((result) => result.brandId === brandId)
                   ? "Los modelos encontrados ya están seleccionados."
                   : "No encontramos este modelo."}
               </p>
@@ -357,8 +377,10 @@ export function CompatibleModelsField({
                 className="mt-1 w-full justify-start"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={createCompatibility}
+                isLoading={saving}
+                loadingLabel="Agregando modelo…"
               >
-                + Agregar “{normalizeWhitespace(query)}”
+                + Agregar modelo “{selectedBrand?.name} {candidateModel}”
               </Button>
             ) : null}
           </div>
@@ -366,6 +388,7 @@ export function CompatibleModelsField({
       </div>
 
       {searchError ? <p role="alert" className="mt-2 text-small text-danger">{searchError}</p> : null}
+      {modelMessage ? <p role="status" className="mt-2 text-small text-success">{modelMessage}</p> : null}
       <FieldError errors={errors} />
     </div>
   );

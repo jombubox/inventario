@@ -51,4 +51,21 @@ describe("Quick Add publication action", () => {
     expect(await quickAddInventoryAction({ status: "idle" }, data)).toMatchObject({ status: "error", fieldErrors: { condition: expect.any(Array) } });
     expect(mocks.save).not.toHaveBeenCalled();
   });
+
+  it("adds existing stock without validating or forwarding stale product metadata", async () => {
+    const data = form();
+    data.set("productMode", "existing");
+    data.set("productId", "00000000-0000-4000-8000-000000000005");
+    data.set("salePrice", "-1");
+    data.set("condition", "invalid");
+    data.set("brandId", "stale-brand");
+    data.set("compatibilities", JSON.stringify([{ brandId: "stale", model: "old" }]));
+    mocks.save.mockResolvedValue({ product: { id: "existing", slug: "existing", status: "ACTIVE", isPublic: true }, productCreated: false, box: { name: "Caja A03" }, locationName: "Almacén" });
+    expect(await quickAddInventoryAction({ status: "idle" }, data)).toMatchObject({ status: "success", productCreated: false });
+    const payload = mocks.save.mock.calls[0]?.[1];
+    expect(payload).toMatchObject({ productMode: "existing", quantity: 5 });
+    for (const key of ["brandId", "salePrice", "condition", "compatibilities", "status", "isPublic", "primarySerialNumber"]) {
+      expect(payload).not.toHaveProperty(key);
+    }
+  });
 });
