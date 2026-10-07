@@ -86,7 +86,7 @@ async function loadCatalogContext(
     if (input.brandId === CUSTOM_CATALOG_VALUE) {
       throw new InvalidOperationError("Escribe el nombre de la nueva marca.");
     }
-    throw new EntityNotFoundError("Brand not found or inactive.");
+    throw new EntityNotFoundError("La marca ya no existe o está inactiva.");
   }
   if (!componentType) {
     if (input.componentTypeId === CUSTOM_CATALOG_VALUE) {
@@ -197,7 +197,7 @@ async function assertCompatibilityBrandsExist(
     .where(and(inArray(brands.id, uniqueIds), eq(brands.active, true)));
 
   if (rows.length !== uniqueIds.length) {
-    throw new EntityNotFoundError("One or more compatibility brands do not exist.");
+    throw new EntityNotFoundError("Una marca de los modelos compatibles ya no existe o está inactiva.");
   }
 }
 
@@ -262,6 +262,7 @@ function productSnapshot(product: {
   title: string;
   description: string | null;
   salePrice: string | null;
+  warranty: string | null;
   condition: "NEW" | "USED" | null;
   currency: string;
   status: string;
@@ -277,6 +278,7 @@ function productSnapshot(product: {
     title: product.title,
     description: product.description,
     salePrice: product.salePrice,
+    warranty: product.warranty,
     condition: product.condition,
     currency: product.currency,
     status: product.status,
@@ -347,6 +349,7 @@ export async function createProductInTransaction(
       title,
       description: input.description,
       salePrice: input.salePrice,
+      warranty: input.warranty ?? null,
       condition: input.condition ?? null,
       currency: input.currency,
       status: input.status,
@@ -438,6 +441,7 @@ export async function updateProduct(
         title: input.title ?? generatedTitle,
         description: input.description,
         salePrice: input.salePrice,
+        warranty: input.warranty,
         condition: input.condition,
         currency: input.currency,
         status: input.status,

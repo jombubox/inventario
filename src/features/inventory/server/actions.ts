@@ -27,6 +27,7 @@ import {
 } from "@/validators/admin-inventory";
 import { quickAddInventoryMutationSchema } from "@/validators/quick-add-inventory";
 import { productPublicationPath } from "@/features/products/domain/public-product";
+import { EntityNotFoundError } from "@/features/shared/domain/service-errors";
 
 export type QuickAddMutationState = MutationState & {
   productId?: string;
@@ -61,6 +62,7 @@ export async function quickAddInventoryAction(
     compatibilities: parseStringArray(formData.get("compatibilities")),
     title: formData.get("title"),
     salePrice: formData.get("salePrice") ?? "",
+    warranty: formData.get("warranty"),
     condition: formData.get("condition") ?? undefined,
     currency: "MXN",
     status: formData.get("status") ?? "ACTIVE",
@@ -97,6 +99,7 @@ export async function quickAddInventoryAction(
       publicationPath: productPublicationPath(result.product),
     };
   } catch (error) {
+    if (error instanceof EntityNotFoundError) return { status: "error", message: error.message };
     return errorState(error);
   }
 }

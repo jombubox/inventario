@@ -1,3 +1,4 @@
+import { goToQuickAddStep } from "./helpers/quick-add-wizard";
 import { expect, test, type Page } from "@playwright/test";
 import { Pool } from "pg";
 import { testImage } from "./helpers/test-image";
@@ -60,13 +61,18 @@ for (const section of ["productos", "inventario"]) {
 test("photo selection survives returning to the form without duplicates or revoked previews", async ({ page }, testInfo) => {
   await login(page);
   const dialog = await newProduct(page);
+  await goToQuickAddStep(dialog, 2);
   await dialog.getByLabel("Número de parte", { exact: true }).fill(`PHOTO-REG-${testInfo.project.name}`);
   const file = { name: "same-photo.png", mimeType: "image/png", buffer: testImage() };
+  await goToQuickAddStep(dialog, 4);
   await dialog.getByLabel(/Agregar fotos/).setInputFiles(file);
+  await goToQuickAddStep(dialog, 4);
   await dialog.getByLabel(/Agregar fotos/).setInputFiles(file);
+  await goToQuickAddStep(dialog, 4);
   await expect(dialog.getByRole("button", { name: "Eliminar foto: same-photo.png", exact: true })).toHaveCount(1);
-  await dialog.getByRole("button", { name: "Continuar con ubicación", exact: true }).click();
-  await dialog.getByRole("button", { name: "← Cambiar producto", exact: true }).click();
+  await goToQuickAddStep(dialog, 5);
+  await goToQuickAddStep(dialog, 2);
+  await goToQuickAddStep(dialog, 4);
   const livePreviews = await dialog.locator('[style*="blob:"]').evaluateAll(async elements => {
     return Promise.all(elements.map(async element => {
       const url = (element as HTMLElement).style.backgroundImage.match(/url\(["']?(.*?)["']?\)/)?.[1];
@@ -80,15 +86,17 @@ test("retry after a lost successful upload response does not duplicate a stored 
   test.setTimeout(120_000);
   await login(page);
   const dialog = await newProduct(page);
+  await goToQuickAddStep(dialog, 2);
   await dialog.getByLabel("Número de parte", { exact: true }).fill(`LOST-UPLOAD-${testInfo.project.name}`);
+  await goToQuickAddStep(dialog, 4);
   await dialog.getByLabel(/Agregar fotos/).setInputFiles({ name: "retained.png", mimeType: "image/png", buffer: testImage() });
   let first = true;
   await page.route("**/api/products/images/confirm", async route => {
     if (first) { first = false; await route.fetch(); await route.abort("failed"); }
     else await route.continue();
   });
-  await dialog.getByRole("button", { name: "Continuar con ubicación", exact: true }).click();
-  await dialog.getByRole("button", { name: "Guardar producto", exact: true }).click();
+  await goToQuickAddStep(dialog, 5);
+  await dialog.getByRole("button", { name: "Agregar producto", exact: true }).click();
   await expect(dialog.getByText("El producto y el inventario sí se guardaron.")).toBeVisible({ timeout: 30_000 });
   await dialog.getByRole("button", { name: /Reintentar.*(?:foto|subida)/ }).first().click();
   await expect(dialog.getByText("Las fotos se guardaron correctamente.")).toBeVisible({ timeout: 30_000 });
@@ -100,12 +108,16 @@ test("retry after a lost successful upload response does not duplicate a stored 
 test("a selected photo preview remains live after navigating back to creation", async ({ page }, testInfo) => {
   await login(page);
   const dialog = await newProduct(page);
+  await goToQuickAddStep(dialog, 2);
   await dialog.getByLabel("Número de parte", { exact: true }).fill(`PREVIEW-REG-${testInfo.project.name}`);
+  await goToQuickAddStep(dialog, 4);
   await dialog.getByLabel(/Agregar fotos/).setInputFiles({ name: "preview.png", mimeType: "image/png", buffer: testImage() });
+  await goToQuickAddStep(dialog, 2);
   await dialog.getByLabel("Número de parte", { exact: true }).press("Enter");
-  await expect(dialog.getByRole("heading", { name: "Crear producto nuevo" })).toBeVisible();
-  await dialog.getByRole("button", { name: "Continuar con ubicación", exact: true }).click();
-  await dialog.getByRole("button", { name: "← Cambiar producto", exact: true }).click();
+  await expect(dialog.getByRole("heading", { name: "Identificación del producto" })).toBeVisible();
+  await goToQuickAddStep(dialog, 5);
+  await goToQuickAddStep(dialog, 2);
+  await goToQuickAddStep(dialog, 4);
   const live = await dialog.locator('[style*="blob:"]').first().evaluate(async element => {
     const url = (element as HTMLElement).style.backgroundImage.match(/url\(["']?(.*?)["']?\)/)?.[1];
     return url ? new Promise<boolean>((resolve) => { const image = new Image(); image.onload = () => resolve(image.naturalWidth > 0); image.onerror = () => resolve(false); image.src = url; }) : false;
@@ -119,7 +131,9 @@ test("three selected images retain order and primary across Quick Add, edit and 
   await login(page);
   const dialog = await newProduct(page);
   const title = `Image order ${testInfo.project.name}`;
+  await goToQuickAddStep(dialog, 2);
   await dialog.getByLabel("Número de parte", { exact: true }).fill(`ORDER-${testInfo.project.name}`);
+  await goToQuickAddStep(dialog, 2);
   await dialog.getByLabel("Nombre del producto").fill(title);
   const formats = await page.evaluate(() => {
     const canvas = document.createElement("canvas"); canvas.width = 100; canvas.height = 80;
@@ -127,9 +141,12 @@ test("three selected images retain order and primary across Quick Add, edit and 
     return ["image/jpeg", "image/webp"].map((mimeType) => ({ mimeType, data: canvas.toDataURL(mimeType).split(",")[1]! }));
   });
   const limit = Buffer.alloc(10 * 1024 * 1024); testImage().copy(limit);
+  await goToQuickAddStep(dialog, 4);
   const photoInput = dialog.getByLabel(/Agregar fotos/);
   await photoInput.setInputFiles({ name: "limit.png", mimeType: "image/png", buffer: limit });
+  await goToQuickAddStep(dialog, 4);
   await expect(dialog.getByRole("button", { name: "Eliminar foto: limit.png" })).toBeVisible();
+  await goToQuickAddStep(dialog, 4);
   await dialog.getByRole("button", { name: "Eliminar foto: limit.png" }).click();
   await photoInput.setInputFiles({ name: "spoof.png", mimeType: "image/png", buffer: Buffer.from("invalid binary") });
   await expect(dialog.getByRole("alert")).toContainText("firma binaria");
@@ -139,11 +156,13 @@ test("three selected images retain order and primary across Quick Add, edit and 
     { name: "three.webp", mimeType: "image/webp", buffer: Buffer.from(formats[1]!.data, "base64") },
   ]);
   await expect(dialog.locator('[data-photo-state="selected"]')).toHaveCount(3);
+  await goToQuickAddStep(dialog, 4);
   await dialog.getByRole("button", { name: "Hacer foto principal: three.webp", exact: true }).click();
+  await goToQuickAddStep(dialog, 4);
   await dialog.getByRole("button", { name: "Mover foto a la derecha: one.png", exact: true }).click();
   await expect(dialog.locator('[data-photo-state]').first()).toContainText("three.webp");
-  await dialog.getByRole("button", { name: "Continuar con ubicación" }).click();
-  await dialog.getByRole("button", { name: "Guardar producto", exact: true }).click();
+  await goToQuickAddStep(dialog, 5);
+  await dialog.getByRole("button", { name: "Agregar producto", exact: true }).click();
   await expect(dialog.getByText("Las fotos se guardaron correctamente.")).toBeVisible({ timeout: 30_000 });
   await expect(dialog.locator('[data-photo-state="uploaded"]')).toHaveCount(3);
   const publicPath = (await dialog.getByRole("link", { name: "Ver publicación" }).getAttribute("href"))!;
@@ -263,10 +282,14 @@ test("theme tokens, persistence, admin surfaces and mobile layout match the pale
       await checkViewer(page, viewer, testInfo.project.name.startsWith("mobile"));
       await viewer.getByRole("button", { name: "Cerrar ventana" }).click();
       const dialog = await newProduct(page);
+      await goToQuickAddStep(dialog, 2);
       await dialog.getByLabel("Número de parte", { exact: true }).fill("VISUAL-ONLY");
+      await goToQuickAddStep(dialog, 2);
       await expect(dialog.getByLabel("Número de parte", { exact: true })).toHaveCSS("background-color", theme === "light" ? "rgb(248, 250, 251)" : "rgb(17, 21, 26)");
+      await goToQuickAddStep(dialog, 4);
       await dialog.getByLabel(/Agregar fotos/).setInputFiles([{ name: "first.png", mimeType: "image/png", buffer: testImage() }, { name: "second.png", mimeType: "image/png", buffer: testImage() }]);
       await expect(dialog.locator('[data-photo-state="selected"]')).toHaveCount(2);
+      await goToQuickAddStep(dialog, 4);
       await dialog.getByRole("button", { name: "Hacer foto principal: second.png" }).click();
       await dialog.locator('[data-photo-state]').first().scrollIntoViewIfNeeded();
       const output = testInfo.outputPath(`${size.width}-${theme}-quick-add-photos.png`);

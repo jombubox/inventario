@@ -1,3 +1,4 @@
+import { goToQuickAddStep } from "./helpers/quick-add-wizard";
 import { createHash, createHmac, randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 import { Pool } from "pg";
@@ -33,7 +34,9 @@ test("Quick Add sends 6 MiB and exact 10 MiB directly to R2; later photos surviv
   const dialog = page.getByRole("dialog", { name: "Agregar producto al inventario" });
   await dialog.getByRole("button", { name: "Agregar producto nuevo", exact: true }).click();
   const part = `DIRECT-${testInfo.project.name}`;
+  await goToQuickAddStep(dialog, 2);
   await dialog.getByLabel("Número de parte", { exact: true }).fill(part);
+  await goToQuickAddStep(dialog, 4);
   const picker = dialog.getByLabel(/Agregar fotos/);
   await picker.setInputFiles({ name: "too-big.png", mimeType: "image/png", buffer: image(10 * 1024 * 1024 + 1) });
   await expect(dialog.getByText("too-big.png supera el límite de 10 MB.", { exact: true })).toBeVisible();
@@ -57,9 +60,10 @@ test("Quick Add sends 6 MiB and exact 10 MiB directly to R2; later photos surviv
     if (route.request().method() === "PUT" && ++puts === 2) await route.fulfill({ status: 503 });
     else await route.continue();
   });
-  await dialog.getByRole("button", { name: "Continuar con ubicación", exact: true }).click();
+  await goToQuickAddStep(dialog, 5);
   expect(bodies).toHaveLength(0); // No authorization or upload before the creation transaction.
-  await dialog.getByRole("button", { name: "Guardar producto", exact: true }).click();
+  await goToQuickAddStep(dialog, 5);
+  await dialog.getByRole("button", { name: "Agregar producto", exact: true }).click();
   await expect(dialog.locator('[data-photo-state="uploading"]').getByRole("status")).toContainText("99%", { timeout: 30_000 });
   await expect(dialog.getByRole("button", { name: "Cerrar", exact: true })).toBeDisabled();
   releaseConfirmation();

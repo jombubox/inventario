@@ -1,3 +1,4 @@
+import { goToQuickAddStep } from "./helpers/quick-add-wizard";
 import { expect, test, type Page } from "@playwright/test";
 
 const credentials = {
@@ -52,8 +53,9 @@ test("quick add reuses an existing product, creates a product with multiple comp
   await expect(dialog.getByLabel("Buscar producto")).toBeFocused();
   await expect(dialog.getByRole("button", { name: "Agregar producto nuevo", exact: true })).toBeVisible();
   await dialog.getByRole("button", { name: "Agregar producto nuevo", exact: true }).click();
-  await expect(dialog.getByRole("heading", { name: "Crear producto nuevo" })).toBeVisible();
-  await expect(dialog.getByText("Modelos compatibles", { exact: true })).toBeVisible();
+  await expect(dialog.getByRole("heading", { name: "Marca y tipo de pieza" })).toBeVisible();
+  await expect(dialog.getByText("Paso 1 de 5", { exact: true })).toBeVisible();
+  await goToQuickAddStep(dialog, 1);
   await dialog.getByRole("button", { name: "← Volver a buscar" }).click();
   await dialog.getByLabel("Buscar producto").fill("EAY 123456");
   await expect(dialog.getByText("LG-PSU-EAY123456", { exact: false })).toBeVisible();
@@ -61,10 +63,14 @@ test("quick add reuses an existing product, creates a product with multiple comp
   await expect(dialog.getByText("Encontramos productos parecidos", { exact: true })).toBeVisible();
   await dialog.getByRole("button").filter({ hasText: "LG-PSU-EAY123456" }).click();
   await expect(dialog.getByText("Producto encontrado", { exact: true })).toBeVisible();
+  await goToQuickAddStep(dialog, 5);
   await expect(dialog.getByLabel("Ubicación")).toContainText("Almacén E2E");
+  await goToQuickAddStep(dialog, 5);
   await dialog.getByLabel("Ubicación").selectOption({ label: "Almacén E2E" });
+  await goToQuickAddStep(dialog, 5);
   await dialog.getByLabel("Bolsa (opcional)").fill(bagLabel);
-  await dialog.getByLabel("Cantidad").fill("3");
+  await goToQuickAddStep(dialog, 5);
+  await dialog.getByLabel(/^Cantidad(?: de piezas)?$/u).fill("3");
   const existingSubmit = dialog.getByRole("button", { name: "Agregar 3 al inventario" });
   await existingSubmit.click();
   await expect(dialog.getByText(/3 unidad\(es\) agregadas correctamente/u)).toBeVisible({ timeout: 20_000 });
@@ -77,26 +83,39 @@ test("quick add reuses an existing product, creates a product with multiple comp
   await adminNav.getByRole("button", { name: "Agregar producto" }).click();
   dialog = page.getByRole("dialog", { name: "Agregar producto al inventario" });
   await dialog.getByRole("button", { name: "Agregar producto nuevo", exact: true }).click();
+  await goToQuickAddStep(dialog, 2);
   await dialog.getByLabel("Número de parte").fill(newPartNumber);
+  await goToQuickAddStep(dialog, 2);
   await dialog.getByLabel("Número de serie principal (opcional)").fill(primarySerial);
+  await goToQuickAddStep(dialog, 1);
   await dialog.getByRole("button", { name: /Agregar nueva marca/u }).click();
   await dialog.getByLabel("Nueva marca").fill(inlineBrand);
+  await goToQuickAddStep(dialog, 1);
   await dialog.getByRole("button", { name: "Guardar marca" }).click();
   await expect(dialog.getByText("Se creó la marca.")).toBeVisible();
+  await goToQuickAddStep(dialog, 1);
   await dialog.getByRole("button", { name: /Agregar nueva marca/u }).click();
   await dialog.getByLabel("Nueva marca").fill(`  ${inlineBrand.toUpperCase()}  `);
+  await goToQuickAddStep(dialog, 1);
   await dialog.getByRole("button", { name: "Guardar marca" }).click();
   await expect(dialog.getByText("Esta marca ya existe; la seleccionamos.")).toBeVisible();
+  await goToQuickAddStep(dialog, 2);
   await expect(dialog.getByLabel("Número de parte")).toHaveValue(newPartNumber);
+  await goToQuickAddStep(dialog, 2);
   await expect(dialog.getByLabel("Número de serie principal (opcional)")).toHaveValue(primarySerial);
+  await goToQuickAddStep(dialog, 1);
   await dialog.getByRole("button", { name: /Agregar tipo de pieza/u }).click();
   await dialog.getByLabel("Nuevo tipo de pieza").fill(inlinePieceType);
+  await goToQuickAddStep(dialog, 1);
   await dialog.getByRole("button", { name: "Guardar tipo de pieza" }).click();
   await expect(dialog.getByText("Se creó el tipo de pieza.")).toBeVisible();
+  await goToQuickAddStep(dialog, 1);
   await dialog.getByRole("button", { name: /Agregar tipo de pieza/u }).click();
   await dialog.getByLabel("Nuevo tipo de pieza").fill(inlinePieceType.toLowerCase());
+  await goToQuickAddStep(dialog, 1);
   await dialog.getByRole("button", { name: "Guardar tipo de pieza" }).click();
   await expect(dialog.getByText("Este tipo de pieza ya existe; lo seleccionamos.")).toBeVisible();
+  await goToQuickAddStep(dialog, 2);
   const addSecondary = dialog.getByRole("button", {
     name: "Agregar número de serie secundario",
   });
@@ -105,18 +124,25 @@ test("quick add reuses an existing product, creates a product with multiple comp
   await addSecondary.click();
   await dialog.getByRole("textbox", { name: "Número de serie secundario 2", exact: true }).fill(secondarySerialTwo);
 
+  await goToQuickAddStep(dialog, 3);
   await dialog.getByLabel("Marca del modelo compatible").selectOption({ label: "Samsung" });
+  await goToQuickAddStep(dialog, 3);
   const compatibleSearch = dialog.getByLabel("Buscar modelo compatible");
   await compatibleSearch.fill("UN55NU7100");
+  await goToQuickAddStep(dialog, 3);
   await dialog.getByRole("option", { name: /Samsung UN55NU7100FXZX/u }).click();
   await compatibleSearch.fill("UN58NU7100");
+  await goToQuickAddStep(dialog, 3);
   await dialog.getByRole("option", { name: /Samsung UN58NU7100FXZX/u }).click();
   await compatibleSearch.fill(inlineCompatibleModel);
   await expect(dialog.getByText("No encontramos este modelo.", { exact: true })).toBeVisible();
+  await goToQuickAddStep(dialog, 3);
   await dialog.getByRole("option", { name: new RegExp(`Agregar.*${inlineCompatibleModel}`, "u") }).click();
+  await goToQuickAddStep(dialog, 3);
   const selectedModels = dialog.getByRole("list", { name: "Modelos compatibles seleccionados" });
   await expect(selectedModels.getByRole("listitem")).toHaveCount(3);
 
+  await goToQuickAddStep(dialog, 4);
   const photoInput = dialog.getByLabel(/Agregar fotos/u);
   await photoInput.setInputFiles({ name: "archivo.txt", mimeType: "text/plain", buffer: Buffer.from("no-image") });
   await expect(dialog.getByText(/no es una imagen JPEG, PNG o WEBP/u)).toBeVisible();
@@ -128,18 +154,21 @@ test("quick add reuses an existing product, creates a product with multiple comp
     { name: `reverso-${suffix}.webp`, mimeType: "image/webp", buffer: Buffer.from("UklGRiIAAABXRUJQVlA4ICAAAADQAQCdASoBAAEAAUAmJaQAA3AA/v89WAAAAA==", "base64") },
   ]);
   await expect(dialog.getByText("Foto principal", { exact: true })).toBeVisible();
+  await goToQuickAddStep(dialog, 4);
   await dialog.getByRole("button", { name: `Eliminar foto: quitar-${suffix}.jpg` }).click();
   await expect(dialog.getByRole("button", { name: `Eliminar foto: quitar-${suffix}.jpg` })).toHaveCount(0);
   await expect(dialog.getByText("Foto principal", { exact: true })).toBeVisible();
+  await goToQuickAddStep(dialog, 3);
   await dialog.getByRole("button", {
     name: "Eliminar modelo compatible Samsung UN55NU7100FXZX",
   }).click();
   await expect(selectedModels.getByRole("listitem")).toHaveCount(2);
   await compatibleSearch.fill("UN55NU7100");
+  await goToQuickAddStep(dialog, 3);
   await dialog.getByRole("option", { name: /Samsung UN55NU7100FXZX/u }).click();
   await expect(selectedModels.getByRole("listitem")).toHaveCount(3);
 
-  await dialog.getByRole("button", { name: "Continuar con ubicación" }).click();
+  await goToQuickAddStep(dialog, 5);
   await dialog.getByLabel("Ubicación").selectOption({
     label: `Almacén E2E sin cajas ${suffix}`,
   });
@@ -147,8 +176,10 @@ test("quick add reuses an existing product, creates a product with multiple comp
   await dialog.getByRole("button", { name: "Crear caja" }).click();
   await dialog.getByLabel("Código").fill(newBoxCode);
   await dialog.getByLabel("Nombre").fill(`Caja E2E ${suffix}`);
-  await dialog.getByLabel("Cantidad").fill("2");
-  await dialog.getByRole("button", { name: "Guardar producto" }).click();
+  await goToQuickAddStep(dialog, 5);
+  await dialog.getByLabel(/^Cantidad(?: de piezas)?$/u).fill("2");
+  await goToQuickAddStep(dialog, 5);
+  await dialog.getByRole("button", { name: "Agregar producto" }).click();
   await expect(dialog.getByText(/2 unidad\(es\) agregadas correctamente/u)).toBeVisible({ timeout: 20_000 });
   await expect(dialog.getByText("Las fotos se guardaron correctamente.", { exact: true })).toBeVisible({ timeout: 20_000 });
   await dialog.getByRole("button", { name: "Cerrar", exact: true }).click();
@@ -240,9 +271,12 @@ test("quick add is keyboard and mobile friendly", async ({ page }, testInfo) => 
   await dialog.getByLabel("Buscar producto").fill("EAY123456");
   await expect(dialog.getByText("LG-PSU-EAY123456", { exact: false })).toBeVisible();
   await dialog.getByRole("button").filter({ hasText: "LG-PSU-EAY123456" }).click();
+  await goToQuickAddStep(dialog, 5);
   await expect(dialog.getByLabel("Ubicación")).toBeVisible();
   await expect(dialog.getByLabel("Caja")).toBeVisible();
+  await goToQuickAddStep(dialog, 5);
   await expect(dialog.getByLabel("Bolsa (opcional)")).toBeVisible();
+  await goToQuickAddStep(dialog, 5);
   await expect(dialog.getByLabel("Cantidad")).toBeVisible();
   const overflow = await dialog.evaluate((element) => element.scrollWidth - element.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);

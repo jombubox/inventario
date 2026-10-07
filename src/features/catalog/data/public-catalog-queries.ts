@@ -78,6 +78,7 @@ export type PublicProductDetailDTO = Omit<
 > & {
   condition: "NEW" | "USED" | null;
   description: string | null;
+  warranty?: string | null;
   images: PublicProductImageDTO[];
   compatibilities: PublicCompatibilityDTO[];
   updatedAt: Date;
@@ -421,6 +422,7 @@ export async function getPublicProductBySlug(
     .select({
       ...cardSelection(stock),
       description: products.description,
+      warranty: products.warranty,
       condition: products.condition,
       updatedAt: products.updatedAt,
     })
@@ -459,6 +461,7 @@ export async function getPublicProductBySlug(
   return {
     ...card,
     description: row.description,
+    warranty: row.warranty,
     condition: row.condition,
     images: imageRows.flatMap((image) =>
       image.storageKey

@@ -156,6 +156,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 <dt className="text-label uppercase tracking-wide text-muted-foreground">Condición</dt>
                 <dd className="mt-1 font-semibold text-navy">{formatProductCondition(product.condition)}</dd>
               </div>
+              {product.warranty ? <div><dt className="text-small text-muted-foreground">Garantía</dt><dd className="mt-1 break-words font-semibold text-navy">{product.warranty}</dd></div> : null}
             </dl>
 
             <div className="mt-6">

@@ -21,6 +21,7 @@ export const compatibilityMutationSchema = z.object({
 });
 
 export const productPublicationFields = {
+  warranty: optionalDisplayText.pipe(z.string().max(240, "La garantía debe tener 240 caracteres o menos.").nullable().optional()),
   condition: z.enum(productConditionValues, { error: "Selecciona Nuevo o Usado." }).default("NEW"),
   salePrice: z.union([moneyString, z.literal(""), z.null()]).transform((value) => value || null),
   currency: currencyCode.default("MXN"),

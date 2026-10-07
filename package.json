@@ -12,7 +12,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:integration": "vitest run src/features/admin/server/admin-services.integration.test.ts src/features/catalog/data/public-catalog-queries.integration.test.ts src/db/product-condition-migration.integration.test.ts",
+    "test:integration": "vitest run src/features/admin/server/admin-services.integration.test.ts src/features/catalog/data/public-catalog-queries.integration.test.ts src/db/product-condition-migration.integration.test.ts src/db/product-warranty-migration.integration.test.ts",
     "test:e2e:seed": "tsx src/scripts/seed-catalog-e2e.ts",
     "test:e2e": "pnpm test:e2e:seed && playwright test",
     "test:watch": "vitest",

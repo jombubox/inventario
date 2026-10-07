@@ -40,6 +40,8 @@ export function CompatibleModelsField({
   value,
   onChange,
   defaultBrandId,
+  searchBrandId,
+  onSearchBrandChange,
   errors,
   onBusyChange,
 }: {
@@ -48,15 +50,19 @@ export function CompatibleModelsField({
   value: CompatibilityValue[];
   onChange: (value: CompatibilityValue[]) => void;
   defaultBrandId: string;
+  searchBrandId?: string | null;
+  onSearchBrandChange?: (id: string) => void;
   errors?: string[];
   onBusyChange?: (busy: boolean) => void;
 }) {
   const generatedId = useId();
   const listboxId = `${idPrefix}-${generatedId.replaceAll(":", "")}-results`;
   const inputRef = useRef<HTMLInputElement>(null);
-  const [brandOverride, setBrandId] = useState<string | null>(null);
-  const brandId = brands.some((brand) => brand.id === (brandOverride ?? defaultBrandId))
-    ? brandOverride ?? defaultBrandId : brands[0]?.id ?? "";
+  const [brandOverride, setBrandOverride] = useState<string | null>(null);
+  const selectedSearchBrand = searchBrandId ?? brandOverride ?? defaultBrandId;
+  const brandId = brands.some((brand) => brand.id === selectedSearchBrand)
+    ? selectedSearchBrand : brands[0]?.id ?? "";
+  const setBrandId = (id: string) => { setBrandOverride(id); onSearchBrandChange?.(id); };
   const [saving, startTransition] = useTransition();
   const [modelMessage, setModelMessage] = useState("");
   useEffect(() => { onBusyChange?.(saving); }, [saving, onBusyChange]);

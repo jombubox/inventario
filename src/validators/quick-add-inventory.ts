@@ -126,6 +126,33 @@ const newProductSchema = quickAddFieldsSchema
     }
   });
 
+// Wizard validation uses the same field rules as the final server contract.
+// Identity can come from step 2 OR step 3, so require it only after models.
+export const quickAddWizardSchemas = {
+  1: quickAddFieldsSchema.pick({ brandId: true, componentTypeId: true }).extend({
+    brandId: z.uuid("Selecciona una marca."),
+    componentTypeId: z.uuid("Selecciona un tipo de pieza."),
+  }),
+  2: quickAddFieldsSchema.pick({ title: true, partNumber: true, primarySerialNumber: true, secondarySerialNumbers: true })
+    .superRefine(validateProductSerialFields),
+  3: quickAddFieldsSchema.pick({ partNumber: true, compatibilities: true }).superRefine((value, context) => {
+    if (!value.partNumber && value.compatibilities.length === 0) {
+      context.addIssue({ code: "custom", path: ["compatibilities"], message: "Agrega un modelo compatible o vuelve a Identificación para escribir un número de parte." });
+    }
+  }),
+  5: quickAddFieldsSchema.pick({
+    locationId: true, boxMode: true, boxId: true, newBoxCode: true,
+    newBoxName: true, bagLabel: true, quantity: true, salePrice: true,
+    warranty: true, condition: true, status: true, isPublic: true,
+  }).superRefine((value, context) => {
+    if (value.boxMode === "existing" && !value.boxId) context.addIssue({ code: "custom", path: ["boxId"], message: "Selecciona una caja." });
+    if (value.boxMode === "new") {
+      if (!value.newBoxCode) context.addIssue({ code: "custom", path: ["newBoxCode"], message: "Escribe el código de la caja." });
+      if (!value.newBoxName) context.addIssue({ code: "custom", path: ["newBoxName"], message: "Escribe el nombre de la caja." });
+    }
+  }),
+};
+
 // Inventory entry never validates, defaults or forwards product master data.
 const inventoryEntrySchema = quickAddFieldsSchema.pick({
   locationId: true, boxMode: true, boxId: true, newBoxCode: true,

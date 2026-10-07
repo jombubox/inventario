@@ -39,6 +39,7 @@ export const products = pgTable(
     normalizedPartNumber: text("normalized_part_number"),
     title: text("title").notNull(),
     description: text("description"),
+    warranty: text("warranty"),
     salePrice: numeric("sale_price", { precision: 12, scale: 2, mode: "string" }),
     currency: char("currency", { length: 3 }).default("MXN").notNull(),
     condition: text("condition").$type<ProductCondition>(),
@@ -68,6 +69,7 @@ export const products = pgTable(
     check("products_sku_format", sql`${table.sku} ~ '^[A-Z0-9]+(?:-[A-Z0-9]+)*$'`),
     check("products_slug_format", sql`${table.slug} ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'`),
     check("products_title_not_blank", sql`length(btrim(${table.title})) > 0`),
+    check("products_warranty_length", sql`${table.warranty} is null or length(${table.warranty}) <= 240`),
     check(
       "products_part_number_pair",
       sql`(${table.partNumber} is null and ${table.normalizedPartNumber} is null) or (${table.partNumber} is not null and ${table.normalizedPartNumber} is not null and length(btrim(${table.normalizedPartNumber})) > 0)`,

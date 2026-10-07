@@ -27,13 +27,11 @@ export function ProductSerialFields({
   primaryErrors?: string[];
   secondaryErrors?: string[];
 }) {
-  const sequence = useRef(0);
   const inputRefs = useRef(new Map<string, HTMLInputElement>());
 
   const addSecondary = () => {
     if (secondarySerialNumbers.length >= MAX_PRODUCT_SECONDARY_SERIALS) return;
-    sequence.current += 1;
-    const id = `new-${sequence.current}`;
+    const id = `new-${crypto.randomUUID()}`;
     onSecondarySerialNumbersChange([
       ...secondarySerialNumbers,
       { id, value: "" },
@@ -60,6 +58,7 @@ export function ProductSerialFields({
           Número de serie principal <span className="font-normal text-muted-foreground">(opcional)</span>
         </Label>
         <Input
+          aria-invalid={Boolean(primaryErrors?.length)}
           id={`${idPrefix}-primary-serial`}
           value={primarySerialNumber}
           onChange={(event) => onPrimarySerialNumberChange(event.target.value)}
@@ -106,6 +105,7 @@ export function ProductSerialFields({
                   }}
                   id={`${idPrefix}-secondary-serial-${serial.id}`}
                   aria-label={`Número de serie secundario ${index + 1}`}
+                  aria-invalid={Boolean(secondaryErrors?.length)}
                   value={serial.value}
                   onChange={(event) =>
                     onSecondarySerialNumbersChange(

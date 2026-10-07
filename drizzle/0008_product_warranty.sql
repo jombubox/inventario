@@ -1,0 +1,2 @@
+ALTER TABLE "products" ADD COLUMN "warranty" text;--> statement-breakpoint
+ALTER TABLE "products" ADD CONSTRAINT "products_warranty_length" CHECK ("products"."warranty" is null or length("products"."warranty") <= 240);

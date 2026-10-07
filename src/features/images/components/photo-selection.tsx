@@ -31,6 +31,7 @@ export function PhotoSelection({ files, onChange, id, states = {}, locked = fals
 }) {
   const [error, setError] = useState("");
   const [validating, setValidating] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   async function addFiles(selected: File[]) {
@@ -70,8 +71,9 @@ export function PhotoSelection({ files, onChange, id, states = {}, locked = fals
     {!locked ? <div>
       <Label htmlFor={id}>Fotos del producto</Label>
       <p className="mt-1 text-xs text-muted-foreground">JPEG, PNG o WebP; hasta 10 MB por foto. La primera será la principal.</p>
-      <input id={id} aria-label={id === "quick-product-photos" ? "+ Agregar fotos" : "Subir imágenes"} type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={validating}
-        className="mt-2 block w-full min-w-0 rounded-md border border-input bg-field p-2 text-small focus-visible:ring-2 focus-visible:ring-ring"
+      {id === "quick-product-photos" ? <Button type="button" variant="outline" className="mt-2" disabled={validating} onClick={() => fileInput.current?.click()}>+ Agregar fotos</Button> : null}
+      <input ref={fileInput} id={id} aria-label={id === "quick-product-photos" ? "+ Agregar fotos" : "Subir imágenes"} type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={validating}
+        className={id === "quick-product-photos" ? "hidden" : "mt-2 block w-full min-w-0 rounded-md border border-input bg-field p-2 text-small focus-visible:ring-2 focus-visible:ring-ring"}
         onChange={(event) => { const selected = Array.from(event.target.files ?? []); event.target.value = ""; void addFiles(selected); }} />
     </div> : null}
     {validating ? <p role="status" className="text-small">Verificando fotos…</p> : null}

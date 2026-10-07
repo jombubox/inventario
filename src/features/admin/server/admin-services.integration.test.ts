@@ -180,6 +180,51 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     expect((await getPublicProductBySlug(db, legacy.slug))?.condition).toBeNull();
   });
 
+  it("commits the complete wizard payload once, then registers ordered direct images and edits warranty", async () => {
+    const { brand, componentType } = await catalogIds();
+    const warehouse = await createLocation(db, { code: "WIZ-WH", name: "Almacén wizard", type: "WAREHOUSE", parentId: null, active: true, notes: null });
+    const input = quickAddInventoryMutationSchema.parse({
+      productMode: "new", brandId: brand.id, componentTypeId: componentType.id, title: "Fuente wizard", partNumber: "WIZ-123",
+      primarySerialNumber: " MAIN-1 ", secondarySerialNumbers: ["SECOND-1", "SECOND-2"],
+      compatibilities: ["TV-1", "TV-2", "TV-3"].map(model => ({ brandId: brand.id, model, notes: null })),
+      locationId: warehouse.id, boxMode: "new", newBoxCode: "WIZ-BOX", newBoxName: "Caja 18", bagLabel: " Bolsa 3 ", quantity: 5,
+      salePrice: "1250.01", warranty: " 30   días ", currency: "MXN", status: "ACTIVE", condition: "USED", isPublic: true,
+    });
+    const result = await quickAddInventory(db, input);
+    expect(await nodeDb.select().from(products)).toHaveLength(1);
+    expect(result.product).toMatchObject({ brandId: brand.id, componentTypeId: componentType.id, partNumber: "WIZ-123", title: "Fuente wizard", salePrice: "1250.01", warranty: "30 días", condition: "USED", status: "ACTIVE", isPublic: true, currency: "MXN" });
+    expect(result.item).toMatchObject({ quantity: 5, locationId: result.box.id, legacyBagNumber: "Bolsa 3" });
+    expect(result.box).toMatchObject({ parentId: warehouse.id, code: "WIZ-BOX", name: "Caja 18" });
+    expect(await nodeDb.select().from(productCompatibilities)).toHaveLength(3);
+    expect((await nodeDb.select().from(productSerialNumbers)).map(row => row.serialNumber)).toEqual(expect.arrayContaining(["MAIN-1", "SECOND-1", "SECOND-2"]));
+    // Images use the unchanged authorization/confirmation services only after commit.
+    const objects = new Map<string, R2PutObject>();
+    const storage: DirectImageStorage = {
+      async putObject(object) { objects.set(object.objectKey, object); },
+      async deleteObject(key) { objects.delete(key); },
+      async authorizePut(key) { return `https://local.invalid/${key}`; },
+      async inspectTemporary(key) { const object = objects.get(key)!; return { size: object.body.byteLength, contentType: object.contentType, etag: "local-etag" }; },
+      async readTemporary(key) { return objects.get(key)!.body; },
+      async copyTemporary(key, finalKey) { objects.set(finalKey, { ...objects.get(key)!, objectKey: finalKey }); },
+      async deleteTemporary(key) { objects.delete(key); },
+    };
+    const bytes = Buffer.from("89504e470d0a1a0a00000000", "hex"), secret = "wizard-local-secret";
+    const fingerprint = Buffer.from(await crypto.subtle.digest("SHA-256", bytes)).toString("hex");
+    const batchId = crypto.randomUUID();
+    for (const position of [2, 1, 0]) {
+      const image = directImageUploadSchema.parse({ productId: result.product.id, uploadId: crypto.randomUUID(), batchId, position, filename: `photo-${position}.png`, mimeType: "image/png", size: bytes.length, signatureHex: bytes.toString("hex"), fingerprint });
+      const authorized = await authorizeDirectImageUpload(db, storage, image, secret);
+      if (!("token" in authorized) || !authorized.token) throw new Error("Expected authorization");
+      objects.set(temporaryImageKey(image, secret), { objectKey: temporaryImageKey(image, secret), body: bytes, contentType: "image/png" });
+      await confirmDirectImageUpload(db, storage, authorized.token, secret);
+    }
+    expect((await nodeDb.select().from(productImages).orderBy(asc(productImages.sortOrder))).map(row => ({ order: row.sortOrder, primary: row.isPrimary }))).toEqual([{ order: 0, primary: true }, { order: 1, primary: false }, { order: 2, primary: false }]);
+    expect(await getPublicProductBySlug(db, result.product.slug)).toMatchObject({ warranty: "30 días", availability: { key: "IN_STOCK" } });
+    await updateProduct(db, { ...createProductMutationSchema.parse({ ...input, description: null }), id: result.product.id, expectedUpdatedAt: result.product.updatedAt, warranty: "90 días" });
+    expect(await getAdminProductDetail(db, result.product.id)).toMatchObject({ warranty: "90 días" });
+    expect(await getPublicProductBySlug(db, result.product.slug)).toMatchObject({ warranty: "90 días" });
+  });
+
   it("adds inventory-only stock at the same and different boxes without rewriting any product metadata", async () => {
     const product = await createTestProduct({ condition: "USED", primarySerialNumber: "MASTER-SERIAL", secondarySerialNumbers: ["MASTER-ALT"] });
     const parent = await createLocation(db, { code: "REG-WH", name: "Almacén", type: "WAREHOUSE", parentId: null, active: true, notes: null });

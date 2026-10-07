@@ -41,6 +41,7 @@ type ProductFormValue = {
   title: string;
   description: string | null;
   salePrice: string | null;
+  warranty: string | null;
   condition: ProductCondition | null;
   currency: string;
   status: "DRAFT" | "ACTIVE" | "ARCHIVED";
@@ -232,6 +233,7 @@ export function ProductForm({
         </div>
         <div className="sm:col-span-2"><Label htmlFor="description">Descripción</Label><Textarea id="description" name="description" defaultValue={product?.description ?? ""} rows={4} className="mt-2" /></div>
         <div><Label htmlFor="salePrice">Precio de venta</Label><Input id="salePrice" name="salePrice" inputMode="decimal" defaultValue={product?.salePrice ?? ""} placeholder="0.00" className="mt-2" /><FieldError errors={state.fieldErrors?.salePrice} /></div>
+        <div><Label htmlFor="warranty">Garantía <span className="font-normal text-muted-foreground">(opcional)</span></Label><Input id="warranty" name="warranty" defaultValue={product?.warranty ?? ""} maxLength={240} placeholder="Ej. 30 días; sin garantía" className="mt-2" /><FieldError errors={state.fieldErrors?.warranty} /></div>
         <div><Label htmlFor="currency">Moneda</Label><Select id="currency" name="currency" defaultValue={product?.currency ?? "MXN"} className="mt-2"><option value="MXN">MXN · Peso mexicano</option></Select></div>
         <div><Label htmlFor="product-condition">Condición</Label><Select id="product-condition" name="condition" defaultValue={product ? product.condition ?? "" : "NEW"} className="mt-2" aria-invalid={Boolean(state.fieldErrors?.condition)} aria-describedby="product-condition-help">{product?.condition === null ? <option value="">Sin especificar</option> : null}{Object.entries(productConditionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select><p id="product-condition-help" className="mt-1.5 text-xs text-muted-foreground">Indica si el producto es nuevo o usado.</p><FieldError errors={state.fieldErrors?.condition} /></div>
         <div><Label htmlFor="status">Estado</Label><Select id="status" name="status" defaultValue={product?.status ?? "DRAFT"} className="mt-2"><option value="DRAFT">Borrador</option><option value="ACTIVE">Activo</option><option value="ARCHIVED">Archivado</option></Select></div>

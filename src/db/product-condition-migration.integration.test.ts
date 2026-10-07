@@ -47,7 +47,7 @@ describe.skipIf(!local)("additive product condition migration", () => {
       expect((await pool.query("select count(*)::int as count from products")).rows[0].count).toBe(1);
       expect((await pool.query("select count(*)::int as count from inventory_items")).rows[0].count).toBe(1);
       await migrate(drizzle(pool), { migrationsFolder: "drizzle" });
-      expect((await pool.query("select * from products where id=$1", [product.id])).rows[0]).toEqual({ ...product, condition: null });
+      expect((await pool.query("select * from products where id=$1", [product.id])).rows[0]).toEqual({ ...product, condition: null, warranty: null });
       expect((await pool.query("select * from inventory_items where id=$1", [stock.id])).rows[0]).toEqual(stock);
       await expect(pool.query("update products set condition='invalid' where id=$1", [product.id])).rejects.toMatchObject({ code: "23514" });
       await pool.query("update products set condition='USED' where id=$1", [product.id]);

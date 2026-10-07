@@ -1,3 +1,4 @@
+import { goToQuickAddStep } from "./helpers/quick-add-wizard";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 const stagingUrl = process.env.PLAYWRIGHT_BASE_URL ?? "";
@@ -92,20 +93,26 @@ test.describe("remote staging smoke", () => {
     await dialog.getByLabel("Buscar producto").fill(partNumber);
     await expect(dialog.getByText("No encontramos este producto", { exact: true })).toBeVisible();
     await dialog.getByRole("button", { name: "Agregar producto nuevo", exact: true }).click();
+    await goToQuickAddStep(dialog, 2);
     await dialog.getByLabel("Número de serie principal (opcional)").fill(primarySerial);
+    await goToQuickAddStep(dialog, 2);
     await dialog.getByRole("button", { name: "Agregar número de serie secundario" }).click();
     await dialog.getByRole("textbox", { name: "Número de serie secundario 1", exact: true }).fill(secondaryOne);
+    await goToQuickAddStep(dialog, 2);
     await dialog.getByRole("button", { name: "Agregar número de serie secundario" }).click();
     await dialog.getByRole("textbox", { name: "Número de serie secundario 2", exact: true }).fill(secondaryTwo);
-    await dialog.getByRole("button", { name: "Continuar con ubicación" }).click();
+    await goToQuickAddStep(dialog, 5);
     await selectOptionContaining(dialog.getByLabel("Ubicación"), warehouseName);
     const createBoxButton = dialog.getByRole("button", { name: "Crear caja" });
     if (await createBoxButton.count()) await createBoxButton.click();
     await dialog.getByLabel("Código").fill(boxCode);
     await dialog.getByLabel("Nombre").fill(boxName);
+    await goToQuickAddStep(dialog, 5);
     await dialog.getByLabel("Bolsa (opcional)").fill(`  Bolsa   ${smokeId}  `);
-    await dialog.getByLabel("Cantidad").fill("2");
-    await dialog.getByRole("button", { name: "Guardar producto" }).click();
+    await goToQuickAddStep(dialog, 5);
+    await dialog.getByLabel(/^Cantidad(?: de piezas)?$/u).fill("2");
+    await goToQuickAddStep(dialog, 5);
+    await dialog.getByRole("button", { name: "Agregar producto" }).click();
     await expect(dialog.getByText(/2 unidad\(es\) agregadas correctamente/u)).toBeVisible({ timeout: 30_000 });
     await dialog.getByRole("button", { name: "Cerrar", exact: true }).click();
 
@@ -115,10 +122,13 @@ test.describe("remote staging smoke", () => {
     await dialog.getByLabel("Buscar producto").fill(`${smokeId}-ALT-B`);
     await expect(dialog.getByText(primarySerial, { exact: false })).toBeVisible();
     await dialog.getByRole("button").filter({ hasText: partNumber }).click();
+    await goToQuickAddStep(dialog, 5);
     await selectOptionContaining(dialog.getByLabel("Ubicación"), warehouseName);
     await selectOptionContaining(dialog.getByLabel("Caja"), boxName);
+    await goToQuickAddStep(dialog, 5);
     await dialog.getByLabel("Bolsa (opcional)").fill(normalizedBag);
-    await dialog.getByLabel("Cantidad").fill("3");
+    await goToQuickAddStep(dialog, 5);
+    await dialog.getByLabel(/^Cantidad(?: de piezas)?$/u).fill("3");
     await dialog.getByRole("button", { name: "Agregar 3 al inventario" }).click();
     await expect(dialog.getByText(/3 unidad\(es\) agregadas correctamente/u)).toBeVisible({ timeout: 30_000 });
     await dialog.getByRole("button", { name: "Cerrar", exact: true }).click();
