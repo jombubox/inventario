@@ -141,7 +141,7 @@ export async function getAdminProductReview(db: Database, productId: string) {
     where: and(eq(products.id, productId), isNull(products.deletedAt)),
   });
   if (!product) return null;
-  const [images, compatibilities] = await Promise.all([
+  const [images, compatibilities, availability] = await Promise.all([
     db.select({ storageKey: productImages.storageKey, alt: productImages.alt })
       .from(productImages).where(eq(productImages.productId, productId))
       .orderBy(desc(productImages.isPrimary), asc(productImages.sortOrder), asc(productImages.createdAt)),
@@ -149,8 +149,10 @@ export async function getAdminProductReview(db: Database, productId: string) {
       .from(productCompatibilities).innerJoin(brands, eq(productCompatibilities.brandId, brands.id))
       .where(eq(productCompatibilities.productId, productId))
       .orderBy(asc(brands.name), asc(productCompatibilities.model)),
+    db.select({ quantity: sql<number>`coalesce(sum(${inventoryItems.quantity}), 0)::int` })
+      .from(inventoryItems).where(and(eq(inventoryItems.productId, productId), eq(inventoryItems.status, "AVAILABLE"))),
   ]);
-  return { images: images.flatMap((image) => image.storageKey ? [{ url: getR2PublicUrl(image.storageKey), alt: image.alt || product.title }] : []), compatibilities };
+  return { availableStock: availability[0]?.quantity ?? 0, images: images.flatMap((image) => image.storageKey ? [{ url: getR2PublicUrl(image.storageKey), alt: image.alt || product.title }] : []), compatibilities };
 }
 
 export async function getAdminProductDetail(db: Database, productId: string) {

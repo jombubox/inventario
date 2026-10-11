@@ -9,9 +9,11 @@ import {
   useMemo,
   useRef,
   useState,
-  useTransition,
 } from "react";
 
+import { WarrantyField, WarrantySubmission } from "@/features/products/components/warranty-field";
+import { warrantyDraft, warrantySubmission } from "@/features/products/domain/warranty";
+import { CatalogAutocomplete } from "@/features/products/components/catalog-autocomplete";
 import { FieldError, FormFeedback } from "@/components/forms/form-feedback";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,10 +37,6 @@ import {
   ProductSerialFields,
   type SerialNumberValue,
 } from "@/features/products/components/product-serial-fields";
-import {
-  createBrandInlineAction,
-  createComponentTypeInlineAction,
-} from "@/features/products/server/catalog-actions";
 import type { QuickAddProductResult } from "@/features/inventory/data/quick-add-queries";
 import {
   quickAddInventoryAction,
@@ -209,117 +207,6 @@ function ProductResult({
   );
 }
 
-function QuickCatalogField({
-  kind,
-  options,
-  value,
-  onChange,
-  onCreated,
-  errors,
-  onBusyChange,
-}: {
-  kind: "brand" | "componentType";
-  options: CatalogOption[];
-  value: string;
-  onChange: (value: string) => void;
-  onCreated: (entry: CatalogOption) => void;
-  errors?: string[];
-  onBusyChange: (busy: boolean) => void;
-}) {
-  const [query, setQuery] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [name, setName] = useState("");
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-  const [saving, startTransition] = useTransition();
-  useEffect(() => { onBusyChange(saving); }, [saving, onBusyChange]);
-  const isBrand = kind === "brand";
-  const noun = isBrand ? "marca" : "tipo de pieza";
-  const filtered = options.filter((option) =>
-    `${option.name} ${option.code}`.toLocaleLowerCase("es-MX")
-      .includes(query.trim().toLocaleLowerCase("es-MX")),
-  );
-
-  const save = () => {
-    if (!name.trim()) {
-      setError(isBrand ? "Escribe el nombre de la nueva marca." : "Escribe el nombre del nuevo tipo de pieza.");
-      return;
-    }
-    setError("");
-    setMessage("");
-    startTransition(async () => {
-      const body = new FormData();
-      body.set("name", name);
-      const result = isBrand
-        ? await createBrandInlineAction(body)
-        : await createComponentTypeInlineAction(body);
-      if (result.status === "error" || !result.entry) {
-        setError(result.message ?? `No fue posible guardar ${isBrand ? "la marca" : "el tipo de pieza"}.`);
-        return;
-      }
-      onCreated(result.entry);
-      onChange(result.entry.id);
-      setMessage(result.message ?? "Guardado.");
-      setCreating(false);
-      setName("");
-      setQuery("");
-    });
-  };
-
-  return (
-    <div>
-      <Label htmlFor={`quick-${kind}`}>{isBrand ? "Marca" : "Tipo de pieza"}</Label>
-      <Input
-        id={`quick-${kind}-search`}
-        aria-label={isBrand ? "Buscar marca" : "Buscar tipo de pieza"}
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder={isBrand ? "Buscar marca…" : "Buscar tipo de pieza…"}
-        className="mt-2"
-        autoComplete="off"
-      />
-      <Select
-        aria-invalid={Boolean(errors?.length)}
-        aria-describedby={errors?.length ? `quick-${kind}-error` : undefined}
-        id={`quick-${kind}`}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-2"
-      >
-        <option value="">Selecciona {isBrand ? "una marca" : "un tipo de pieza"}</option>
-        {value && !filtered.some((option) => option.id === value) ? options.filter((option) => option.id === value).map((option) => <option key={option.id} value={option.id}>{option.name}</option>) : null}
-        {filtered.map((option) => (
-          <option key={option.id} value={option.id}>{option.name}</option>
-        ))}
-      </Select>
-      <Button type="button" variant="ghost" size="sm" className="mt-2" onClick={() => { setCreating((current) => !current); setError(""); }}>
-        + Agregar {isBrand ? "nueva marca" : "tipo de pieza"}
-      </Button>
-      {creating ? (
-        <div className="mt-2 rounded-md bg-primary-soft/50 p-3">
-          <Label htmlFor={`quick-${kind}-new`}>{isBrand ? "Nueva marca" : "Nuevo tipo de pieza"}</Label>
-          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-            <Input
-              id={`quick-${kind}-new`}
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              maxLength={120}
-              autoFocus
-              disabled={saving}
-            />
-            <Button type="button" size="sm" onClick={save} isLoading={saving} loadingLabel="Guardando…">
-              Guardar {noun}
-            </Button>
-          </div>
-        </div>
-      ) : null}
-      {errors?.length ? <div id={`quick-${kind}-error`}><FieldError errors={errors} /></div> : null}
-      {error ? <p role="alert" className="mt-2 text-small text-danger">{error}</p> : null}
-      {message ? <p role="status" className="mt-2 text-small text-success">{message}</p> : null}
-    </div>
-  );
-}
-
 function QuickAddDialog({
   options: initialOptions,
   startNew,
@@ -382,8 +269,8 @@ function QuickAddDialog({
   const [compatibleBrandId, setCompatibleBrandId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [salePrice, setSalePrice] = useState("");
-  const [warranty, setWarranty] = useState("");
-  const [condition, setCondition] = useState<ProductCondition>("NEW");
+  const [warranty, setWarranty] = useState(() => warrantyDraft());
+  const [condition, setCondition] = useState<ProductCondition>("USED");
   const [status, setStatus] = useState<"ACTIVE" | "DRAFT" | "ARCHIVED">("ACTIVE");
   const [isPublic, setIsPublic] = useState(true);
   const [photos, setPhotos] = useState<File[]>([]);
@@ -521,7 +408,7 @@ function QuickAddDialog({
   };
 
   const busy = pending || photosValidating || modelSaving || locationSaving || brandSaving || typeSaving || photosBusy;
-  const dirty = !selectedProduct && (Boolean(brandId || componentTypeId || partNumber || title || primarySerialNumber || salePrice || warranty || bagLabel || newBoxCode || newBoxName) || secondarySerialNumbers.length > 0 || compatibilities.length > 0 || photos.length > 0 || quantity !== 1 || condition !== "NEW" || status !== "ACTIVE" || !isPublic || (Boolean(locationId) && locationId !== initialLocationId) || (Boolean(boxId) && boxId !== (initialBox?.id ?? "")));
+  const dirty = !selectedProduct && (Boolean(brandId || componentTypeId || partNumber || title || primarySerialNumber || salePrice || warranty.months || warranty.noWarranty || bagLabel || newBoxCode || newBoxName) || secondarySerialNumbers.length > 0 || compatibilities.length > 0 || photos.length > 0 || quantity !== 1 || condition !== "USED" || status !== "ACTIVE" || !isPublic || (Boolean(locationId) && locationId !== initialLocationId) || (Boolean(boxId) && boxId !== (initialBox?.id ?? "")));
   const discard = () => { dialogRef.current?.close(); onClose(); };
   const close = () => {
     if (busy) return;
@@ -573,7 +460,7 @@ function QuickAddDialog({
   const payload = {
     productMode: "new", productId: "", brandId, customBrandName, componentTypeId, customComponentTypeName,
     partNumber, primarySerialNumber, secondarySerialNumbers: secondarySerialNumbers.map(({ value }) => value),
-    compatibilities, title, salePrice, warranty, currency: "MXN", condition, status, isPublic,
+    compatibilities, title, salePrice, warranty: warrantySubmission(warranty), currency: "MXN", condition, status, isPublic,
     locationId: resolvedLocationId, boxMode, boxId: resolvedBoxId, newBoxCode, newBoxName, bagLabel, quantity,
   };
   const validateStep = (current: WizardStep) => current === 4 ? null : quickAddWizardSchemas[current].safeParse(payload);
@@ -663,7 +550,7 @@ function QuickAddDialog({
         <input type="hidden" name="compatibilities" value={JSON.stringify(compatibilities)} />
         <input type="hidden" name="title" value={title} />
         <input type="hidden" name="salePrice" value={salePrice} />
-        <input type="hidden" name="warranty" value={warranty} />
+        <WarrantySubmission value={warranty} />
         <input type="hidden" name="condition" value={condition} />
         <input type="hidden" name="status" value={status} />
         <input type="hidden" name="isPublic" value={String(isPublic)} />
@@ -815,7 +702,7 @@ function QuickAddDialog({
                   {Object.values(errors).some((value) => value?.length) ? <p data-validation-alert tabIndex={-1} role="alert" className="mb-4 text-small text-danger">Revisa los campos marcados antes de continuar.</p> : null}
                   {wizardStep === 1 ? <div className="grid gap-5 sm:grid-cols-2">
                     <button type="button" disabled={busy} className="text-left text-small font-semibold text-link hover:underline sm:col-span-2" onClick={() => setStep("search")}>← Volver a buscar</button>
-                    <QuickCatalogField
+                    <CatalogAutocomplete
                       kind="brand"
                       options={catalogOptions.brands}
                       value={brandId}
@@ -829,7 +716,7 @@ function QuickAddDialog({
                           : [...current.brands, entry].sort((left, right) => left.name.localeCompare(right.name, "es")),
                       }))}
                     />
-                    <QuickCatalogField
+                    <CatalogAutocomplete
                       kind="componentType"
                       options={catalogOptions.componentTypes}
                       value={componentTypeId}
@@ -992,7 +879,7 @@ function QuickAddDialog({
                       <p id="quick-price-help" className="mt-1 text-xs text-muted-foreground">Hasta dos decimales, sin comas. Si lo dejas vacío, se mostrará «Consultar precio».</p>
                       <FieldError errors={errors?.salePrice} />
                     </div>
-                      <div className="sm:col-span-2"><Label htmlFor="quick-warranty">Garantía <span className="font-normal text-muted-foreground">(opcional)</span></Label><Input aria-invalid={Boolean(errors.warranty?.length)} id="quick-warranty" value={warranty} onChange={(event) => setWarranty(event.target.value)} maxLength={240} placeholder="Ej. 30 días; sin garantía" className="mt-2" /><FieldError errors={errors.warranty} /></div>
+                      <div className="sm:col-span-2"><WarrantyField id="quick-warranty" value={warranty} onChange={(value) => { setWarranty(value); setClientErrors((current) => ({ ...current, warranty: undefined })); }} errors={errors.warranty} submit={false} /></div>
                       <div className="sm:col-span-2"><p className="font-semibold">Disponibilidad: {Number.isInteger(quantity) && quantity > 0 ? getPublicAvailability(quantity).label : "Revisa la cantidad"}</p><p className="mt-1 text-small text-muted-foreground">Se calcula con las piezas disponibles del inventario.</p></div>
                     </div>
                     <h3 className="mt-7 text-h3 text-navy">Publicación</h3>

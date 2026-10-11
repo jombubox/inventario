@@ -228,7 +228,7 @@ async function checkViewer(page: Page, viewer: import("@playwright/test").Locato
     await page.mouse.move(0, 0); await expect(zoom).toHaveCSS("transform", "matrix(1, 0, 0, 1, 0, 0)");
   }
   await viewer.getByRole("button", { name: "Siguiente", exact: true }).click();
-  await expect(viewer.getByRole("status")).toContainText("de 3");
+  await expect(viewer.getByRole("status", { name: "Posición de la foto" })).toContainText("de 3");
   await page.keyboard.press("ArrowLeft");
 }
 

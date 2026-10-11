@@ -25,15 +25,20 @@ export function AdminListFilters({ children, className, label, placeholder }: {
   const formRef = useRef<HTMLFormElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestedParams = useRef<string | null>(null);
+  const appliedParams = useRef(searchParams.toString());
   const [pending, startTransition] = useTransition();
 
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
   useEffect(() => {
+    // The initial server-rendered controls already match the URL. Do not overwrite
+    // a user's first change while hydration replays its event after a refresh.
+    if (appliedParams.current === searchParams.toString()) return;
     // Back/forward and pagination must also update the uncontrolled form.
     if (timer.current) return;
     // A response to the previous search must not overwrite a newer typed query.
     if (requestedParams.current !== null && requestedParams.current !== searchParams.toString()) return;
     requestedParams.current = null;
+    appliedParams.current = searchParams.toString();
     for (const element of Array.from(formRef.current?.elements ?? [])) {
       if (element instanceof HTMLInputElement || element instanceof HTMLSelectElement) {
         const defaultValue = element instanceof HTMLInputElement ? element.defaultValue :

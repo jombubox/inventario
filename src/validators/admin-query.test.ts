@@ -15,3 +15,10 @@ describe("admin search query parsing", () => {
     expect(inventoryListQuerySchema.safeParse({ status: "wrong" }).success).toBe(false);
   });
 });
+
+it("accepts only exact UUID inventory product filters", () => {
+  const id = "00000000-0000-4000-8000-000000000001";
+  expect(inventoryListQuerySchema.parse({ productId: id }).productId).toBe(id);
+  expect(inventoryListQuerySchema.parse({ productId: "" }).productId).toBeUndefined();
+  expect(inventoryListQuerySchema.safeParse({ productId: "Samsung" }).success).toBe(false);
+});

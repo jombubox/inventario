@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { getDb } from "@/db";
+import { readWarrantySubmission } from "@/features/products/domain/warranty";
 import { requireAdmin } from "@/features/auth/server/admin-auth";
 import { revalidatePublicCatalog } from "@/features/catalog/server/revalidation";
 import {
@@ -62,7 +63,7 @@ export async function quickAddInventoryAction(
     compatibilities: parseStringArray(formData.get("compatibilities")),
     title: formData.get("title"),
     salePrice: formData.get("salePrice") ?? "",
-    warranty: formData.get("warranty"),
+    warranty: readWarrantySubmission(formData),
     condition: formData.get("condition") ?? undefined,
     currency: "MXN",
     status: formData.get("status") ?? "ACTIVE",

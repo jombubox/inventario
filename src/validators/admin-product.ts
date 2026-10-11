@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { warrantyMutationSchema } from "@/validators/warranty";
 
 import { productStatusValues } from "@/db/schema/enums";
 import { CUSTOM_CATALOG_VALUE } from "@/features/products/domain/catalog-selection";
@@ -21,8 +22,8 @@ export const compatibilityMutationSchema = z.object({
 });
 
 export const productPublicationFields = {
-  warranty: optionalDisplayText.pipe(z.string().max(240, "La garantía debe tener 240 caracteres o menos.").nullable().optional()),
-  condition: z.enum(productConditionValues, { error: "Selecciona Nuevo o Usado." }).default("NEW"),
+  warranty: warrantyMutationSchema,
+  condition: z.enum(productConditionValues, { error: "Selecciona Nuevo o Usado." }).default("USED"),
   salePrice: z.union([moneyString, z.literal(""), z.null()]).transform((value) => value || null),
   currency: currencyCode.default("MXN"),
   status: z.enum(productStatusValues),
@@ -104,7 +105,7 @@ export const archiveProductMutationSchema = z.object({
   expectedUpdatedAt: z.coerce.date(),
 });
 
-// Older internal import callers can leave condition unclassified; UI schemas default new creations to NEW.
+// Internal imports can explicitly leave condition unclassified; new creations default to USED.
 export type CreateProductMutationInput = Omit<z.infer<typeof createProductMutationSchema>, "condition"> & {
   condition?: "NEW" | "USED" | null;
 };

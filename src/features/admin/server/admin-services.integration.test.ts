@@ -154,6 +154,65 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     });
   }
 
+  it("resolves concurrent normalized brand and piece creation to one record", async () => {
+    for (const create of [createBrandCatalogEntry, createComponentTypeCatalogEntry]) {
+      const [left, right] = await Promise.all([create(db, { name: " UX   concurrente " }), create(db, { name: "ux concurrente" })]);
+      expect(left.entry.id).toBe(right.entry.id);
+      expect([left.created, right.created].sort()).toEqual([false, true]);
+    }
+    expect(await nodeDb.select().from(brands).where(eq(brands.normalizedName, "UX CONCURRENTE"))).toHaveLength(1);
+    expect(await nodeDb.select().from(componentTypes).where(eq(componentTypes.normalizedName, "UX CONCURRENTE"))).toHaveLength(1);
+  });
+
+  it("filters exact products in PostgreSQL without duplicated images, preserving locations, bags, filters and pagination", async () => {
+    const product = await createTestProduct();
+    const other = await createTestProduct({ partNumber: "OTHER", compatibilities: [] });
+    const warehouse = await createLocation(db, { code: "UX-WH", name: "Almacén UX", type: "WAREHOUSE", parentId: null, active: true, notes: null });
+    const boxes = await Promise.all(["1", "2"].map(n => createLocation(db, { code: `UX-BOX-${n}`, name: `Caja ${n}`, type: "BOX", parentId: warehouse.id, active: true, notes: null })));
+    for (let n = 0; n < 23; n++) await createInventoryItem(db, { productId: n === 22 ? other.id : product.id, locationId: boxes[n % 2]!.id, quantity: 2, condition: "UNKNOWN", status: n === 21 ? "RESERVED" : "AVAILABLE", acquiredAt: null, acquisitionSource: null, purchaseCost: null, notes: null, legacyBagNumber: n === 0 ? "4" : null, legacyLocationCode: null });
+    await nodeDb.insert(productImages).values([0, 1].map(n => ({ productId: product.id, provider: "R2", storageKey: `products/${product.id}/${crypto.randomUUID()}.png`, alt: "UX", isPrimary: n === 0, sortOrder: n })));
+    const statements: string[] = [];
+    const logged = drizzle(pool, { schema, logger: { logQuery(query) { statements.push(query); } } }) as unknown as Database;
+    const result = await listAdminInventory(logged, inventoryListQuerySchema.parse({ productId: product.id }));
+    expect(result.total).toBe(22); expect(result.rows).toHaveLength(20); expect(result.pageCount).toBe(2);
+    expect(result.filteredProduct?.title).toBe(product.title);
+    expect(result.rows.every(row => row.productId === product.id)).toBe(true);
+    expect(statements).toHaveLength(4);
+    const second = await listAdminInventory(db, inventoryListQuerySchema.parse({ productId: product.id, page: 2 }));
+    expect(second.rows).toHaveLength(2);
+    expect(new Set([...result.rows, ...second.rows].map(row => row.id)).size).toBe(22);
+    const all = await listAdminInventory(db, inventoryListQuerySchema.parse({ productId: product.id, pageSize: 50 }));
+    expect(all.rows.some(row => row.placement.bagLabel === "Bolsa 4")).toBe(true);
+    expect(new Set(all.rows.map(row => row.placement.boxLabel))).toEqual(new Set(["Caja 1", "Caja 2"]));
+    expect(all.rows.every(row => row.placement.parentLocation === "Almacén UX")).toBe(true);
+    const available = await listAdminInventory(db, inventoryListQuerySchema.parse({ productId: product.id, status: "AVAILABLE", q: product.sku, pageSize: 50 }));
+    expect(available.total).toBe(21);
+    expect(await getAdminProductReview(db, product.id)).toMatchObject({ availableStock: 42 });
+    const zero = await createTestProduct({ partNumber: "ZERO", compatibilities: [] });
+    expect(await listAdminInventory(db, inventoryListQuerySchema.parse({ productId: zero.id }))).toMatchObject({ total: 0, rows: [], filteredProduct: { id: zero.id } });
+    expect(await getAdminProductReview(db, zero.id)).toMatchObject({ availableStock: 0 });
+    expect(inventoryListQuerySchema.safeParse({ productId: "invalid" }).success).toBe(false);
+    expect((await listAdminInventory(db, inventoryListQuerySchema.parse({}))).total).toBe(23);
+  });
+
+  it("persists months, no warranty and unspecified values while leaving legacy warranty and condition intact", async () => {
+    const legacy = await createTestProduct({ partNumber: "LEGACY-WARRANTY", warranty: " 30   días ", condition: null });
+    for (const months of ["3", "6", "12", "24", ""]) {
+      const { brand, componentType } = await catalogIds();
+      const input = createProductMutationSchema.parse({ brandId: brand.id, componentTypeId: componentType.id, partNumber: `MONTHS-${months || "UNSET"}`, warranty: { months, noWarranty: false }, salePrice: null, description: null, status: "ACTIVE", isPublic: true, compatibilities: [] });
+      const product = await createProduct(db, input);
+      expect(product.condition).toBe("USED");
+      expect(product.warranty).toBe(months ? `${months} meses` : null);
+      expect(await getPublicProductBySlug(db, product.slug)).toMatchObject({ condition: "USED", warranty: product.warranty });
+      const updated = await updateProduct(db, { ...input, id: product.id, expectedUpdatedAt: product.updatedAt, warranty: "Sin garantía", condition: "NEW" });
+      expect(await getAdminProductDetail(db, product.id)).toMatchObject({ warranty: "Sin garantía", condition: "NEW" });
+      expect(await getPublicProductBySlug(db, product.slug)).toMatchObject({ warranty: "Sin garantía", condition: "NEW" });
+      expect(updated.condition).toBe("NEW");
+    }
+    await updateProduct(db, { brandId: legacy.brandId, componentTypeId: legacy.componentTypeId, id: legacy.id, expectedUpdatedAt: legacy.updatedAt, partNumber: legacy.partNumber, title: legacy.title, description: legacy.description, salePrice: legacy.salePrice, currency: legacy.currency, status: legacy.status, isPublic: legacy.isPublic, compatibilities: [] });
+    expect(await getAdminProductDetail(db, legacy.id)).toMatchObject({ warranty: " 30   días ", condition: null });
+  });
+
   it("persists product condition separately from inventory grading through Quick Add, edit and public reads", async () => {
     const { brand, componentType } = await catalogIds();
     const warehouse = await createLocation(db, { code: "COND-WH", name: "Almacén norte", type: "WAREHOUSE", parentId: null, active: true, notes: null });
@@ -320,7 +379,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     statements.length = 0;
     const review = await getAdminProductReview(loggedDb, list.rows[0]!.id);
     expect(review?.compatibilities).toEqual([{ brand: brand.name, model: "MODELO PUBLICACIÓN" }]);
-    expect(statements).toHaveLength(3);
+    expect(statements).toHaveLength(4);
   });
 
   it("renames physical Quick Add locations without moving boxes or stock and rejects stale edits", async () => {

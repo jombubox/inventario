@@ -8,7 +8,7 @@ const skuFormat = /^[A-Z0-9]+(?:-[A-Z0-9]+)*$/u;
 const slugFormat = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 
 export const productBaseInputSchema = z.object({
-  condition: z.enum(productConditionValues).default("NEW"),
+  condition: z.enum(productConditionValues).default("USED"),
   sku: z.string().regex(skuFormat).optional(),
   slug: z.string().regex(slugFormat).optional(),
   brandId: z.uuid(),

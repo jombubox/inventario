@@ -60,7 +60,7 @@ test("Inventory shows SKU, physical box/bag and one Edit entry point with all ex
   await page.keyboard.press("Escape"); await expect(modal).toHaveCount(0); await expect(trigger).toBeFocused();
 });
 
-test("Quick Add defaults Nuevo, persists Usado and edit/public pages retain the condition", async ({ page }, info) => {
+test("Quick Add defaults Usado, persists both conditions and edit/public pages retain the condition", async ({ page }, info) => {
   test.setTimeout(120_000);
   const suffix = info.project.name.startsWith("mobile") ? "MOB" : "DESK";
   await login(page);
@@ -71,7 +71,7 @@ test("Quick Add defaults Nuevo, persists Usado and edit/public pages retain the 
     await goToQuickAddStep(modal, 2);
     await modal.getByLabel("Número de parte", { exact: true }).fill(`UX-${condition}-${suffix}`);
     await goToQuickAddStep(modal, 5);
-    await expect(modal.getByLabel("Condición", { exact: true })).toHaveValue("NEW");
+    await expect(modal.getByLabel("Condición", { exact: true })).toHaveValue("USED");
     await goToQuickAddStep(modal, 5);
     await modal.getByLabel("Condición", { exact: true }).selectOption(condition);
     await goToQuickAddStep(modal, 2);

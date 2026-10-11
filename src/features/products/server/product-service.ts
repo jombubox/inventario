@@ -350,7 +350,7 @@ export async function createProductInTransaction(
       description: input.description,
       salePrice: input.salePrice,
       warranty: input.warranty ?? null,
-      condition: input.condition ?? null,
+      condition: input.condition === undefined ? "USED" : input.condition,
       currency: input.currency,
       status: input.status,
       isPublic,

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { getDb } from "@/db";
+import { readWarrantySubmission } from "@/features/products/domain/warranty";
 import { requireAdmin } from "@/features/auth/server/admin-auth";
 import { revalidatePublicCatalog } from "@/features/catalog/server/revalidation";
 import { archiveProduct, createProduct, updateProduct } from "@/features/products/server/product-service";
@@ -50,7 +51,7 @@ function productFields(formData: FormData) {
     title: formData.get("title"),
     description: formData.get("description"),
     salePrice: formData.get("salePrice"),
-    warranty: formData.get("warranty") ?? undefined,
+    warranty: readWarrantySubmission(formData),
     condition: formData.get("condition") ?? undefined,
     currency: formData.get("currency") ?? "MXN",
     status: formData.get("status"),

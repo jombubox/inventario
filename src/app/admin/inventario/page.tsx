@@ -27,7 +27,7 @@ export default async function InventoryPage({
 }) {
   await requireAdmin();
   const raw = await searchParams;
-  const query = inventoryListQuerySchema.parse(
+  const parsed = inventoryListQuerySchema.safeParse(
     Object.fromEntries(
       Object.entries(raw).map(([key, value]) => [
         key,
@@ -35,8 +35,10 @@ export default async function InventoryPage({
       ]),
     ),
   );
+  if (!parsed.success) return <EmptyState title="El filtro de inventario no es válido." description="Revisa el producto y los filtros de la dirección." action={<Link href="/admin/inventario" className="font-semibold text-link">Quitar filtros</Link>} />;
+  const query = parsed.data;
   const db = getDb();
-  const [{ rows, total, pageCount }, options] = await Promise.all([
+  const [{ rows, total, pageCount, filteredProduct }, options] = await Promise.all([
     listAdminInventory(db, query),
     listInventoryFormOptions(db),
   ]);
@@ -45,6 +47,10 @@ export default async function InventoryPage({
       (entry): entry is [string, string] => typeof entry[1] === "string",
     ),
   );
+  const withoutProduct = new URLSearchParams(current);
+  withoutProduct.delete("productId");
+  withoutProduct.delete("page");
+  const clearProductLink = `/admin/inventario?${withoutProduct}`;
   const pageLink = (page: number) => {
     const params = new URLSearchParams(current);
     params.set("page", String(page));
@@ -79,9 +85,15 @@ export default async function InventoryPage({
           </div>
       </details>
 
+      {query.productId ? <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-card p-4 text-small shadow-sm">
+        <p className="min-w-0 break-words">Producto: <strong>{filteredProduct?.title ?? "Producto no disponible"}</strong></p>
+        <Link href={clearProductLink} className="inline-flex min-h-11 items-center font-semibold text-link">Quitar filtro</Link>
+      </div> : null}
       <Card>
         <CardContent className="p-4 sm:p-5">
           <AdminListFilters className="grid gap-3 sm:grid-cols-2 lg:grid-cols-7" label="Buscar inventario" placeholder="Código, SKU, parte, serie, marca, ubicación o caja">
+            {query.productId ? <input type="hidden" name="productId" value={query.productId} /> : null}
+            <input type="hidden" name="pageSize" value={query.pageSize} />
             <Select aria-label="Condición" name="condition" defaultValue={query.condition ?? ""}>
               <option value="">Cualquier condición</option>
               <option value="NEW">Nuevo</option>
@@ -124,7 +136,7 @@ export default async function InventoryPage({
           {rows.length === 0 ? (
             <div className="p-8">
               <EmptyState
-                title="No encontramos inventario con esa búsqueda." action={<Link href="/admin/inventario" className="font-semibold text-link">Limpiar búsqueda y filtros</Link>}
+                title={filteredProduct && total === 0 && !query.q && !query.condition && !query.status && !query.location && !query.unlocated ? "Este producto no tiene existencias registradas." : "No encontramos inventario con esa búsqueda."} action={<Link href={filteredProduct ? "/admin/productos" : "/admin/inventario"} className="font-semibold text-link">{filteredProduct ? "Volver a productos" : "Limpiar búsqueda y filtros"}</Link>}
                 description="Registra una existencia o ajusta los filtros de búsqueda."
               />
             </div>

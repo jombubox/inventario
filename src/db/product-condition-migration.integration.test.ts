@@ -59,7 +59,7 @@ describe.skipIf(!local)("additive product condition migration", () => {
       const existingAdded = await quickAddInventory(db, existingInput);
       const newAdded = await quickAddInventory(db, newInput);
       expect(existingAdded).toMatchObject({ productCreated: false, item: { quantity: 3 }, product: { condition: "USED" } });
-      expect(newAdded).toMatchObject({ productCreated: true, item: { quantity: 3 }, product: { condition: "NEW", currency: "MXN", status: "ACTIVE", isPublic: true } });
+      expect(newAdded).toMatchObject({ productCreated: true, item: { quantity: 3 }, product: { condition: "USED", currency: "MXN", status: "ACTIVE", isPublic: true } });
     } finally {
       await pool.end();
       await admin.query(`drop database if exists "${databaseName}"`);

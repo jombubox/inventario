@@ -14,6 +14,7 @@ export async function listAdminInventory(db: Database, query: InventoryListQuery
   const breadcrumb = createLocationBreadcrumbResolver(locationNodes);
   const codePath = createLocationBreadcrumbResolver(locationNodes.map((location) => ({ ...location, name: location.code })));
   const conditions: SQL[] = [isNull(products.deletedAt)];
+  if (query.productId) conditions.push(eq(inventoryItems.productId, query.productId));
   if (query.q) {
     const pattern = searchPattern(query.q);
     const needle = query.q.toLocaleLowerCase("es-MX");
@@ -36,7 +37,7 @@ export async function listAdminInventory(db: Database, query: InventoryListQuery
   const where = conditions.length > 0 ? and(...conditions) : undefined;
   const offset = (query.page - 1) * query.pageSize;
 
-  const [rows, totalResult] = await Promise.all([
+  const [rows, totalResult, filteredProduct] = await Promise.all([
     db
       .select({
         id: inventoryItems.id,
@@ -70,6 +71,9 @@ export async function listAdminInventory(db: Database, query: InventoryListQuery
       .innerJoin(products, eq(inventoryItems.productId, products.id))
       .leftJoin(locations, eq(inventoryItems.locationId, locations.id))
       .where(where),
+    query.productId ? db.query.products.findFirst({
+      columns: { id: true, title: true }, where: and(eq(products.id, query.productId), isNull(products.deletedAt)),
+    }) : Promise.resolve(undefined),
   ]);
 
   const rowsWithBreadcrumb = rows.map((row) => ({
@@ -82,6 +86,7 @@ export async function listAdminInventory(db: Database, query: InventoryListQuery
   const total = totalResult[0]?.value ?? 0;
   return {
     rows: rowsWithBreadcrumb,
+    filteredProduct: filteredProduct ?? null,
     total,
     pageCount: Math.max(1, Math.ceil(total / query.pageSize)),
   };

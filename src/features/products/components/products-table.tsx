@@ -21,7 +21,6 @@ function ProductReviewModal({ selection, onClose }: { selection: Selection; onCl
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
-    if (kind === "details") return;
     const controller = new AbortController();
     fetch(`/api/admin/products/${product.id}/review`, { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
@@ -36,6 +35,11 @@ function ProductReviewModal({ selection, onClose }: { selection: Selection; onCl
   for (const item of review?.compatibilities ?? []) groups.set(item.brand, [...(groups.get(item.brand) ?? []), item.model]);
   return <Modal title={kind === "images" ? "Fotos del producto" : kind === "models" ? "Modelos compatibles" : "Detalles del producto"} onClose={onClose}>
     <p className="mb-4 break-words font-semibold">{product.title}</p>
+    {kind !== "models" ? <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-md bg-muted p-3">
+      <p className="text-small">{review ? review.availableStock > 0 ? `Disponible en inventario · ${review.availableStock} piezas` : "Sin existencias" : error ? "No fue posible consultar las existencias." : "Consultando existencias…"}</p>
+      <Link href={`/admin/inventario?productId=${product.id}`} className="inline-flex min-h-11 items-center rounded-md bg-primary px-4 text-small font-semibold text-white">Buscar en inventario</Link>
+    </div> : null}
+    {kind === "details" && product.primaryImage ? <div className="relative mb-4 h-40 overflow-hidden rounded-md bg-white"><PreviewPhoto image={{ url: product.primaryImage, alt: product.title }} sizes="320px" /></div> : null}
     {kind === "details" ? <>
       <dl className="grid gap-4 text-small sm:grid-cols-2">
         <div><dt className="text-muted-foreground">Creado</dt><dd>{formatDateTime(product.createdAt)}</dd></div>
@@ -53,6 +57,7 @@ function ProductReviewModal({ selection, onClose }: { selection: Selection; onCl
       : kind === "images" ? <ImagePreview images={review.images} title={product.title} />
       : groups.size === 0 ? <p>Este producto no tiene modelos compatibles registrados.</p>
       : <div className="space-y-5">{Array.from(groups, ([brand, models]) => <section key={brand}><h3 className="font-semibold">{brand}</h3><ul className="mt-2 list-disc space-y-2 pl-5">{models.map((model) => <li key={model} className="break-words">{model}</li>)}</ul></section>)}</div>}
+
   </Modal>;
 }
 

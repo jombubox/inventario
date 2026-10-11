@@ -136,9 +136,12 @@ test("Quick Add publishes price and photos, manages locations inline, and review
   if (!mobile) {
     const bounds = await mainImage.boundingBox();
     expect(bounds).toBeTruthy();
-    await popup.mouse.move(bounds!.x + bounds!.width * .25, bounds!.y + bounds!.height * .25);
     const zoom = popup.locator("[data-product-zoom]");
-    await expect(zoom).toHaveAttribute("style", /scale\(2.25\)/u);
+    await expect.poll(async () => {
+      await popup.mouse.move(bounds!.x + bounds!.width * .2, bounds!.y + bounds!.height * .2);
+      await popup.mouse.move(bounds!.x + bounds!.width * .25, bounds!.y + bounds!.height * .25);
+      return zoom.getAttribute("style");
+    }).toMatch(/scale\(2.25\)/u);
     const firstOrigin = await zoom.evaluate((element) => (element as HTMLElement).style.transformOrigin);
     await popup.mouse.move(bounds!.x + bounds!.width * .75, bounds!.y + bounds!.height * .75);
     expect(await zoom.evaluate((element) => (element as HTMLElement).style.transformOrigin)).not.toBe(firstOrigin);
@@ -171,9 +174,9 @@ test("Quick Add publishes price and photos, manages locations inline, and review
   const thumb = row.getByRole("button", { name: `Ver fotos de ${title}` });
   await thumb.click();
   let modal = page.getByRole("dialog", { name: "Fotos del producto" });
-  await expect(modal.getByRole("status")).toHaveText("1 de 2");
+  await expect(modal.getByRole("status", { name: "Posición de la foto" })).toHaveText("1 de 2");
   await modal.getByRole("button", { name: "Siguiente" }).click();
-  await expect(modal.getByRole("status")).toHaveText("2 de 2");
+  await expect(modal.getByRole("status", { name: "Posición de la foto" })).toHaveText("2 de 2");
   await snapshot(page, testInfo, "admin-image-preview");
   await page.keyboard.press("Escape");
   await expect(thumb).toBeFocused();

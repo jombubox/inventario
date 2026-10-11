@@ -28,6 +28,7 @@ export const productListQuerySchema = z.object({
 });
 
 export const inventoryListQuerySchema = z.object({
+  productId: z.preprocess(emptyToUndefined, z.uuid("Selecciona un producto válido.").optional()),
   q: z.string().trim().max(100).catch("").default(""),
   condition: z.preprocess(emptyToUndefined, z.enum(inventoryConditionValues).optional()),
   status: z.preprocess(emptyToUndefined, z.enum(inventoryStatusValues).optional()),

@@ -1,7 +1,7 @@
 import { deflateSync } from "node:zlib";
 
 // A deterministic, visibly patterned landscape PNG for gallery/zoom review.
-export function testImage(): Buffer {
+export function testImage(width = 800, height = 600): Buffer {
   const crc = (data: Buffer) => {
     let value = 0xffffffff;
     for (const byte of data) {
@@ -16,7 +16,6 @@ export function testImage(): Buffer {
     const checksum = Buffer.alloc(4); checksum.writeUInt32BE(crc(content));
     return Buffer.concat([length, content, checksum]);
   };
-  const width = 800, height = 600;
   const header = Buffer.alloc(13);
   header.writeUInt32BE(width); header.writeUInt32BE(height, 4);
   header[8] = 8; header[9] = 2;

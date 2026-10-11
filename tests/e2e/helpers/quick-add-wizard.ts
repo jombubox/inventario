@@ -8,11 +8,10 @@ export async function goToQuickAddStep(dialog: Locator, target: number) {
   while (current !== target) {
     if (current === 1 && target > 1) {
       for (const id of ["quick-brand", "quick-componentType"]) {
-        const select = dialog.locator(`#${id}`);
-        if (!await select.inputValue()) {
-          const value = await select.locator('option[value]:not([value=""])').first().getAttribute("value");
-          if (!value) throw new Error(`Missing fixture options for ${id}`);
-          await select.selectOption(value);
+        const input = dialog.locator(`#${id}`);
+        if (!await input.inputValue()) {
+          await input.focus();
+          await dialog.getByRole("listbox").getByRole("option").first().click();
         }
       }
     }

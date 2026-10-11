@@ -19,9 +19,9 @@ const baseInput = {
 };
 
 describe("product condition", () => {
-  it("defaults new products to Nuevo and accepts Usado", () => {
-    expect(createProductMutationSchema.parse(baseInput).condition).toBe("NEW");
-    expect(createProductMutationSchema.parse({ ...baseInput, condition: "USED" }).condition).toBe("USED");
+  it("defaults new products to Usado and accepts Nuevo", () => {
+    expect(createProductMutationSchema.parse(baseInput).condition).toBe("USED");
+    expect(createProductMutationSchema.parse({ ...baseInput, condition: "NEW" }).condition).toBe("NEW");
   });
   it.each(["ACTIVE", "AVAILABLE", "USED_GOOD", "custom", null, ""])("rejects condition %s during creation", condition => {
     expect(createProductMutationSchema.safeParse({ ...baseInput, condition }).success).toBe(false);

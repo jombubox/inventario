@@ -43,16 +43,14 @@ test("five-step navigation validates, preserves all fields, submits once and res
     await expect(dialog.getByText("Selecciona una marca.", { exact: true })).toBeVisible();
     await expect(dialog.getByText("Selecciona un tipo de pieza.", { exact: true })).toBeVisible();
     await expect(dialog.locator("#quick-brand")).toBeFocused();
-    await dialog.getByRole("button", { name: /Agregar nueva marca/u }).click();
-    await dialog.getByLabel("Nueva marca").fill(`Marca ${suffix}`);
-    await dialog.getByRole("button", { name: "Guardar marca", exact: true }).click();
+    await dialog.getByLabel("Buscar marca").fill(`Marca ${suffix}`);
+    await dialog.getByRole("option", { name: /Agregar marca/u }).click();
     await expect(dialog.getByText("Se creó la marca.")).toBeVisible();
-    const brandId = await dialog.locator("#quick-brand").inputValue();
-    await dialog.getByRole("button", { name: /Agregar tipo de pieza/u }).click();
-    await dialog.getByLabel("Nuevo tipo de pieza").fill(`Pieza ${suffix}`);
-    await dialog.getByRole("button", { name: "Guardar tipo de pieza", exact: true }).click();
+    const brandId = await dialog.locator('input[name="brandId"]').inputValue();
+    await dialog.getByLabel("Buscar tipo de pieza").fill(`Pieza ${suffix}`);
+    await dialog.getByRole("option", { name: /Agregar tipo de pieza/u }).click();
     await expect(dialog.getByText("Se creó el tipo de pieza.")).toBeVisible();
-    const typeId = await dialog.locator("#quick-componentType").inputValue();
+    const typeId = await dialog.locator('input[name="componentTypeId"]').inputValue();
     await dialog.getByRole("button", { name: "Siguiente", exact: true }).click();
     await step(dialog, 2);
     await expect(dialog.getByRole("heading", { name: "Identificación del producto" })).toBeFocused();
@@ -86,7 +84,7 @@ test("five-step navigation validates, preserves all fields, submits once and res
     await dialog.getByRole("button", { name: "Siguiente", exact: true }).click();
     await step(dialog, 5);
     await dialog.getByLabel("Precio de venta").fill("1250.01");
-    await dialog.getByLabel("Garantía (opcional)").fill("30 días");
+    await dialog.getByLabel("Garantía", { exact: true }).fill("6");
     await dialog.getByLabel("Condición", { exact: true }).selectOption("USED");
     await dialog.getByLabel("Cantidad de piezas").fill("5");
     await expect(dialog.getByText("Disponibilidad: Disponible", { exact: true })).toBeVisible();
@@ -121,12 +119,12 @@ test("five-step navigation validates, preserves all fields, submits once and res
         await dialog.getByRole("textbox", { name: "Número de serie secundario 2", exact: true }).fill("SECOND-2");
       }
       if (number === 1) {
-        await expect(dialog.locator("#quick-brand")).toHaveValue(brandId);
-        await expect(dialog.locator("#quick-componentType")).toHaveValue(typeId);
+        await expect(dialog.locator('input[name="brandId"]')).toHaveValue(brandId);
+        await expect(dialog.locator('input[name="componentTypeId"]')).toHaveValue(typeId);
       }
     }
     await goToQuickAddStep(dialog, 5);
-    for (const [label, value] of [["Precio de venta", "1250.01"], ["Garantía (opcional)", "30 días"], ["Cantidad de piezas", "5"], ["Bolsa (opcional)", "Bolsa 3"], ["Código", `BOX-${suffix}`], ["Nombre", "Caja 18"]]) {
+    for (const [label, value] of [["Precio de venta", "1250.01"], ["Garantía", "6"], ["Cantidad de piezas", "5"], ["Bolsa (opcional)", "Bolsa 3"], ["Código", `BOX-${suffix}`], ["Nombre", "Caja 18"]]) {
       await expect(dialog.getByLabel(label!, { exact: true })).toHaveValue(value!);
     }
     await expect(dialog.getByLabel("Ubicación", { exact: true })).toHaveValue(locationId);
@@ -140,7 +138,7 @@ test("five-step navigation validates, preserves all fields, submits once and res
     const rows = (await pool.query("select * from products where part_number=$1", [part])).rows;
     expect(rows).toHaveLength(1);
     const product = rows[0];
-    expect(product).toMatchObject({ brand_id: brandId, component_type_id: typeId, title: `Fuente ${suffix}`, sale_price: "1250.01", warranty: "30 días", currency: "MXN", condition: "USED", status: "ACTIVE", is_public: true });
+    expect(product).toMatchObject({ brand_id: brandId, component_type_id: typeId, title: `Fuente ${suffix}`, sale_price: "1250.01", warranty: "6 meses", currency: "MXN", condition: "USED", status: "ACTIVE", is_public: true });
     expect((await pool.query("select serial_number from product_serial_numbers where product_id=$1", [product.id])).rows.map(row => row.serial_number)).toEqual(expect.arrayContaining(["PRIMARY-1", "SECOND-1", "SECOND-2"]));
     expect((await pool.query("select * from product_compatibilities where product_id=$1", [product.id])).rows).toHaveLength(3);
     expect((await pool.query("select i.quantity,i.legacy_bag_number,l.code,l.parent_id from inventory_items i join locations l on l.id=i.location_id where i.product_id=$1", [product.id])).rows).toEqual([{ quantity: 5, legacy_bag_number: "Bolsa 3", code: `BOX-${suffix}`, parent_id: locationId }]);
@@ -150,16 +148,16 @@ test("five-step navigation validates, preserves all fields, submits once and res
     const reviewPage = await page.context().newPage();
     try {
       await reviewPage.goto(publicPath!);
-      await expect(reviewPage.locator("dl").getByText("30 días", { exact: true })).toBeVisible();
+      await expect(reviewPage.locator("dl").getByText("6 meses", { exact: true })).toBeVisible();
       await reviewPage.goto(`/admin/productos/${product.id}`);
-      await expect(reviewPage.getByLabel("Garantía (opcional)")).toHaveValue("30 días");
-      await reviewPage.getByLabel("Garantía (opcional)").fill("90 días");
+      await expect(reviewPage.getByLabel("Garantía", { exact: true })).toHaveValue("6");
+      await reviewPage.getByLabel("Garantía", { exact: true }).fill("12");
       await reviewPage.getByRole("button", { name: "Guardar cambios", exact: true }).click();
       await expect(reviewPage.getByText("Producto actualizado correctamente.")).toBeVisible();
       await reviewPage.reload();
-      await expect(reviewPage.getByLabel("Garantía (opcional)")).toHaveValue("90 días");
+      await expect(reviewPage.getByLabel("Garantía", { exact: true })).toHaveValue("12");
       await reviewPage.goto(publicPath!);
-      await expect(reviewPage.locator("dl").getByText("90 días", { exact: true })).toBeVisible();
+      await expect(reviewPage.locator("dl").getByText("12 meses", { exact: true })).toBeVisible();
     } finally { await reviewPage.close(); }
     await dialog.getByRole("button", { name: "Agregar otro producto" }).click();
     await step(dialog, 1);
@@ -182,7 +180,7 @@ test("five-step navigation validates, preserves all fields, submits once and res
     await expect(dialog.getByLabel("Ubicación", { exact: true })).toHaveValue("");
     await expect(dialog.getByLabel("Cantidad de piezas")).toHaveValue("1");
     await expect(dialog.getByLabel("Precio de venta")).toHaveValue("");
-    await expect(dialog.getByLabel("Garantía (opcional)")).toHaveValue("");
+    await expect(dialog.getByLabel("Garantía", { exact: true })).toHaveValue("");
     await expect(dialog.getByLabel("Bolsa (opcional)")).toHaveValue("");
   } finally { await pool.end(); }
 });
