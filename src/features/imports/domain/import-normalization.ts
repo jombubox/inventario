@@ -14,6 +14,11 @@ export function importString(value: unknown): string | null {
   return text === "" ? null : text;
 }
 
+export function importNotes(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  return String(value).replace(/\r\n?/gu, "\n").trim() || null;
+}
+
 export function parseImportInteger(
   value: unknown,
   fallback: number,

@@ -27,6 +27,7 @@ import {
   createInventoryItem,
   moveInventoryItem,
   recordStockMovement,
+  updateInventoryDetails,
 } from "@/features/inventory/server/inventory-service";
 import {
   analyzeImportFile,
@@ -83,6 +84,7 @@ import { buildInventoryExport } from "@/features/exports/server/inventory-export
 import { consumeOperationalRateLimit } from "@/features/security/server/rate-limit";
 import { createProductMutationSchema, type CreateProductMutationInput } from "@/validators/admin-product";
 import { quickAddInventoryMutationSchema } from "@/validators/quick-add-inventory";
+import { updateInventoryDetailsMutationSchema } from "@/validators/admin-inventory";
 import { inventoryListQuerySchema, productListQuerySchema } from "@/validators/admin-query";
 import { listAdminInventory } from "@/features/inventory/data/admin-inventory-queries";
 import { getAdminProductDetail, getAdminProductReview, listAdminProducts } from "@/features/products/data/admin-product-queries";
@@ -162,6 +164,37 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     }
     expect(await nodeDb.select().from(brands).where(eq(brands.normalizedName, "UX CONCURRENTE"))).toHaveLength(1);
     expect(await nodeDb.select().from(componentTypes).where(eq(componentTypes.normalizedName, "UX CONCURRENTE"))).toHaveLength(1);
+  });
+
+  it("persists per-entry provenance, separates sources and preserves master data through edits and exports", async () => {
+    const product = await createTestProduct();
+    const parent = await createLocation(db, { code: "INFO-WH", name: "Almacén", type: "WAREHOUSE", parentId: null, active: true, notes: null });
+    const box = await createLocation(db, { code: "INFO-BOX", name: "Caja", type: "BOX", parentId: parent.id, active: true, notes: null });
+    const base = { productMode: "existing", productId: product.id, locationId: parent.id, boxMode: "existing", boxId: box.id, quantity: 2 };
+    const old = await quickAddInventory(db, quickAddInventoryMutationSchema.parse(base));
+    const information = { acquisitionSource: "Taller León", acquiredAt: "2026-10-13", notes: "Revisado: sí.\nConector dañado." };
+    const added = await quickAddInventory(db, quickAddInventoryMutationSchema.parse({ ...base, ...information }));
+    expect(added.item.id).not.toBe(old.item.id);
+    expect(added.item).toMatchObject({ acquisitionSource: information.acquisitionSource, acquiredAt: new Date("2026-10-13T00:00:00Z"), notes: information.notes, quantity: 2 });
+    const repeated = await quickAddInventory(db, quickAddInventoryMutationSchema.parse({ ...base, ...information, quantity: 3 }));
+    expect(repeated.item).toMatchObject({ id: added.item.id, quantity: 5, notes: information.notes });
+    for (const change of [{ acquisitionSource: "Otro origen" }, { acquiredAt: "2026-10-14" }, { notes: "Otro lote" }]) {
+      const different = await quickAddInventory(db, quickAddInventoryMutationSchema.parse({ ...base, ...information, ...change }));
+      expect(different.item.id).not.toBe(added.item.id);
+    }
+    expect(await nodeDb.query.inventoryItems.findFirst({ where: eq(inventoryItems.id, old.item.id) })).toMatchObject({ quantity: 2, acquisitionSource: null, acquiredAt: null, notes: null });
+    const edit = updateInventoryDetailsMutationSchema.parse({ ...repeated.item, expectedUpdatedAt: repeated.item.updatedAt, acquiredAt: "2024-02-29", notes: "Línea 1\nLínea 2" });
+    await updateInventoryDetails(db, edit);
+    const reloaded = await nodeDb.query.inventoryItems.findFirst({ where: eq(inventoryItems.id, added.item.id) });
+    expect(reloaded).toMatchObject({ acquisitionSource: information.acquisitionSource, acquiredAt: new Date("2024-02-29T00:00:00Z"), notes: "Línea 1\nLínea 2", quantity: 5 });
+    expect((await pool.query("select acquired_at::text from inventory_items where id=$1", [added.item.id])).rows[0].acquired_at).toBe("2024-02-29");
+    expect(await nodeDb.query.products.findFirst({ where: eq(products.id, product.id) })).toEqual(product);
+    const exported = await buildInventoryExport(db);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(exported.bytes as unknown as ExcelJS.Buffer);
+    const values = workbook.worksheets.flatMap((sheet) => sheet.getSheetValues().flat()).join("|");
+    expect(values).toContain("Taller León");
+    expect(values).toContain("Línea 1\nLínea 2");
   });
 
   it("filters exact products in PostgreSQL without duplicated images, preserving locations, bags, filters and pagination", async () => {
@@ -247,12 +280,14 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
       primarySerialNumber: " MAIN-1 ", secondarySerialNumbers: ["SECOND-1", "SECOND-2"],
       compatibilities: ["TV-1", "TV-2", "TV-3"].map(model => ({ brandId: brand.id, model, notes: null })),
       locationId: warehouse.id, boxMode: "new", newBoxCode: "WIZ-BOX", newBoxName: "Caja 18", bagLabel: " Bolsa 3 ", quantity: 5,
+      acquisitionSource: "Taller León", acquiredAt: "2026-10-13", notes: "Revisado: sí.\nConector pendiente.",
       salePrice: "1250.01", warranty: " 30   días ", currency: "MXN", status: "ACTIVE", condition: "USED", isPublic: true,
     });
     const result = await quickAddInventory(db, input);
     expect(await nodeDb.select().from(products)).toHaveLength(1);
     expect(result.product).toMatchObject({ brandId: brand.id, componentTypeId: componentType.id, partNumber: "WIZ-123", title: "Fuente wizard", salePrice: "1250.01", warranty: "30 días", condition: "USED", status: "ACTIVE", isPublic: true, currency: "MXN" });
     expect(result.item).toMatchObject({ quantity: 5, locationId: result.box.id, legacyBagNumber: "Bolsa 3" });
+    expect(result.item).toMatchObject({ acquisitionSource: "Taller León", acquiredAt: new Date("2026-10-13T00:00:00Z"), notes: "Revisado: sí.\nConector pendiente." });
     expect(result.box).toMatchObject({ parentId: warehouse.id, code: "WIZ-BOX", name: "Caja 18" });
     expect(await nodeDb.select().from(productCompatibilities)).toHaveLength(3);
     expect((await nodeDb.select().from(productSerialNumbers)).map(row => row.serialNumber)).toEqual(expect.arrayContaining(["MAIN-1", "SECOND-1", "SECOND-2"]));
@@ -281,6 +316,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     expect(await getPublicProductBySlug(db, result.product.slug)).toMatchObject({ warranty: "30 días", availability: { key: "IN_STOCK" } });
     await updateProduct(db, { ...createProductMutationSchema.parse({ ...input, description: null }), id: result.product.id, expectedUpdatedAt: result.product.updatedAt, warranty: "90 días" });
     expect(await getAdminProductDetail(db, result.product.id)).toMatchObject({ warranty: "90 días" });
+    expect(await nodeDb.query.inventoryItems.findFirst({ where: eq(inventoryItems.id, result.item.id) })).toMatchObject({ acquisitionSource: "Taller León", acquiredAt: new Date("2026-10-13T00:00:00Z"), notes: "Revisado: sí.\nConector pendiente." });
     expect(await getPublicProductBySlug(db, result.product.slug)).toMatchObject({ warranty: "90 días" });
   });
 

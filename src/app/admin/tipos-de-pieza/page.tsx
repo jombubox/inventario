@@ -1,3 +1,4 @@
+import { buttonStyles } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
@@ -31,7 +32,7 @@ export default async function PieceTypesPage({
       </CardContent></Card>
       <form method="get" className="flex gap-3">
         <Input name="q" defaultValue={query.q} aria-label="Buscar tipos de pieza" placeholder="Buscar tipo de pieza…" />
-        <button className="min-h-11 rounded-md bg-action px-5 font-semibold text-action-foreground hover:bg-action-hover">Buscar</button>
+        <button className={buttonStyles()}>Buscar</button>
       </form>
       {rows.length === 0 ? (
         <Card><CardContent className="p-8"><EmptyState

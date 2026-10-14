@@ -19,13 +19,13 @@ export function PageHeader({
 }: PageHeaderProps) {
   return (
     <header className={cn("flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between", className)}>
-      <div className="max-w-2xl">
+      <div className="min-w-0 max-w-2xl">
         {eyebrow ? (
           <p className="mb-2 text-label text-link">{eyebrow}</p>
         ) : null}
-        <h1 className="text-h1">{title}</h1>
+        <h1 className="break-words text-h1">{title}</h1>
         {description ? (
-          <p className="mt-2 text-body text-muted-foreground">{description}</p>
+          <p className="mt-2 break-words text-body text-muted-foreground">{description}</p>
         ) : null}
       </div>
       {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}

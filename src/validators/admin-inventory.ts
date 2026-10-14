@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { inventoryInformationFields } from "@/validators/inventory-information";
 
 import {
   inventoryConditionValues,
@@ -19,13 +20,8 @@ export const createInventoryMutationSchema = z
     quantity: z.coerce.number().int().positive("La cantidad inicial debe ser mayor que cero."),
     condition: z.enum(inventoryConditionValues),
     status: z.enum(inventoryStatusValues),
-    acquiredAt: z.preprocess(
-      (value) => (value === "" || value === undefined ? null : value),
-      z.coerce.date().nullable(),
-    ),
-    acquisitionSource: optionalDisplayText,
+    ...inventoryInformationFields,
     purchaseCost: z.union([moneyString, z.literal(""), z.null()]).transform((value) => value || null),
-    notes: optionalDisplayText,
     legacyBagNumber: optionalDisplayText,
     legacyLocationCode: optionalDisplayText,
   })
@@ -43,13 +39,8 @@ export const updateInventoryDetailsMutationSchema = z.object({
   id: z.uuid(),
   expectedUpdatedAt: z.coerce.date(),
   condition: z.enum(inventoryConditionValues),
-  acquiredAt: z.preprocess(
-    (value) => (value === "" || value === undefined ? null : value),
-    z.coerce.date().nullable(),
-  ),
-  acquisitionSource: optionalDisplayText,
+  ...inventoryInformationFields,
   purchaseCost: z.union([moneyString, z.literal(""), z.null()]).transform((value) => value || null),
-  notes: optionalDisplayText,
   legacyBagNumber: optionalDisplayText,
   legacyLocationCode: optionalDisplayText,
 });

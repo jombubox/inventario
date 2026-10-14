@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonStyles } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { ProductImagePlaceholder } from "@/features/catalog/components/product-image";
 import { ImagePreview, PreviewPhoto } from "@/features/images/components/image-preview";
@@ -37,7 +37,7 @@ function ProductReviewModal({ selection, onClose }: { selection: Selection; onCl
     <p className="mb-4 break-words font-semibold">{product.title}</p>
     {kind !== "models" ? <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-md bg-muted p-3">
       <p className="text-small">{review ? review.availableStock > 0 ? `Disponible en inventario · ${review.availableStock} piezas` : "Sin existencias" : error ? "No fue posible consultar las existencias." : "Consultando existencias…"}</p>
-      <Link href={`/admin/inventario?productId=${product.id}`} className="inline-flex min-h-11 items-center rounded-md bg-primary px-4 text-small font-semibold text-white">Buscar en inventario</Link>
+      <Link href={`/admin/inventario?productId=${product.id}`} className={buttonStyles()}>Buscar en inventario</Link>
     </div> : null}
     {kind === "details" && product.primaryImage ? <div className="relative mb-4 h-40 overflow-hidden rounded-md bg-white"><PreviewPhoto image={{ url: product.primaryImage, alt: product.title }} sizes="320px" /></div> : null}
     {kind === "details" ? <>

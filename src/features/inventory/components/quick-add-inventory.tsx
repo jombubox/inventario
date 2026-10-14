@@ -11,6 +11,7 @@ import {
   useState,
 } from "react";
 
+import { InventoryInformationFields, type InventoryInformation } from "./inventory-information-fields";
 import { WarrantyField, WarrantySubmission } from "@/features/products/components/warranty-field";
 import { warrantyDraft, warrantySubmission } from "@/features/products/domain/warranty";
 import { CatalogAutocomplete } from "@/features/products/components/catalog-autocomplete";
@@ -289,6 +290,7 @@ function QuickAddDialog({
   const [newBoxName, setNewBoxName] = useState("");
   const [bagLabel, setBagLabel] = useState("");
   const [quantity, setQuantity] = useState(1);
+  const [information, setInformation] = useState<InventoryInformation>({ acquisitionSource: "", acquiredAt: "", notes: "" });
 
   const resolvedLocationId = !locationId ? "" : options.locations.some((location) => location.id === locationId)
     ? locationId
@@ -408,7 +410,7 @@ function QuickAddDialog({
   };
 
   const busy = pending || photosValidating || modelSaving || locationSaving || brandSaving || typeSaving || photosBusy;
-  const dirty = !selectedProduct && (Boolean(brandId || componentTypeId || partNumber || title || primarySerialNumber || salePrice || warranty.months || warranty.noWarranty || bagLabel || newBoxCode || newBoxName) || secondarySerialNumbers.length > 0 || compatibilities.length > 0 || photos.length > 0 || quantity !== 1 || condition !== "USED" || status !== "ACTIVE" || !isPublic || (Boolean(locationId) && locationId !== initialLocationId) || (Boolean(boxId) && boxId !== (initialBox?.id ?? "")));
+  const dirty = !selectedProduct && (Boolean(brandId || componentTypeId || partNumber || title || primarySerialNumber || salePrice || warranty.months || warranty.noWarranty || information.acquisitionSource || information.acquiredAt || information.notes || bagLabel || newBoxCode || newBoxName) || secondarySerialNumbers.length > 0 || compatibilities.length > 0 || photos.length > 0 || quantity !== 1 || condition !== "USED" || status !== "ACTIVE" || !isPublic || (Boolean(locationId) && locationId !== initialLocationId) || (Boolean(boxId) && boxId !== (initialBox?.id ?? "")));
   const discard = () => { dialogRef.current?.close(); onClose(); };
   const close = () => {
     if (busy) return;
@@ -461,7 +463,7 @@ function QuickAddDialog({
     productMode: "new", productId: "", brandId, customBrandName, componentTypeId, customComponentTypeName,
     partNumber, primarySerialNumber, secondarySerialNumbers: secondarySerialNumbers.map(({ value }) => value),
     compatibilities, title, salePrice, warranty: warrantySubmission(warranty), currency: "MXN", condition, status, isPublic,
-    locationId: resolvedLocationId, boxMode, boxId: resolvedBoxId, newBoxCode, newBoxName, bagLabel, quantity,
+    locationId: resolvedLocationId, boxMode, boxId: resolvedBoxId, newBoxCode, newBoxName, bagLabel, quantity, ...information,
   };
   const validateStep = (current: WizardStep) => current === 4 ? null : quickAddWizardSchemas[current].safeParse(payload);
   const continueNewProduct = () => {
@@ -562,6 +564,9 @@ function QuickAddDialog({
         <input type="hidden" name="newBoxName" value={newBoxName} />
         <input type="hidden" name="bagLabel" value={bagLabel} />
         <input type="hidden" name="quantity" value={quantity} />
+        <input type="hidden" name="acquisitionSource" value={information.acquisitionSource} />
+        <input type="hidden" name="acquiredAt" value={information.acquiredAt} />
+        <input type="hidden" name="notes" value={information.notes} />
 
         <header className="shrink-0 flex items-start justify-between gap-4 border-b border-border px-5 py-4 sm:px-7 sm:py-5">
           <div className="min-w-0 flex-1">
@@ -869,6 +874,10 @@ function QuickAddDialog({
                       </div>
                       <FieldError errors={inventoryErrors?.quantity} />
                     </div>
+                  </div>
+                  <div className="mt-6">
+                    {selectedProduct ? <details className="rounded-md border border-border p-4"><summary className="cursor-pointer font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Información adicional (opcional)</summary><div className="mt-4"><InventoryInformationFields id="quick-information" value={information} onChange={setInformation} errors={inventoryErrors} submit={false} /></div></details>
+                      : <InventoryInformationFields id="quick-information" value={information} onChange={setInformation} errors={inventoryErrors} submit={false} />}
                   </div>
                   {!selectedProduct ? <>
                     <h3 className="mt-7 text-h3 text-navy">Venta</h3>

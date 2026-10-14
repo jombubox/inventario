@@ -35,7 +35,7 @@ const headerAliases: Record<ImportField, readonly string[]> = {
   isPublic: ["ISPUBLIC", "IS PUBLIC", "PUBLICO"],
   titleOverride: ["TITLEOVERRIDE", "TITLE OVERRIDE", "TITULO PERSONALIZADO"],
   description: ["DESCRIPTION", "DESCRIPCION"],
-  internalNotes: ["INTERNALNOTES", "INTERNAL NOTES", "NOTAS INTERNAS", "NOTAS"],
+  internalNotes: ["INTERNALNOTES", "INTERNAL NOTES", "NOTAS INTERNAS", "NOTAS", "NOTES"],
   legacyTitle: ["LEGACYTITLE", "LEGACY TITLE", "TITULO"],
   legacyLocationCode: ["LEGACYLOCATIONCODE", "LEGACY LOCATION CODE", "SKU"],
   legacyExtra: ["LEGACYEXTRA", "LEGACY EXTRA", "ULTIMA COLUMNA"],

@@ -204,6 +204,10 @@ async function addStock(
         eq(inventoryItems.locationId, boxId),
         eq(inventoryItems.condition, "UNKNOWN"),
         eq(inventoryItems.status, "AVAILABLE"),
+        // Never merge entries from different sources or rewrite older provenance.
+        sql`${inventoryItems.acquiredAt} is not distinct from ${input.acquiredAt?.toISOString().slice(0, 10) ?? null}::date`,
+        sql`${inventoryItems.acquisitionSource} is not distinct from ${input.acquisitionSource ?? null}`,
+        sql`${inventoryItems.notes} is not distinct from ${input.notes ?? null}`,
         sql`coalesce(upper(regexp_replace(btrim(${inventoryItems.legacyBagNumber}), '[[:space:]]+', ' ', 'g')), '') = ${normalizedBag}`,
       ),
     )
@@ -228,10 +232,10 @@ async function addStock(
     quantity: input.quantity,
     condition: "UNKNOWN",
     status: "AVAILABLE",
-    acquiredAt: null,
-    acquisitionSource: null,
+    acquiredAt: input.acquiredAt ?? null,
+    acquisitionSource: input.acquisitionSource,
     purchaseCost: null,
-    notes: null,
+    notes: input.notes ?? null,
     legacyBagNumber: bagLabel,
     legacyLocationCode: null,
   });

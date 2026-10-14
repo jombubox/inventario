@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { inventoryInformationFields } from "@/validators/inventory-information";
 
 import { UNPARENTED_BOXES_LOCATION_ID } from "@/features/locations/domain/quick-add-location";
 import { CUSTOM_CATALOG_VALUE } from "@/features/products/domain/catalog-selection";
@@ -48,6 +49,9 @@ const quickAddFieldsSchema = z
     newBoxCode: optionalDisplayText,
     newBoxName: optionalDisplayText,
     bagLabel: optionalDisplayText,
+    ...inventoryInformationFields,
+    acquiredAt: inventoryInformationFields.acquiredAt.optional(),
+    notes: inventoryInformationFields.notes.optional(),
     quantity: z.coerce
       .number()
       .int("La cantidad debe ser un número entero.")
@@ -144,6 +148,7 @@ export const quickAddWizardSchemas = {
     locationId: true, boxMode: true, boxId: true, newBoxCode: true,
     newBoxName: true, bagLabel: true, quantity: true, salePrice: true,
     warranty: true, condition: true, status: true, isPublic: true,
+    acquisitionSource: true, acquiredAt: true, notes: true,
   }).superRefine((value, context) => {
     if (value.boxMode === "existing" && !value.boxId) context.addIssue({ code: "custom", path: ["boxId"], message: "Selecciona una caja." });
     if (value.boxMode === "new") {
@@ -157,6 +162,7 @@ export const quickAddWizardSchemas = {
 const inventoryEntrySchema = quickAddFieldsSchema.pick({
   locationId: true, boxMode: true, boxId: true, newBoxCode: true,
   newBoxName: true, bagLabel: true, quantity: true,
+  acquisitionSource: true, acquiredAt: true, notes: true,
 });
 
 export const quickAddInventoryMutationSchema = z.discriminatedUnion("productMode", [

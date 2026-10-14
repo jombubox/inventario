@@ -142,7 +142,7 @@ test("the administrator uploads an image directly through the signed fake R2 bou
   expect(uploadResponse.status(), uploadText).toBe(201);
   await page.goto(editHref!);
   await expect(page.getByLabel("Texto alternativo")).toHaveValue("tiny");
-  await expect(page.getByText("Principal", { exact: true })).toBeVisible();
+  await expect(page.getByText("Foto principal", { exact: true })).toBeVisible();
 
   const secondUpload = await directUpload(page, {
     headers: { Origin: currentOrigin(page) },

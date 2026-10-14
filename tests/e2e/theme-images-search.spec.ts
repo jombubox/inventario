@@ -267,7 +267,8 @@ test("theme tokens, persistence, admin surfaces and mobile layout match the pale
         expect(colors).toEqual({ background: theme === "light" ? "#F1F3F4" : "#0D0F11", card: theme === "light" ? "#FFFFFF" : "#191D23", primary: "#2F73F2", actual: theme === "light" ? "rgb(241, 243, 244)" : "rgb(13, 15, 17)" });
         await expect(page.locator(".bg-card").first()).toHaveCSS("background-color", theme === "light" ? "rgb(255, 255, 255)" : "rgb(25, 29, 35)");
         const primary = page.locator('[data-quick-add-trigger]').filter({ visible: true }).first();
-        await expect(primary).toHaveCSS("background-color", "rgb(47, 115, 242)");
+        await expect(primary).toHaveCSS("background-color", "rgb(45, 111, 234)");
+        await expect(primary).toHaveCSS("color", "rgb(255, 255, 255)");
         expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
         const output = testInfo.outputPath(`${size.width}-${theme}-${path.replaceAll("/", "") || "dashboard"}.png`);
         await page.screenshot({ path: output, caret: "initial" }); await testInfo.attach(`${size.width}-${theme}-${path || "dashboard"}`, { path: output, contentType: "image/png" });

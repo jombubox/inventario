@@ -21,6 +21,14 @@ function form() {
 }
 
 describe("Quick Add publication action", () => {
+  it("forwards acquisition information to inventory without flattening notes", async () => {
+    const data = form();
+    data.set("acquisitionSource", "Taller León");
+    data.set("acquiredAt", "2026-10-13");
+    data.set("notes", "Revisado: sí.\nConector pendiente.");
+    await quickAddInventoryAction({ status: "idle" }, data);
+    expect(mocks.save.mock.calls[0]?.[1]).toMatchObject({ acquisitionSource: "Taller León", acquiredAt: new Date("2026-10-13T00:00:00Z"), notes: "Revisado: sí.\nConector pendiente." });
+  });
   beforeEach(() => {
     mocks.save.mockReset();
     mocks.authenticate.mockReset();

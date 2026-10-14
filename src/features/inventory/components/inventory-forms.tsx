@@ -1,13 +1,13 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
+import { InventoryInformationFields, type InventoryInformation } from "./inventory-information-fields";
 import { FormFeedback } from "@/components/forms/form-feedback";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import {
   adjustInventoryAction,
   createInventoryAction,
@@ -38,7 +38,12 @@ const statusOptions = [
 ] as const;
 
 export function CreateInventoryForm({ products, locations }: { products: ProductOption[]; locations: LocationOption[] }) {
-  const [state, action] = useActionState(createInventoryAction, initialMutationState);
+  const [information, setInformation] = useState<InventoryInformation>({ acquisitionSource: "", acquiredAt: "", notes: "" });
+  const [state, action] = useActionState(async (previous: typeof initialMutationState, data: FormData) => {
+    const result = await createInventoryAction(previous, data);
+    if (result.status === "success") setInformation({ acquisitionSource: "", acquiredAt: "", notes: "" });
+    return result;
+  }, initialMutationState);
   return (
     <form action={action} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" noValidate>
       <div className="sm:col-span-2"><Label htmlFor="new-product">Producto</Label><Select id="new-product" name="productId" className="mt-2" required><option value="">Selecciona un producto</option>{products.map((item) => <option key={item.id} value={item.id}>{item.sku} · {item.title}</option>)}</Select></div>
@@ -46,12 +51,10 @@ export function CreateInventoryForm({ products, locations }: { products: Product
       <div><Label htmlFor="new-quantity">Cantidad inicial</Label><Input id="new-quantity" name="quantity" type="number" min="1" step="1" defaultValue="1" className="mt-2" /></div>
       <div><Label htmlFor="new-condition">Condición</Label><Select id="new-condition" name="condition" defaultValue="UNKNOWN" className="mt-2">{conditionOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></div>
       <div><Label htmlFor="new-status">Estado</Label><Select id="new-status" name="status" defaultValue="AVAILABLE" className="mt-2"><option value="AVAILABLE">Disponible</option><option value="RESERVED">Reservado</option><option value="DAMAGED">Dañado</option></Select></div>
-      <div><Label htmlFor="new-acquired">Fecha de adquisición</Label><Input id="new-acquired" name="acquiredAt" type="date" className="mt-2" /></div>
-      <div><Label htmlFor="new-source">Origen</Label><Input id="new-source" name="acquisitionSource" className="mt-2" /></div>
       <div><Label htmlFor="new-cost">Costo de compra</Label><Input id="new-cost" name="purchaseCost" inputMode="decimal" placeholder="0.00" className="mt-2" /></div>
       <div><Label htmlFor="new-bag">N° Bolsa legacy</Label><Input id="new-bag" name="legacyBagNumber" className="mt-2" /></div>
       <div><Label htmlFor="new-legacy-location">Código legacy</Label><Input id="new-legacy-location" name="legacyLocationCode" placeholder="J1B1" className="mt-2" /></div>
-      <div className="sm:col-span-2 lg:col-span-4"><Label htmlFor="new-notes">Notas</Label><Textarea id="new-notes" name="notes" rows={3} className="mt-2" /></div>
+      <div className="sm:col-span-2 lg:col-span-4"><InventoryInformationFields id="new-information" value={information} onChange={setInformation} errors={state.fieldErrors} /></div>
       <div className="sm:col-span-2 lg:col-span-4"><FormFeedback state={state} /></div>
       <div className="sm:col-span-2 lg:col-span-4 flex justify-end"><SubmitButton pendingLabel="Creando inventario…">Crear existencia</SubmitButton></div>
     </form>
@@ -79,16 +82,16 @@ export function InventoryRowActions({ item, locations }: { item: InventoryRowVal
   const [detailsState, detailsAction] = useActionState(updateInventoryDetailsAction, initialMutationState);
   const [inState, inAction] = useActionState(stockMovementAction, initialMutationState);
   const [outState, outAction] = useActionState(stockMovementAction, initialMutationState);
+  const [information, setInformation] = useState<InventoryInformation>({ acquisitionSource: item.acquisitionSource ?? "", acquiredAt: item.acquiredAt ?? "", notes: item.notes ?? "" });
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <form action={detailsAction} className="sm:col-span-2 space-y-3 rounded-md bg-muted/45 p-4">
         <input type="hidden" name="id" value={item.id} /><input type="hidden" name="expectedUpdatedAt" value={item.updatedAt} /><h3 className="font-semibold text-navy">Datos físicos</h3>
         <div><Label htmlFor={`condition-${item.id}`}>Condición</Label><Select id={`condition-${item.id}`} name="condition" defaultValue={item.condition} className="mt-2">{conditionOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></div>
-        <div className="grid grid-cols-2 gap-3"><div><Label htmlFor={`acquired-${item.id}`}>Adquisición</Label><Input id={`acquired-${item.id}`} name="acquiredAt" type="date" defaultValue={item.acquiredAt ?? ""} className="mt-2" /></div><div><Label htmlFor={`cost-${item.id}`}>Costo</Label><Input id={`cost-${item.id}`} name="purchaseCost" defaultValue={item.purchaseCost ?? ""} className="mt-2" /></div></div>
-        <div><Label htmlFor={`source-${item.id}`}>Origen</Label><Input id={`source-${item.id}`} name="acquisitionSource" defaultValue={item.acquisitionSource ?? ""} className="mt-2" /></div>
+        <div className="grid grid-cols-2 gap-3"><div><Label htmlFor={`cost-${item.id}`}>Costo</Label><Input id={`cost-${item.id}`} name="purchaseCost" defaultValue={item.purchaseCost ?? ""} className="mt-2" /></div></div>
         <div className="grid grid-cols-2 gap-3"><div><Label htmlFor={`bag-${item.id}`}>N° Bolsa</Label><Input id={`bag-${item.id}`} name="legacyBagNumber" defaultValue={item.legacyBagNumber ?? ""} className="mt-2" /></div><div><Label htmlFor={`legacy-${item.id}`}>Código legacy</Label><Input id={`legacy-${item.id}`} name="legacyLocationCode" defaultValue={item.legacyLocationCode ?? ""} className="mt-2" /></div></div>
-        <div><Label htmlFor={`notes-${item.id}`}>Notas</Label><Textarea id={`notes-${item.id}`} name="notes" defaultValue={item.notes ?? ""} rows={2} className="mt-2" /></div>
+        <div><InventoryInformationFields id={`information-${item.id}`} value={information} onChange={setInformation} errors={detailsState.fieldErrors} /></div>
         <FormFeedback state={detailsState} /><SubmitButton size="sm" pendingLabel="Actualizando…">Actualizar datos</SubmitButton>
       </form>
 

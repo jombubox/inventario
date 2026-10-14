@@ -196,7 +196,7 @@ test("quick add reuses an existing product, creates a product with multiple comp
   await productRow.getByRole("link", { name: "Editar" }).click();
   await expect(page.getByAltText(`frente-${suffix}`)).toBeVisible();
   await expect(page.getByAltText(`reverso-${suffix}`)).toBeVisible();
-  await expect(page.getByText("Principal", { exact: true })).toBeVisible();
+  await expect(page.getByText("Foto principal", { exact: true })).toBeVisible();
   await page.getByLabel("Número de serie principal (opcional)").fill(editedPrimarySerial);
   await page.getByRole("button", { name: "Agregar número de serie secundario" }).click();
   await page.getByRole("textbox", { name: "Número de serie secundario 3", exact: true }).fill(secondarySerialThree);

@@ -74,6 +74,9 @@ export async function quickAddInventoryAction(
     newBoxCode: formData.get("newBoxCode"),
     newBoxName: formData.get("newBoxName"),
     bagLabel: formData.get("bagLabel"),
+    acquisitionSource: formData.get("acquisitionSource"),
+    acquiredAt: formData.get("acquiredAt"),
+    notes: formData.get("notes"),
     quantity: formData.get("quantity"),
   });
   if (!parsed.success) return validationState(parsed.error);

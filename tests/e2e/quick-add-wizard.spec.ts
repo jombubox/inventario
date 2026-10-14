@@ -83,6 +83,9 @@ test("five-step navigation validates, preserves all fields, submits once and res
     await page.screenshot({ path: info.outputPath("step-4-photos.png") });
     await dialog.getByRole("button", { name: "Siguiente", exact: true }).click();
     await step(dialog, 5);
+    await dialog.getByLabel("Origen", { exact: true }).fill("Taller León");
+    await dialog.getByLabel("Fecha", { exact: true }).fill("2026-10-13");
+    await dialog.getByLabel("Notas", { exact: true }).fill("Revisado: sí.\nConector pendiente.");
     await dialog.getByLabel("Precio de venta").fill("1250.01");
     await dialog.getByLabel("Garantía", { exact: true }).fill("6");
     await dialog.getByLabel("Condición", { exact: true }).selectOption("USED");
@@ -124,6 +127,9 @@ test("five-step navigation validates, preserves all fields, submits once and res
       }
     }
     await goToQuickAddStep(dialog, 5);
+    await expect(dialog.getByLabel("Origen", { exact: true })).toHaveValue("Taller León");
+    await expect(dialog.getByLabel("Fecha", { exact: true })).toHaveValue("2026-10-13");
+    await expect(dialog.getByLabel("Notas", { exact: true })).toHaveValue("Revisado: sí.\nConector pendiente.");
     for (const [label, value] of [["Precio de venta", "1250.01"], ["Garantía", "6"], ["Cantidad de piezas", "5"], ["Bolsa (opcional)", "Bolsa 3"], ["Código", `BOX-${suffix}`], ["Nombre", "Caja 18"]]) {
       await expect(dialog.getByLabel(label!, { exact: true })).toHaveValue(value!);
     }
@@ -138,6 +144,7 @@ test("five-step navigation validates, preserves all fields, submits once and res
     const rows = (await pool.query("select * from products where part_number=$1", [part])).rows;
     expect(rows).toHaveLength(1);
     const product = rows[0];
+    expect((await pool.query("select acquisition_source, acquired_at::text, notes from inventory_items where product_id=$1", [product.id])).rows).toEqual([{ acquisition_source: "Taller León", acquired_at: "2026-10-13", notes: "Revisado: sí.\nConector pendiente." }]);
     expect(product).toMatchObject({ brand_id: brandId, component_type_id: typeId, title: `Fuente ${suffix}`, sale_price: "1250.01", warranty: "6 meses", currency: "MXN", condition: "USED", status: "ACTIVE", is_public: true });
     expect((await pool.query("select serial_number from product_serial_numbers where product_id=$1", [product.id])).rows.map(row => row.serial_number)).toEqual(expect.arrayContaining(["PRIMARY-1", "SECOND-1", "SECOND-2"]));
     expect((await pool.query("select * from product_compatibilities where product_id=$1", [product.id])).rows).toHaveLength(3);
@@ -182,6 +189,9 @@ test("five-step navigation validates, preserves all fields, submits once and res
     await expect(dialog.getByLabel("Precio de venta")).toHaveValue("");
     await expect(dialog.getByLabel("Garantía", { exact: true })).toHaveValue("");
     await expect(dialog.getByLabel("Bolsa (opcional)")).toHaveValue("");
+    await expect(dialog.getByLabel("Origen", { exact: true })).toHaveValue("");
+    await expect(dialog.getByLabel("Fecha", { exact: true })).toHaveValue("");
+    await expect(dialog.getByLabel("Notas", { exact: true })).toHaveValue("");
   } finally { await pool.end(); }
 });
 
@@ -206,6 +216,13 @@ for (const size of [{ width: 1440, height: 900 }, { width: 900, height: 900 }, {
         await expect(dialog.getByRole("button", { name: number === 5 ? "Agregar producto" : "Siguiente", exact: true })).toBeInViewport();
         await expect(dialog.getByRole("heading").first()).toBeInViewport();
         await page.screenshot({ path: info.outputPath(`${theme}-step-${number}.png`) });
+        if (number === 5) {
+          await dialog.getByLabel("Notas", { exact: true }).scrollIntoViewIfNeeded();
+          for (const label of ["Origen", "Fecha", "Notas"]) await expect(dialog.getByLabel(label, { exact: true })).toBeVisible();
+          await expect(dialog.getByRole("button", { name: "Agregar producto", exact: true })).toBeInViewport();
+          expect(await dialog.evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
+          await page.screenshot({ path: info.outputPath(`${theme}-additional-information.png`) });
+        }
       }
     }
     // A smaller visible viewport models the space available with an on-screen keyboard.

@@ -191,7 +191,7 @@ export function ProductForm({
         </div>
         <div>
           <span className="text-label font-semibold text-foreground">{product ? "SKU inmutable" : "Vista previa del SKU"}</span>
-          <div className="mt-2 min-h-11 rounded-xl border border-primary/20 bg-primary-soft px-3 py-3 font-mono text-small font-semibold text-primary-active">
+          <div className="mt-2 min-h-11 break-all rounded-xl border border-primary/20 bg-primary-soft px-3 py-3 font-mono text-small font-semibold text-primary-active">
             {skuPreview}
           </div>
           <p className="mt-1.5 text-xs text-muted-foreground">El servidor vuelve a generarlo y valida colisiones al guardar.</p>

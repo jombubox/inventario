@@ -23,6 +23,7 @@ import {
 import {
   appendInternalNote,
   importString,
+  importNotes,
   parseImportBoolean,
   parseImportCondition,
   parseImportDate,
@@ -278,7 +279,7 @@ export async function analyzeImportRows(
       isPublic: isPublic.value,
       titleOverride: importString(values.titleOverride),
       description: importString(values.description),
-      internalNotes: importString(values.internalNotes),
+      internalNotes: importNotes(values.internalNotes),
       legacyTitle: importString(values.legacyTitle),
     };
 

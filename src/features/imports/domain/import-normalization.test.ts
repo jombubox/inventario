@@ -5,9 +5,15 @@ import {
   parseImportDate,
   parseImportInteger,
   parseImportMoney,
+  importNotes,
 } from "@/features/imports/domain/import-normalization";
 
 describe("import normalization", () => {
+  it("preserves multiline Spanish inventory notes", () => {
+    expect(importNotes("  Primera línea\r\n¿Reparar? Sí.  ")).toBe("Primera línea\n¿Reparar? Sí.");
+    expect(importNotes("\n  ")).toBeNull();
+    expect(importNotes(null)).toBeNull();
+  });
   it("normalizes Mexican legacy and ISO dates without accepting rollover dates", () => {
     expect(parseImportDate("31/01/2025")).toEqual({ value: "2025-01-31" });
     expect(parseImportDate("2025-01-31")).toEqual({ value: "2025-01-31" });

@@ -4,6 +4,9 @@ import { describe, expect, it } from "vitest";
 import { detectImportMapping, parseXlsxWorkbook } from "@/features/imports/server/xlsx-parser";
 
 describe("legacy XLSX parser", () => {
+  it("recognizes inventory export provenance headers", () => {
+    expect(detectImportMapping(["AcquiredAt", "AcquisitionSource", "Notes"])).toMatchObject({ acquiredAt: "AcquiredAt", acquisitionSource: "AcquisitionSource", internalNotes: "Notes" });
+  });
   it("maps legacy SKU to physical legacy location and never to ExistingSKU", () => {
     const mapping = detectImportMapping([
       "N° Bolsa",

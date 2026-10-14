@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Modal } from "@/components/ui/modal";
+import { ImagePreview } from "./image-preview";
 import { allowedImageMimeTypes, assertSafeImageDescription, imageSignatureHex, MAX_IMAGE_BYTES, MAX_PRODUCT_IMAGES } from "@/features/images/domain/image-policy";
 
 const uploadIds = new WeakMap<File, string>();
@@ -15,19 +17,24 @@ export type PhotoState = { status: "selected" | "uploading" | "uploaded" | "fail
 
 function PhotoThumbnail({ file }: { file: File }) {
   const ref = useRef<HTMLDivElement>(null);
+  const urlRef = useRef("");
+  const [preview, setPreview] = useState<string | null>(null);
   useEffect(() => {
     const url = URL.createObjectURL(file);
+    urlRef.current = url;
     const element = ref.current;
     if (element) element.style.backgroundImage = `url("${url}")`;
     return () => { if (element) element.style.backgroundImage = ""; URL.revokeObjectURL(url); };
   }, [file]);
-  return <div ref={ref} role="img" aria-label={file.name} className="aspect-square rounded-md bg-white bg-contain bg-center bg-no-repeat" />;
+  return <><button type="button" className="block w-full rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Ver foto: ${file.name}`} onClick={() => setPreview(urlRef.current)}><div ref={ref} role="img" aria-label={file.name} className="aspect-square rounded-md bg-white bg-contain bg-center bg-no-repeat" /></button>
+    {preview ? <Modal title="Vista previa de la foto" onClose={() => setPreview(null)}><ImagePreview title={file.name} images={[{ url: preview, alt: file.name }]} /></Modal> : null}</>;
 }
 
-export function PhotoSelection({ files, onChange, id, states = {}, locked = false, existingCount = 0, onValidating, onRetry }: {
+export function PhotoSelection({ files, onChange, id, states = {}, locked = false, existingCount = 0, onValidating, onRetry, hideUploaded = false }: {
   files: File[]; onChange: (files: File[]) => void; id: string;
   states?: Record<string, PhotoState>; locked?: boolean; existingCount?: number;
   onValidating?: (validating: boolean) => void; onRetry?: () => void;
+  hideUploaded?: boolean;
 }) {
   const [error, setError] = useState("");
   const [validating, setValidating] = useState(false);
@@ -70,10 +77,10 @@ export function PhotoSelection({ files, onChange, id, states = {}, locked = fals
   return <section aria-label="Fotos del producto" className="space-y-3 text-left">
     {!locked ? <div>
       <Label htmlFor={id}>Fotos del producto</Label>
-      <p className="mt-1 text-xs text-muted-foreground">JPEG, PNG o WebP; hasta 10 MB por foto. La primera será la principal.</p>
-      {id === "quick-product-photos" ? <Button type="button" variant="outline" className="mt-2" disabled={validating} onClick={() => fileInput.current?.click()}>+ Agregar fotos</Button> : null}
+      <p className="mt-1 text-xs text-muted-foreground">JPEG, PNG o WebP; hasta 10 MiB por foto. {existingCount ? "Las fotos nuevas se agregan al final sin reemplazar las existentes." : "La primera será la principal."}</p>
+      <Button type="button" className="mt-2" disabled={validating} onClick={() => fileInput.current?.click()}>+ Agregar fotos</Button>
       <input ref={fileInput} id={id} aria-label={id === "quick-product-photos" ? "+ Agregar fotos" : "Subir imágenes"} type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={validating}
-        className={id === "quick-product-photos" ? "hidden" : "mt-2 block w-full min-w-0 rounded-md border border-input bg-field p-2 text-small focus-visible:ring-2 focus-visible:ring-ring"}
+        className="hidden"
         onChange={(event) => { const selected = Array.from(event.target.files ?? []); event.target.value = ""; void addFiles(selected); }} />
     </div> : null}
     {validating ? <p role="status" className="text-small">Verificando fotos…</p> : null}
@@ -81,6 +88,7 @@ export function PhotoSelection({ files, onChange, id, states = {}, locked = fals
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
       {files.map((file, index) => {
         const state = states[photoUploadId(file)] ?? { status: "selected" };
+        if (hideUploaded && state.status === "uploaded") return null;
         return <article key={photoUploadId(file)} className="min-w-0 rounded-md border border-border bg-card p-2" data-photo-state={state.status}>
           <PhotoThumbnail file={file} />
           <p className="mt-2 truncate text-xs" title={file.name}>{file.name}</p>
