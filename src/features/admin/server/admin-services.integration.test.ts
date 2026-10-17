@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import ExcelJS from "exceljs";
 
 import type { Database } from "@/db/connection";
@@ -105,6 +105,8 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
   let db: Database;
 
   beforeAll(() => {
+    // Image URL queries must not depend on workstation or CI storage settings.
+    vi.stubEnv("R2_PUBLIC_URL", "https://images.example.test");
     pool = new Pool({ connectionString: testDatabaseUrl });
     nodeDb = drizzle(pool, { schema });
     db = nodeDb as unknown as Database;
@@ -126,6 +128,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
 
   afterAll(async () => {
     await pool?.end();
+    vi.unstubAllEnvs();
   });
 
   async function catalogIds() {
