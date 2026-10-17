@@ -2,8 +2,8 @@ import { goToQuickAddStep } from "./helpers/quick-add-wizard";
 import { expect, test, type Page } from "@playwright/test";
 
 const credentials = {
-  email: "admin@e2e.local",
-  password: "JombuBox-E2E-Admin-123!",
+  email: process.env.ADMIN_EMAIL ?? "admin@e2e.local",
+  password: process.env.ADMIN_PASSWORD ?? "JombuBox-E2E-Admin-123!",
 } as const;
 
 async function login(page: Page) {

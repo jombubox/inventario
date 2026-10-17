@@ -10,8 +10,8 @@ test.use({ actionTimeout: 15_000 });
 
 async function open(page: Page) {
   await page.goto("/login");
-  await page.getByLabel("Correo electrónico").fill("admin@e2e.local");
-  await page.getByLabel("Contraseña").fill("JombuBox-E2E-Admin-123!");
+  await page.getByLabel("Correo electrónico").fill(process.env.ADMIN_EMAIL ?? "admin@e2e.local");
+  await page.getByLabel("Contraseña").fill(process.env.ADMIN_PASSWORD ?? "JombuBox-E2E-Admin-123!");
   await page.getByRole("button", { name: "Iniciar sesión" }).click();
   await expect(page).toHaveURL(/\/admin$/u);
   const trigger = page.locator("[data-quick-add-trigger]").filter({ visible: true }).first();

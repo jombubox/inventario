@@ -5,8 +5,8 @@ import { createReadStream } from "node:fs";
 import { writeFile } from "node:fs/promises";
 
 const credentials = {
-  email: "admin@e2e.local",
-  password: "JombuBox-E2E-Admin-123!",
+  email: process.env.ADMIN_EMAIL ?? "admin@e2e.local",
+  password: process.env.ADMIN_PASSWORD ?? "JombuBox-E2E-Admin-123!",
 } as const;
 
 async function login(page: Page) {
