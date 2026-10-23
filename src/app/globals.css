@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* Native dialogs own the top layer; the mobile menu also needs the full viewport. */
+body:has(dialog[open], header details[open]) .product-contact-bar {
+  display: none;
+}
+
 .hero-board-image { opacity: 0.16; }
 :root[data-theme="dark"] .hero-board-image { opacity: 0.28; }
 

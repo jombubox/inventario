@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { buttonStyles } from "@/components/ui/button";
+import { WhatsAppLink } from "@/components/ui/whatsapp-link";
 import { getDb } from "@/db";
 import { ProductCard } from "@/features/catalog/components/product-card";
 import { HeroBoardBackground } from "@/features/catalog/components/hero-board-background";
@@ -165,6 +166,15 @@ export default async function HomePage() {
         </div>
       </section>
       <BrandLogoCarousel title="Paqueterías" description="Consulta las opciones y condiciones de envío al solicitar tus piezas." logos={shippingLogos} />
+      <section aria-labelledby="home-contact-title" className="px-5 py-12 sm:px-8 lg:px-10">
+        <div className="mx-auto flex max-w-7xl flex-col items-start gap-6 rounded-2xl border border-border bg-card p-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-2xl">
+            <h2 id="home-contact-title" className="text-h2 text-navy">¿No encuentras la pieza que buscas?</h2>
+            <p className="mt-3 text-body text-muted-foreground">Envíanos el número de parte o una fotografía y te ayudamos a consultar disponibilidad.</p>
+          </div>
+          <WhatsAppLink className="w-full sm:w-auto">Preguntar por WhatsApp</WhatsAppLink>
+        </div>
+      </section>
     </>
   );
 }

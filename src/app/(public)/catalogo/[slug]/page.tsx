@@ -9,6 +9,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AvailabilityBadge } from "@/features/catalog/components/availability-badge";
 import { ProductCard } from "@/features/catalog/components/product-card";
 import { ProductGallery } from "@/features/catalog/components/product-gallery";
+import { ProductQuotation } from "@/features/catalog/components/product-quotation";
+import { buildProductQuotationMessage, buildWhatsAppUrl, productQuotationLabel } from "@/config/contact";
 import {
   loadPublicProductBySlug,
   loadRelatedProducts,
@@ -118,7 +120,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(productJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }} />
 
-      <div className="mx-auto w-full max-w-7xl px-5 py-8 sm:px-8 lg:px-10 lg:py-12">
+      <div className="mx-auto w-full max-w-7xl px-5 pt-8 pb-28 sm:px-8 md:pb-8 lg:px-10 lg:py-12">
         <nav aria-label="Migas de pan" className="mb-7 flex flex-wrap items-center gap-2 text-small text-muted-foreground">
           <Link href="/" className="hover:text-foreground hover:underline">Inicio</Link>
           <span aria-hidden="true">/</span>
@@ -127,7 +129,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
           <span className="line-clamp-1 text-foreground" aria-current="page">{product.title}</span>
         </nav>
 
-        <div className="grid gap-9 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.9fr)] lg:gap-12">
+        <div className="grid gap-9 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.9fr)] lg:gap-12">
           <ProductGallery images={product.images} title={product.title} />
 
           <section className="min-w-0">
@@ -135,7 +137,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
               <Badge>{product.componentType.name}</Badge>
               <AvailabilityBadge availability={product.availability} />
             </div>
-            <h1 className="mt-5 text-h1 text-navy">{product.title}</h1>
+            <h1 className="mt-5 text-h1 break-words text-navy">{product.title}</h1>
             <p className="mt-4 text-body text-muted-foreground">
               {product.brand.name}
               {product.partNumber ? ` · Número de parte ${product.partNumber}` : ""}
@@ -159,6 +161,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
               {product.warranty ? <div><dt className="text-small text-muted-foreground">Garantía</dt><dd className="mt-1 break-words font-semibold text-navy">{product.warranty}</dd></div> : null}
             </dl>
 
+            <ProductQuotation href={buildWhatsAppUrl(buildProductQuotationMessage(product))} label={productQuotationLabel(product)} title={product.title} />
+
             <div className="mt-6">
               <h2 className="text-label uppercase tracking-wide text-muted-foreground">Condiciones disponibles</h2>
               {product.conditions.length > 0 ? (
@@ -170,14 +174,6 @@ export default async function ProductPage({ params }: ProductPageProps) {
               ) : (
                 <p className="mt-2 text-small text-muted-foreground">Sin piezas disponibles en este momento.</p>
               )}
-            </div>
-
-            <div className="mt-7 rounded-2xl bg-brand-navy p-5 text-white sm:p-6">
-              <p className="text-label uppercase tracking-[0.14em] text-accent">Referencia para consulta</p>
-              <p className="mt-3 text-lg font-semibold">Conserva el SKU {product.sku}</p>
-              <p className="mt-2 text-small text-white/70">
-                El canal de contacto todavía no está configurado. El SKU identifica esta pieza sin ambigüedad.
-              </p>
             </div>
           </section>
         </div>
