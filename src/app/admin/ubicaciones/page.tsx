@@ -1,3 +1,4 @@
+import { ArchiveRecordForm } from "@/features/archives/components/archive-record-form";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -107,7 +108,7 @@ export default async function LocationsPage() {
                               updatedAt: location.updatedAt.toISOString(),
                             }}
                           />
-                        ) : null}
+                        ) : <div className="mt-4"><ArchiveRecordForm id={location.id} updatedAt={location.updatedAt.toISOString()} category="ubicaciones" archive /></div>}
                       </div>
                   </details>
                 </article>

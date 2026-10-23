@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { revalidateArchiveViews } from "@/features/archives/server/revalidation";
 import { getDb } from "@/db";
 import { requireAdmin } from "@/features/auth/server/admin-auth";
 import {
@@ -27,6 +28,7 @@ export type InlineCatalogState = MutationState & {
 };
 
 function revalidateCatalogPages() {
+  revalidateArchiveViews();
   revalidatePath("/admin");
   revalidatePath("/admin/productos");
   revalidatePath("/admin/marcas");
@@ -152,7 +154,7 @@ async function archiveCatalogAction(
     revalidateCatalogPages();
     return {
       status: "success",
-      message: kind === "brand" ? "Marca desactivada." : "Tipo de pieza desactivado.",
+      message: kind === "brand" ? "Marca archivada correctamente." : "Tipo de pieza archivado correctamente.",
     };
   } catch (error) {
     return errorState(error);

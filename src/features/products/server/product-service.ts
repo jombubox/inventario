@@ -66,21 +66,12 @@ async function loadCatalogContext(
     ? input.customBrandName
       ? await resolveOrCreateBrand(db, input.customBrandName)
       : null
-    : await db.query.brands.findFirst({
-      columns: { id: true, name: true, code: true },
-      where: and(eq(brands.id, input.brandId), eq(brands.active, true)),
-    });
+    : (await db.select({ id: brands.id, name: brands.name, code: brands.code }).from(brands).where(and(eq(brands.id, input.brandId), eq(brands.active, true))).for("share"))[0];
   const componentType = input.componentTypeId === CUSTOM_CATALOG_VALUE
     ? input.customComponentTypeName
       ? await resolveOrCreateComponentType(db, input.customComponentTypeName)
       : null
-    : await db.query.componentTypes.findFirst({
-      columns: { id: true, name: true, code: true },
-      where: and(
-        eq(componentTypes.id, input.componentTypeId),
-        eq(componentTypes.active, true),
-      ),
-    });
+    : (await db.select({ id: componentTypes.id, name: componentTypes.name, code: componentTypes.code }).from(componentTypes).where(and(eq(componentTypes.id, input.componentTypeId), eq(componentTypes.active, true))).for("share"))[0];
 
   if (!brand) {
     if (input.brandId === CUSTOM_CATALOG_VALUE) {
@@ -194,7 +185,7 @@ async function assertCompatibilityBrandsExist(
   const rows = await db
     .select({ id: brands.id })
     .from(brands)
-    .where(and(inArray(brands.id, uniqueIds), eq(brands.active, true)));
+    .where(and(inArray(brands.id, uniqueIds), eq(brands.active, true))).for("share");
 
   if (rows.length !== uniqueIds.length) {
     throw new EntityNotFoundError("Una marca de los modelos compatibles ya no existe o está inactiva.");
@@ -395,9 +386,8 @@ export async function updateProduct(
   input: UpdateProductMutationInput,
 ) {
   return db.transaction(async (tx) => {
-    const existing = await tx.query.products.findFirst({
-      where: and(eq(products.id, input.id), isNull(products.deletedAt)),
-    });
+    const [existing] = await tx.select().from(products).where(and(eq(products.id, input.id), isNull(products.deletedAt))).for("update");
+    if (existing?.status === "ARCHIVED") throw new InvalidOperationError("El producto está archivado. Restáuralo desde Archivados.");
     if (!existing) throw new EntityNotFoundError("Product not found.");
 
     const existingSerialRows = await tx
@@ -496,9 +486,8 @@ export async function archiveProduct(
   input: { id: string; expectedUpdatedAt: Date },
 ) {
   return db.transaction(async (tx) => {
-    const existing = await tx.query.products.findFirst({
-      where: and(eq(products.id, input.id), isNull(products.deletedAt)),
-    });
+    const [existing] = await tx.select().from(products).where(and(eq(products.id, input.id), isNull(products.deletedAt))).for("update");
+    if (existing?.status === "ARCHIVED") throw new InvalidOperationError("El producto está archivado. Restáuralo desde Archivados.");
     if (!existing) throw new EntityNotFoundError("Product not found.");
 
     const [archived] = await tx

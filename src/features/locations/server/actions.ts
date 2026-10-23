@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { revalidateArchiveViews } from "@/features/archives/server/revalidation";
 import { getDb } from "@/db";
 import { requireAdmin } from "@/features/auth/server/admin-auth";
 import { createLocation, deleteBox, updateLocation, renameQuickAddLocation } from "@/features/locations/server/location-service";
@@ -73,6 +74,7 @@ export async function createLocationAction(
   await requireAdmin();
   try {
     await createLocation(getDb(), parsed.data);
+    revalidateArchiveViews();
     revalidatePath("/admin");
     revalidatePath("/admin/ubicaciones");
     return { status: "success", message: "Ubicación creada." };
@@ -94,6 +96,7 @@ export async function updateLocationAction(
   await requireAdmin();
   try {
     await updateLocation(getDb(), parsed.data);
+    revalidateArchiveViews();
     revalidatePath("/admin");
     revalidatePath("/admin/ubicaciones");
     revalidatePath("/admin/inventario");
@@ -114,15 +117,14 @@ export async function deleteBoxAction(
   if (!parsed.success) return validationState(parsed.error);
   await requireAdmin();
   try {
-    const result = await deleteBox(getDb(), parsed.data);
+    await deleteBox(getDb(), parsed.data);
+    revalidateArchiveViews();
     revalidatePath("/admin");
     revalidatePath("/admin/ubicaciones");
     revalidatePath("/admin/inventario");
     return {
       status: "success",
-      message: result.mode === "deleted"
-        ? "Caja eliminada."
-        : "La caja se desactivó para conservar su historial.",
+      message: "Caja archivada correctamente.",
     };
   } catch (error) {
     return errorState(error);

@@ -5,6 +5,7 @@ import {
   desc,
   eq,
   isNull,
+  ne,
   sql,
   type SQL,
 } from "drizzle-orm";
@@ -63,7 +64,7 @@ export async function listAdminProducts(db: Database, query: ProductListQuery) {
     .groupBy(inventoryItems.productId)
     .as("stock_summary");
 
-  const conditions: SQL[] = [isNull(products.deletedAt)];
+  const conditions: SQL[] = [isNull(products.deletedAt), ne(products.status, "ARCHIVED")];
   if (query.q) conditions.push(productSearchCondition(query.q));
   if (query.brand) conditions.push(eq(brands.slug, query.brand));
   if (query.type) conditions.push(eq(componentTypes.slug, query.type));
@@ -157,7 +158,7 @@ export async function getAdminProductReview(db: Database, productId: string) {
 
 export async function getAdminProductDetail(db: Database, productId: string) {
   const product = await db.query.products.findFirst({
-    where: and(eq(products.id, productId), isNull(products.deletedAt)),
+    where: eq(products.id, productId),
     with: {
       brand: true,
       componentType: true,

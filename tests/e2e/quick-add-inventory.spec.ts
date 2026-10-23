@@ -223,8 +223,8 @@ test("quick add reuses an existing product, creates a product with multiple comp
   });
   await stockedBox.getByText("Editar datos o cambiar ubicación padre", { exact: true }).click();
   page.once("dialog", (browserDialog) => browserDialog.accept());
-  await stockedBox.getByRole("button", { name: "Eliminar caja" }).click();
-  await expect(stockedBox.getByText(/No puedes eliminar esta caja porque todavía contiene/u)).toBeVisible();
+  await stockedBox.getByRole("button", { name: "Archivar caja" }).click();
+  await expect(stockedBox.getByText(/No puedes archivar esta ubicación porque contiene/u)).toBeVisible();
 
   await page.locator("summary").filter({ hasText: /^Crear ubicación$/u }).click();
   const createLocation = page.locator("details").filter({ hasText: "Crear ubicación" }).locator("form");
@@ -238,7 +238,7 @@ test("quick add reuses an existing product, creates a product with multiple comp
   });
   await emptyBox.getByText("Editar datos o cambiar ubicación padre", { exact: true }).click();
   page.once("dialog", (browserDialog) => browserDialog.accept());
-  await emptyBox.getByRole("button", { name: "Eliminar caja" }).click();
+  await emptyBox.getByRole("button", { name: "Archivar caja" }).click();
   await expect(
     page.locator("article").filter({
       has: page.getByRole("heading", { name: `Caja vacía E2E ${suffix}`, exact: true }),

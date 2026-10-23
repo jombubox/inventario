@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, gte, isNull, sql } from "drizzle-orm";
+import { and, eq, ne, gte, isNull, sql } from "drizzle-orm";
 
 import type { Database } from "@/db/connection";
 import {
@@ -25,18 +25,12 @@ import type {
 export type InventoryTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 async function assertProductExists(tx: InventoryTransaction, productId: string): Promise<void> {
-  const product = await tx.query.products.findFirst({
-    columns: { id: true },
-    where: and(eq(products.id, productId), isNull(products.deletedAt)),
-  });
+  const [product] = await tx.select({ id: products.id }).from(products).where(and(eq(products.id, productId), isNull(products.deletedAt), ne(products.status, "ARCHIVED"))).for("share");
   if (!product) throw new EntityNotFoundError("Product not found.");
 }
 
 async function assertActiveLocation(tx: InventoryTransaction, locationId: string): Promise<void> {
-  const location = await tx.query.locations.findFirst({
-    columns: { id: true },
-    where: and(eq(locations.id, locationId), eq(locations.active, true)),
-  });
+  const [location] = await tx.select({ id: locations.id }).from(locations).where(and(eq(locations.id, locationId), eq(locations.active, true))).for("share");
   if (!location) throw new EntityNotFoundError("Location not found or inactive.");
 }
 
@@ -224,6 +218,12 @@ export async function adjustInventoryQuantity(
       throw new InvalidOperationError("The new quantity must be different.");
     }
 
+    if (input.newQuantity > item.quantity || (input.newQuantity > 0 &&
+      !["AVAILABLE", "RESERVED", "DAMAGED"].includes(item.status) &&
+      ["AVAILABLE", "RESERVED", "DAMAGED"].includes(input.newStatus))) {
+      await assertProductExists(tx, item.productId);
+      if (item.locationId) await assertActiveLocation(tx, item.locationId);
+    }
     const delta = input.newQuantity - item.quantity;
     const [updated] = await tx
       .update(inventoryItems)
@@ -293,6 +293,8 @@ export async function recordStockMovementInTransaction(
   }
   let updated: typeof inventoryItems.$inferSelect | undefined;
   if (increasing) {
+    await assertProductExists(tx, before.productId);
+    if (before.locationId) await assertActiveLocation(tx, before.locationId);
     [updated] = await tx
       .update(inventoryItems)
       .set({

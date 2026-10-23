@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { revalidateArchiveViews } from "@/features/archives/server/revalidation";
 import { getDb } from "@/db";
 import { readWarrantySubmission } from "@/features/products/domain/warranty";
 import { requireAdmin } from "@/features/auth/server/admin-auth";
@@ -76,6 +77,7 @@ export async function createProductAction(
     return errorState(error);
   }
 
+  revalidateArchiveViews();
   revalidatePath("/admin");
   revalidatePath("/admin/productos");
   revalidatePublicCatalog();
@@ -102,6 +104,7 @@ export async function updateProductAction(
     return errorState(error);
   }
 
+  revalidateArchiveViews();
   revalidatePath("/admin");
   revalidatePath("/admin/productos");
   revalidatePath(`/admin/productos/${parsed.data.id}`);
@@ -128,9 +131,10 @@ export async function archiveProductAction(
     return errorState(error);
   }
 
+  revalidateArchiveViews();
   revalidatePath("/admin");
   revalidatePath("/admin/productos");
   revalidatePath(`/admin/productos/${parsed.data.id}`);
   revalidatePublicCatalog(productSlug);
-  return { status: "success", message: "Producto archivado." };
+  return { status: "success", message: "Producto archivado correctamente." };
 }

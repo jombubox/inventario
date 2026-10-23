@@ -1,4 +1,4 @@
-import { asc, count, eq, ilike, or, sql } from "drizzle-orm";
+import { and, asc, count, eq, ilike, or, sql } from "drizzle-orm";
 
 import type { Database } from "@/db/connection";
 import {
@@ -25,11 +25,11 @@ export async function listAdminBrands(db: Database, query = "") {
       )`,
     })
     .from(brands)
-    .where(
+    .where(and(eq(brands.active, true),
       query.trim()
         ? or(ilike(brands.name, pattern), ilike(brands.code, pattern))
         : undefined,
-    )
+    ))
     .orderBy(asc(brands.name));
 }
 
@@ -46,11 +46,11 @@ export async function listAdminComponentTypes(db: Database, query = "") {
     })
     .from(componentTypes)
     .leftJoin(products, eq(products.componentTypeId, componentTypes.id))
-    .where(
+    .where(and(eq(componentTypes.active, true),
       query.trim()
         ? or(ilike(componentTypes.name, pattern), ilike(componentTypes.code, pattern))
         : undefined,
-    )
+    ))
     .groupBy(componentTypes.id)
     .orderBy(asc(componentTypes.name));
 }

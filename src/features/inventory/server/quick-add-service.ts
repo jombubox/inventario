@@ -32,7 +32,7 @@ async function resolveProduct(
     const [product] = await tx
       .select()
       .from(products)
-      .where(and(eq(products.id, input.productId), sql`${products.deletedAt} is null`))
+      .where(and(eq(products.id, input.productId), sql`${products.deletedAt} is null`, sql`${products.status} <> 'ARCHIVED'`))
       .for("update")
       .limit(1);
     if (!product) throw new EntityNotFoundError("El producto seleccionado ya no existe.");

@@ -32,52 +32,22 @@ import type {
 type CatalogTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 type CatalogEntry = { id: string; name: string; code: string };
 
-async function activateBrand(
+async function requireActiveBrand(
   tx: CatalogTransaction,
   entry: CatalogEntry & { active: boolean },
 ): Promise<CatalogEntry> {
-  if (entry.active) return entry;
-  const [updated] = await tx
-    .update(brands)
-    .set({ active: true, updatedAt: new Date() })
-    .where(eq(brands.id, entry.id))
-    .returning({ id: brands.id, name: brands.name, code: brands.code });
-  if (!updated) throw new Error("Brand activation did not return a row.");
-  await createAuditLog(tx, {
-    action: "BRAND_UPDATED",
-    entityType: "BRAND",
-    entityId: entry.id,
-    before: { name: entry.name, active: false },
-    after: { name: updated.name, active: true },
-    metadata: { reason: "reactivated_during_resolution" },
-  });
-  return updated;
+  const [current] = await tx.select().from(brands).where(eq(brands.id, entry.id)).for("share");
+  if (current?.active) return current;
+  throw new InvalidOperationError("Esta marca está archivada. Restáurala desde Archivados antes de seleccionarla.");
 }
 
-async function activateComponentType(
+async function requireActiveComponentType(
   tx: CatalogTransaction,
   entry: CatalogEntry & { active: boolean },
 ): Promise<CatalogEntry> {
-  if (entry.active) return entry;
-  const [updated] = await tx
-    .update(componentTypes)
-    .set({ active: true, updatedAt: new Date() })
-    .where(eq(componentTypes.id, entry.id))
-    .returning({
-      id: componentTypes.id,
-      name: componentTypes.name,
-      code: componentTypes.code,
-    });
-  if (!updated) throw new Error("Component type activation did not return a row.");
-  await createAuditLog(tx, {
-    action: "COMPONENT_TYPE_UPDATED",
-    entityType: "COMPONENT_TYPE",
-    entityId: entry.id,
-    before: { name: entry.name, active: false },
-    after: { name: updated.name, active: true },
-    metadata: { reason: "reactivated_during_resolution" },
-  });
-  return updated;
+  const [current] = await tx.select().from(componentTypes).where(eq(componentTypes.id, entry.id)).for("share");
+  if (current?.active) return current;
+  throw new InvalidOperationError("Este tipo de pieza está archivado. Restáuralo desde Archivados antes de seleccionarlo.");
 }
 
 export async function resolveOrCreateBrand(
@@ -94,7 +64,7 @@ export async function resolveOrCreateBrand(
     columns: { id: true, name: true, code: true, active: true },
     where: eq(brands.normalizedName, normalizedName),
   });
-  if (direct) return activateBrand(tx, direct);
+  if (direct) return requireActiveBrand(tx, direct);
 
   const [aliasMatch] = await tx
     .select({
@@ -112,7 +82,7 @@ export async function resolveOrCreateBrand(
       ),
     )
     .limit(1);
-  if (aliasMatch) return activateBrand(tx, aliasMatch);
+  if (aliasMatch) return requireActiveBrand(tx, aliasMatch);
 
   await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended('catalog-brand:create', 0))`);
   for (let ordinal = 1; ordinal <= 99; ordinal += 1) {
@@ -155,7 +125,7 @@ export async function resolveOrCreateComponentType(
     columns: { id: true, name: true, code: true, active: true },
     where: eq(componentTypes.normalizedName, normalizedName),
   });
-  if (direct) return activateComponentType(tx, direct);
+  if (direct) return requireActiveComponentType(tx, direct);
 
   const [aliasMatch] = await tx
     .select({
@@ -176,7 +146,7 @@ export async function resolveOrCreateComponentType(
       ),
     )
     .limit(1);
-  if (aliasMatch) return activateComponentType(tx, aliasMatch);
+  if (aliasMatch) return requireActiveComponentType(tx, aliasMatch);
 
   await tx.execute(
     sql`select pg_advisory_xact_lock(hashtextextended('catalog-component:create', 0))`,
@@ -269,7 +239,7 @@ export async function createBrandCatalogEntry(
     );
     const existing = await findBrandByNormalizedName(tx, normalizedName);
     if (existing) {
-      return { entry: await activateBrand(tx, existing), created: false as const };
+      return { entry: await requireActiveBrand(tx, existing), created: false as const };
     }
     return { entry: await resolveOrCreateBrand(tx, name), created: true as const };
   });
@@ -287,7 +257,7 @@ export async function createComponentTypeCatalogEntry(
     );
     const existing = await findComponentTypeByNormalizedName(tx, normalizedName);
     if (existing) {
-      return { entry: await activateComponentType(tx, existing), created: false as const };
+      return { entry: await requireActiveComponentType(tx, existing), created: false as const };
     }
     return { entry: await resolveOrCreateComponentType(tx, name), created: true as const };
   });
@@ -393,8 +363,9 @@ export async function archiveBrandCatalogEntry(
   input: ArchiveCatalogEntryMutationInput,
 ) {
   return db.transaction(async (tx) => {
-    const existing = await tx.query.brands.findFirst({ where: eq(brands.id, input.id) });
+    const [existing] = await tx.select().from(brands).where(eq(brands.id, input.id)).for("update");
     if (!existing) throw new EntityNotFoundError("La marca ya no existe.");
+    if (!existing.active) throw new InvalidOperationError("La marca ya está archivada.");
     const [primaryUsage, compatibilityUsage] = await Promise.all([
       tx.select({ value: count() }).from(products).where(eq(products.brandId, input.id)),
       tx
@@ -405,7 +376,7 @@ export async function archiveBrandCatalogEntry(
     const usage = (primaryUsage[0]?.value ?? 0) + (compatibilityUsage[0]?.value ?? 0);
     if (usage > 0) {
       throw new InvalidOperationError(
-        `No puedes desactivar esta marca porque está siendo utilizada en ${usage} producto(s).`,
+        `No puedes archivar esta marca porque está siendo utilizada en ${usage} producto(s).`,
       );
     }
     const [archived] = await tx
@@ -430,10 +401,9 @@ export async function archiveComponentTypeCatalogEntry(
   input: ArchiveCatalogEntryMutationInput,
 ) {
   return db.transaction(async (tx) => {
-    const existing = await tx.query.componentTypes.findFirst({
-      where: eq(componentTypes.id, input.id),
-    });
+    const [existing] = await tx.select().from(componentTypes).where(eq(componentTypes.id, input.id)).for("update");
     if (!existing) throw new EntityNotFoundError("El tipo de pieza ya no existe.");
+    if (!existing.active) throw new InvalidOperationError("El tipo de pieza ya está archivado.");
     const usageRows = await tx
       .select({ value: count() })
       .from(products)
@@ -441,7 +411,7 @@ export async function archiveComponentTypeCatalogEntry(
     const usage = usageRows[0]?.value ?? 0;
     if (usage > 0) {
       throw new InvalidOperationError(
-        `No puedes desactivar este tipo de pieza porque está siendo utilizado por ${usage} producto(s).`,
+        `No puedes archivar este tipo de pieza porque está siendo utilizado por ${usage} producto(s).`,
       );
     }
     const [archived] = await tx

@@ -1,9 +1,9 @@
 import "server-only";
 
-import { and, count, eq, ne, or, sql } from "drizzle-orm";
+import { and, count, eq, ne, sql } from "drizzle-orm";
 
 import type { Database } from "@/db/connection";
-import { inventoryItems, inventoryMovements, locations } from "@/db/schema";
+import { inventoryItems, locations } from "@/db/schema";
 import { createAuditLog } from "@/features/audit/data/audit-log";
 import { assertValidLocationParent } from "@/features/locations/domain/location-hierarchy";
 import { isQuickAddContainer } from "@/features/locations/domain/quick-add-location";
@@ -55,11 +55,7 @@ export async function createLocationInTransaction(
 ) {
   await assertCodeAvailable(tx, input.code);
   if (input.parentId) {
-    const parent = await tx.query.locations.findFirst({
-      columns: { id: true },
-      where: eq(locations.id, input.parentId),
-    });
-    if (!parent) throw new EntityNotFoundError("Parent location not found.");
+    await assertActiveParent(tx, input.parentId);
   }
 
   const [location] = await tx.insert(locations).values(input).returning();
@@ -104,10 +100,11 @@ async function updateLocationInTransaction(
   tx: LocationTransaction,
   input: UpdateLocationMutationInput,
 ) {
-    const existing = await tx.query.locations.findFirst({
-      where: eq(locations.id, input.id),
-    });
+    const [existing] = await tx.select().from(locations).where(eq(locations.id, input.id)).for("update");
     if (!existing) throw new EntityNotFoundError("Location not found.");
+    if (!existing.active) throw new InvalidOperationError("Restaura esta ubicación desde Archivados antes de editarla.");
+    if (input.parentId) await assertActiveParent(tx, input.parentId);
+    if (!input.active) await assertLocationEmpty(tx, input.id);
     await assertCodeAvailable(tx, input.code, input.id);
     const hierarchy = await loadHierarchy(tx);
     assertValidLocationParent({
@@ -136,7 +133,7 @@ async function updateLocationInTransaction(
     }
 
     await createAuditLog(tx, {
-      action: "LOCATION_UPDATED",
+      action: input.active ? "LOCATION_UPDATED" : "LOCATION_ARCHIVED",
       entityType: "LOCATION",
       entityId: input.id,
       before: {
@@ -157,98 +154,52 @@ async function updateLocationInTransaction(
     return updated;
 }
 
-export async function deleteBox(db: Database, input: DeleteBoxMutationInput) {
+
+// Parent share locks serialize child creation/restoration with parent archival.
+async function assertActiveParent(tx: LocationTransaction, id: string) {
+  const visited = new Set<string>();
+  let current: string | null = id;
+  while (current) {
+    if (visited.has(current)) throw new InvalidOperationError("La jerarquía de ubicaciones contiene un ciclo. Revisa sus relaciones antes de restaurar.");
+    visited.add(current);
+    const [parent]: (typeof locations.$inferSelect)[] = await tx.select().from(locations).where(eq(locations.id, current)).for("share");
+    if (!parent?.active) throw new InvalidOperationError("La ubicación padre está archivada. Restáurala primero.");
+    current = parent.parentId;
+  }
+}
+
+async function assertLocationEmpty(tx: LocationTransaction, id: string) {
+  const [stock] = await tx.select({ units: sql<number>`coalesce(sum(case when ${inventoryItems.status} in ('AVAILABLE', 'RESERVED', 'DAMAGED') then ${inventoryItems.quantity} else 0 end), 0)::int` }).from(inventoryItems).where(sql`${inventoryItems.locationId} in (
+    with recursive subtree(id) as (
+      select ${locations.id} from ${locations} where ${locations.id} = ${id}
+      union select child.id from ${locations} child inner join subtree on child.parent_id = subtree.id
+    ) select id from subtree
+  )`);
+  if (stock && stock.units > 0) throw new InvalidOperationError(`No puedes archivar esta ubicación porque contiene ${stock.units} unidad(es) de inventario. Mueve o da salida al stock primero.`);
+  const [children] = await tx.select({ rows: count() }).from(locations).where(and(eq(locations.parentId, id), eq(locations.active, true)));
+  if (children && children.rows > 0) throw new InvalidOperationError(`No puedes archivar esta ubicación porque contiene ${children.rows} ubicación(es) hija(s) activa(s). Archívalas o reubícalas primero.`);
+}
+
+export async function setLocationArchived(db: Database, input: { id: string; expectedUpdatedAt: Date }, archived: boolean, kind?: "BOX" | "OTHER_LOCATION") {
   return db.transaction(async (tx) => {
-    const [box] = await tx
-      .select()
-      .from(locations)
-      .where(eq(locations.id, input.id))
-      .for("update")
-      .limit(1);
-    if (!box) throw new EntityNotFoundError("La caja ya no existe.");
-    if (box.type !== "BOX") {
-      throw new InvalidOperationError("Solo las cajas pueden eliminarse desde esta acción.");
-    }
-    if (box.updatedAt.getTime() !== input.expectedUpdatedAt.getTime()) {
-      throw new ConcurrentModificationError("La caja fue modificada por otra operación.");
-    }
-
-    const inventorySummary = await tx
-      .select({
-        rows: count(),
-        units: sql<number>`coalesce(sum(case when ${inventoryItems.status} in ('AVAILABLE', 'RESERVED', 'DAMAGED') then ${inventoryItems.quantity} else 0 end), 0)::int`,
-      })
-      .from(inventoryItems)
-      .where(eq(inventoryItems.locationId, box.id));
-    const childSummary = await tx
-      .select({ rows: count() })
-      .from(locations)
-      .where(eq(locations.parentId, box.id));
-    const movementSummary = await tx
-      .select({ rows: count() })
-      .from(inventoryMovements)
-      .where(
-        or(
-          eq(inventoryMovements.fromLocationId, box.id),
-          eq(inventoryMovements.toLocationId, box.id),
-        ),
-      );
-    const inventoryRows = inventorySummary[0]?.rows ?? 0;
-    const units = inventorySummary[0]?.units ?? 0;
-    const children = childSummary[0]?.rows ?? 0;
-    const movements = movementSummary[0]?.rows ?? 0;
-
-    if (units > 0) {
-      throw new InvalidOperationError(
-        `No puedes eliminar esta caja porque todavía contiene ${units} unidad(es) de inventario. Mueve o da salida al stock primero.`,
-      );
-    }
-    if (children > 0) {
-      throw new InvalidOperationError(
-        `No puedes eliminar esta caja porque contiene ${children} ubicación(es) hija(s). Reubícalas primero.`,
-      );
-    }
-
-    if (inventoryRows > 0 || movements > 0) {
-      const [archived] = await tx
-        .update(locations)
-        .set({ active: false, updatedAt: new Date() })
-        .where(and(eq(locations.id, box.id), eq(locations.updatedAt, input.expectedUpdatedAt)))
-        .returning();
-      if (!archived) {
-        throw new ConcurrentModificationError("La caja fue modificada por otra operación.");
-      }
-      await createAuditLog(tx, {
-        action: "LOCATION_ARCHIVED",
-        entityType: "LOCATION",
-        entityId: box.id,
-        before: { code: box.code, name: box.name, active: box.active },
-        after: { code: archived.code, name: archived.name, active: false },
-        metadata: { inventoryRows, movements, reason: "history_preserved" },
-      });
-      return { mode: "archived" as const, box: archived };
-    }
-
-    const [deleted] = await tx
-      .delete(locations)
-      .where(and(eq(locations.id, box.id), eq(locations.updatedAt, input.expectedUpdatedAt)))
-      .returning();
-    if (!deleted) {
-      throw new ConcurrentModificationError("La caja fue modificada por otra operación.");
-    }
-    await createAuditLog(tx, {
-      action: "LOCATION_DELETED",
-      entityType: "LOCATION",
-      entityId: box.id,
-      before: {
-        code: box.code,
-        name: box.name,
-        type: box.type,
-        parentId: box.parentId,
-        active: box.active,
-      },
-      after: null,
-    });
-    return { mode: "deleted" as const, box: deleted };
+    const [existing] = await tx.select().from(locations).where(eq(locations.id, input.id)).for("update");
+    if (!existing) throw new EntityNotFoundError("La ubicación ya no existe.");
+    if ((kind === "BOX" && existing.type !== "BOX") || (kind === "OTHER_LOCATION" && existing.type === "BOX")) throw new InvalidOperationError("La ubicación no pertenece a esta categoría.");
+    if (existing.active === !archived) throw new InvalidOperationError(archived ? "La ubicación ya está archivada." : "La ubicación ya está restaurada.");
+    if (existing.updatedAt.getTime() !== input.expectedUpdatedAt.getTime()) throw new ConcurrentModificationError("La ubicación cambió.");
+    if (archived) await assertLocationEmpty(tx, existing.id);
+    else if (existing.parentId) await assertActiveParent(tx, existing.parentId);
+    const [updated] = await tx.update(locations).set({ active: !archived, updatedAt: new Date() }).where(eq(locations.id, input.id)).returning();
+    if (!updated) throw new ConcurrentModificationError("La ubicación cambió.");
+    await createAuditLog(tx, { action: archived ? "LOCATION_ARCHIVED" : "LOCATION_RESTORED", entityType: "LOCATION", entityId: input.id,
+      before: { code: existing.code, name: existing.name, parentId: existing.parentId, active: existing.active },
+      after: { code: updated.code, name: updated.name, parentId: updated.parentId, active: updated.active } });
+    return updated;
   });
+}
+
+// Retain the existing service entry point; empty boxes now keep their IDs and history too.
+export async function deleteBox(db: Database, input: DeleteBoxMutationInput) {
+  const box = await setLocationArchived(db, input, true, "BOX");
+  return { mode: "archived" as const, box };
 }

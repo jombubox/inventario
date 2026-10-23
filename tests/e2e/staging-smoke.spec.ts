@@ -166,8 +166,8 @@ test.describe("remote staging smoke", () => {
     const stockedBox = page.locator("article").filter({ has: page.getByRole("heading", { name: boxName, exact: true }) });
     await stockedBox.getByText("Editar datos o cambiar ubicación padre", { exact: true }).click();
     page.once("dialog", (browserDialog) => browserDialog.accept());
-    await stockedBox.getByRole("button", { name: "Eliminar caja" }).click();
-    await expect(stockedBox.getByText(/No puedes eliminar esta caja porque todavía contiene/u)).toBeVisible();
+    await stockedBox.getByRole("button", { name: "Archivar caja" }).click();
+    await expect(stockedBox.getByText(/No puedes archivar esta ubicación porque contiene/u)).toBeVisible();
 
     await expectPublicCatalogProduct(page, partNumber);
   });

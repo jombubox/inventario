@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/cn";
 
-type AdminIcon = "home" | "inventory" | "products" | "brands" | "types" | "locations" | "import" | "movements" | "audit";
+type AdminIcon = "home" | "inventory" | "products" | "brands" | "types" | "locations" | "import" | "movements" | "audit" | "archive";
 
 function NavIcon({ icon }: { icon: AdminIcon }) {
   const paths = {
@@ -17,6 +17,7 @@ function NavIcon({ icon }: { icon: AdminIcon }) {
     locations: <><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></>,
     import: <><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M4 20h16" /></>,
     movements: <><path d="M4 7h14" /><path d="m14 3 4 4-4 4" /><path d="M20 17H6" /><path d="m10 13-4 4 4 4" /></>,
+    archive: <><rect x="3" y="3" width="18" height="4" rx="1" /><path d="M5 7v14h14V7M10 11h4" /></>,
     audit: <><path d="M9 4h6" /><path d="M9 2h6v4H9z" /><path d="M6 4H4v17h16V4h-2" /><path d="m8 13 2 2 5-5" /></>,
   } as const;
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="size-5" aria-hidden="true">{paths[icon]}</svg>;

@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, ilike, inArray, isNull, or, type SQL } from "drizzle-orm";
+import { ne, and, asc, count, desc, eq, ilike, inArray, isNull, or, type SQL } from "drizzle-orm";
 
 import type { Database } from "@/db/connection";
 import { inventoryItems, locations, products } from "@/db/schema";
@@ -97,7 +97,7 @@ export async function listInventoryFormOptions(db: Database) {
     db
       .select({ id: products.id, sku: products.sku, title: products.title })
       .from(products)
-      .where(isNull(products.deletedAt))
+      .where(and(isNull(products.deletedAt), ne(products.status, "ARCHIVED")))
       .orderBy(asc(products.title))
       .limit(500),
     db
