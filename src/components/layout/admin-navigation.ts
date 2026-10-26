@@ -1,7 +1,7 @@
 export type AdminNavigationItem = {
   label: string;
   href: string;
-  icon: "home" | "inventory" | "products" | "brands" | "types" | "locations" | "import" | "movements" | "audit";
+  icon: "home" | "inventory" | "products" | "brands" | "types" | "locations" | "import" | "movements" | "audit" | "archive";
   section: "workspace" | "catalog" | "organization" | "other";
 };
 
@@ -12,6 +12,7 @@ export const adminNavigation: readonly AdminNavigationItem[] = [
   { label: "Marcas", icon: "brands", section: "catalog", href: "/admin/marcas" },
   { label: "Tipos de pieza", icon: "types", section: "catalog", href: "/admin/tipos-de-pieza" },
   { label: "Ubicaciones", icon: "locations", section: "organization", href: "/admin/ubicaciones" },
+  { label: "Archivados", icon: "archive", section: "organization", href: "/admin/archivados" },
   { label: "Importar", icon: "import", section: "other", href: "/admin/importar" },
   { label: "Movimientos", icon: "movements", section: "other", href: "/admin/movimientos" },
   { label: "Auditoría", icon: "audit", section: "other", href: "/admin/auditoria" },

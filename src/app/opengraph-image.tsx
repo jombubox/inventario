@@ -1,13 +1,14 @@
 import { ImageResponse } from "next/og";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
 export const alt = "JombuBox · Catálogo técnico de refacciones electrónicas";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-const logoSrc = new URL(
-  "/logo.svg",
-  process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
-).toString();
+// Read our trusted local artwork; builds do not need a running/public origin.
+const logo = await readFile(join(process.cwd(), "public/logo.svg"));
+const logoSrc = `data:image/svg+xml;base64,${logo.toString("base64")}`;
 
 export default function OpenGraphImage() {
   return new ImageResponse(

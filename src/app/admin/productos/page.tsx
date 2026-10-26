@@ -52,7 +52,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         <AdminListFilters className="grid gap-3 md:grid-cols-3 xl:grid-cols-7" label="Buscar productos" placeholder="SKU, título, parte, serie, marca, tipo o modelo">
           <Select aria-label="Marca" name="brand" defaultValue={query.brand ?? ""}><option value="">Todas las marcas</option>{options.brands.map((item) => <option key={item.id} value={item.slug}>{item.name}</option>)}</Select>
           <Select aria-label="Tipo de pieza" name="type" defaultValue={query.type ?? ""}><option value="">Todos los tipos</option>{options.componentTypes.map((item) => <option key={item.id} value={item.slug}>{item.name}</option>)}</Select>
-          <Select aria-label="Estado" name="status" defaultValue={query.status ?? ""}><option value="">Todos los estados</option><option value="DRAFT">Borrador</option><option value="ACTIVE">Activo</option><option value="ARCHIVED">Archivado</option></Select>
+          <Select aria-label="Estado" name="status" defaultValue={query.status ?? ""}><option value="">Todos los estados</option><option value="DRAFT">Borrador</option><option value="ACTIVE">Activo</option></Select>
           <Select aria-label="Existencias" name="stock" defaultValue={query.stock ?? ""}><option value="">Cualquier stock</option><option value="in-stock">Con stock</option><option value="out-of-stock">Sin stock</option><option value="unlocated">Sin ubicación</option></Select>
           <Button type="submit">Aplicar filtros</Button>
           <div className="flex flex-wrap gap-3 md:col-span-3 xl:col-span-7">

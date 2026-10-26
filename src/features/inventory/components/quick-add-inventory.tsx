@@ -899,7 +899,7 @@ function QuickAddDialog({
                       <FieldError errors={errors?.condition} />
                     </div>
                     <div>
-                      <Label htmlFor="quick-status">Estado</Label><Select id="quick-status" value={status} onChange={(event) => setStatus(event.target.value as typeof status)} className="mt-2"><option value="ACTIVE">Activo</option><option value="DRAFT">Borrador</option><option value="ARCHIVED">Archivado</option></Select>
+                      <Label htmlFor="quick-status">Estado</Label><Select id="quick-status" value={status} onChange={(event) => setStatus(event.target.value as typeof status)} className="mt-2"><option value="ACTIVE">Activo</option><option value="DRAFT">Borrador</option></Select>
                     </div>
                     <label className="flex min-h-11 items-center gap-3 self-end rounded-md border border-border p-3 text-small font-semibold"><input type="checkbox" checked={isPublic} onChange={(event) => setIsPublic(event.target.checked)} className="size-5 accent-primary" />Visible en el catálogo público</label>
                     {status !== "ACTIVE" ? <p role="status" className="text-small text-muted-foreground sm:col-span-2">Solo los productos activos pueden aparecer en el catálogo. Se guardará sin visibilidad pública.</p> : null}

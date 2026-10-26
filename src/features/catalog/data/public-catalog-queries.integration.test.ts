@@ -21,6 +21,7 @@ import {
   getRelatedProducts,
 } from "@/features/catalog/data/public-catalog-queries";
 import { parseCatalogSearchParams } from "@/features/catalog/domain/catalog-query";
+import { buildProductQuotationMessage, productQuotationLabel } from "@/config/contact";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const safeLocalDatabase = (() => {
@@ -189,6 +190,26 @@ describe.skipIf(!safeLocalDatabase).sequential("public catalog queries on Postgr
     await expect(
       getPublicProducts(db, parseCatalogSearchParams({ q: "NO-EXISTE-999" })),
     ).resolves.toMatchObject({ total: 0, products: [] });
+  });
+
+  it("quotes real public DTOs without exposing stock records or changing inventory", async () => {
+    const stocked = await addProduct({ ordinal: 15, title: 'Módulo Ñandú "A&B"' });
+    const exhausted = await addProduct({ ordinal: 16 });
+    await addInventory(stocked.id, 2, "AVAILABLE");
+    await addInventory(exhausted.id, 9, "RESERVED");
+    const before = await pool.query("select row_to_json(i) as value from inventory_items i order by id");
+    const stockedDto = await getPublicProductBySlug(db, stocked.slug);
+    const exhaustedDto = await getPublicProductBySlug(db, exhausted.slug);
+    if (!stockedDto || !exhaustedDto) throw new Error("Public fixtures missing");
+    expect(productQuotationLabel(stockedDto)).toBe("Comprar por WhatsApp");
+    expect(productQuotationLabel(exhaustedDto)).toBe("Consultar disponibilidad");
+    const message = buildProductQuotationMessage(stockedDto);
+    expect(message).toContain(`Producto: ${stocked.title}\nSKU: ${stocked.sku}`);
+    expect(message).toContain(`https://inventario-five-mu.vercel.app/catalogo/${stocked.slug}`);
+    expect(message).not.toMatch(/FUENTE_PRIVADA|9999.00|NOTA_PRIVADA|BOLSA_SECRETA|CAJA_SECRETA|locationId|productId/);
+    expect(buildProductQuotationMessage(exhaustedDto)).toContain("si volverá a estar disponible");
+    const after = await pool.query("select row_to_json(i) as value from inventory_items i order by id");
+    expect(after.rows).toEqual(before.rows);
   });
 
   it("filters saleable availability, condition and price without counting reserved or damaged units", async () => {

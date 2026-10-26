@@ -44,14 +44,19 @@ test("catalog management is clear, safe and reachable on desktop and mobile", as
   await expect(page.getByText("Marca actualizada.", { exact: true })).toBeVisible();
   brandCard = page.locator("article").filter({ has: page.getByRole("heading", { name: renamedBrand, exact: true }) });
   page.once("dialog", (dialog) => dialog.accept());
-  await brandCard.getByRole("button", { name: "Desactivar marca" }).click();
-  await expect(brandCard.getByText("Inactiva", { exact: true })).toBeVisible();
+  await brandCard.getByRole("button", { name: "Archivar marca" }).click();
+  await expect(brandCard).toHaveCount(0);
 
   const usedBrand = page.locator("article").filter({ has: page.getByRole("heading", { name: "Samsung", exact: true }) });
   page.once("dialog", (dialog) => dialog.accept());
-  await usedBrand.getByRole("button", { name: "Desactivar marca" }).click();
-  await expect(usedBrand.getByText(/No puedes desactivar esta marca porque está siendo utilizada/u)).toBeVisible();
+  await usedBrand.getByRole("button", { name: "Archivar marca" }).click();
+  await expect(usedBrand.getByText(/No puedes archivar esta marca porque está siendo utilizada/u)).toBeVisible();
 
+  await page.goto('/admin/archivados?categoria=marcas&q='+encodeURIComponent(renamedBrand));
+  await page.getByRole('row').filter({ hasText: renamedBrand }).getByRole('button', { name: 'Restaurar', exact: true }).click();
+  await expect(page.getByRole('row').filter({ hasText: renamedBrand })).toHaveCount(0);
+  await page.goto('/admin/marcas?q='+encodeURIComponent(renamedBrand));
+  await expect(page.getByRole('heading', { name: renamedBrand, exact: true })).toBeVisible();
   await navigation.getByRole("link", { name: "Tipos de pieza", exact: true }).click();
   await page.getByLabel("Nombre del nuevo tipo de pieza").fill(typeName);
   await page.getByRole("button", { name: "Crear tipo de pieza" }).click();
@@ -63,14 +68,19 @@ test("catalog management is clear, safe and reachable on desktop and mobile", as
   await expect(page.getByText("Tipo de pieza actualizado.", { exact: true })).toBeVisible();
   typeCard = page.locator("article").filter({ has: page.getByRole("heading", { name: renamedType, exact: true }) });
   page.once("dialog", (dialog) => dialog.accept());
-  await typeCard.getByRole("button", { name: "Desactivar tipo de pieza" }).click();
-  await expect(typeCard.getByText("Inactivo", { exact: true })).toBeVisible();
+  await typeCard.getByRole("button", { name: "Archivar tipo de pieza" }).click();
+  await expect(typeCard).toHaveCount(0);
 
   const usedType = page.locator("article").filter({ has: page.getByRole("heading", { name: "Mainboard", exact: true }) });
   page.once("dialog", (dialog) => dialog.accept());
-  await usedType.getByRole("button", { name: "Desactivar tipo de pieza" }).click();
-  await expect(usedType.getByText(/No puedes desactivar este tipo de pieza porque está siendo utilizado/u)).toBeVisible();
+  await usedType.getByRole("button", { name: "Archivar tipo de pieza" }).click();
+  await expect(usedType.getByText(/No puedes archivar este tipo de pieza porque está siendo utilizado/u)).toBeVisible();
 
+  await page.goto('/admin/archivados?categoria=tipos&q='+encodeURIComponent(renamedType));
+  await page.getByRole('row').filter({ hasText: renamedType }).getByRole('button', { name: 'Restaurar', exact: true }).click();
+  await expect(page.getByRole('row').filter({ hasText: renamedType })).toHaveCount(0);
+  await page.goto('/admin/tipos-de-pieza?q='+encodeURIComponent(renamedType));
+  await expect(page.getByRole('heading', { name: renamedType, exact: true })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
   await expect(page.getByText("Tipo de componente", { exact: true })).toHaveCount(0);

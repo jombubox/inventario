@@ -1,4 +1,4 @@
-import { asc, inArray, sql } from "drizzle-orm";
+import { eq, asc, inArray, sql } from "drizzle-orm";
 
 import type { Database } from "@/db/connection";
 import { inventoryItems, locations } from "@/db/schema";
@@ -8,6 +8,7 @@ export async function listAdminLocations(db: Database) {
   const rows = await db
     .select()
     .from(locations)
+    .where(eq(locations.active, true))
     .orderBy(asc(locations.name))
     .limit(1000);
 

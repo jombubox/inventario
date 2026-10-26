@@ -86,11 +86,17 @@ import { createProductMutationSchema, type CreateProductMutationInput } from "@/
 import { quickAddInventoryMutationSchema } from "@/validators/quick-add-inventory";
 import { updateInventoryDetailsMutationSchema } from "@/validators/admin-inventory";
 import { inventoryListQuerySchema, productListQuerySchema } from "@/validators/admin-query";
+import { listInventoryFormOptions } from "@/features/inventory/data/admin-inventory-queries";
 import { listAdminInventory } from "@/features/inventory/data/admin-inventory-queries";
 import { getAdminProductDetail, getAdminProductReview, listAdminProducts } from "@/features/products/data/admin-product-queries";
 import { getPublicProductBySlug, getPublicProducts } from "@/features/catalog/data/public-catalog-queries";
 import { productPublicationPath } from "@/features/products/domain/public-product";
 import { ConcurrentModificationError } from "@/features/shared/domain/service-errors";
+import { restoreArchivedRecord } from "@/features/archives/server/archive-service";
+import { getArchiveCounts, listArchivedRecords } from "@/features/archives/data/archive-queries";
+import { setLocationArchived } from "@/features/locations/server/location-service";
+import { listAdminLocations } from "@/features/locations/data/admin-location-queries";
+import { listProductCatalogOptions } from "@/features/products/data/admin-product-queries";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const safeLocalDatabase = (() => {
@@ -392,7 +398,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     const { brand, componentType } = await catalogIds();
     const warehouse = await createLocation(db, { code: "PUB-WH", name: "Almacén publicación", type: "WAREHOUSE", parentId: null, active: true, notes: null });
     const box = await createLocation(db, { code: "PUB-BOX", name: "Caja publicación", type: "BOX", parentId: warehouse.id, active: true, notes: null });
-    for (const status of ["ACTIVE", "DRAFT", "ARCHIVED"] as const) {
+    for (const status of ["ACTIVE", "DRAFT"] as const) {
       for (const isPublic of [true, false]) {
         const result = await quickAddInventory(db, quickAddInventoryMutationSchema.parse({
           productMode: "new", brandId: brand.id, componentTypeId: componentType.id,
@@ -412,7 +418,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     const statements: string[] = [];
     const loggedDb = drizzle(pool, { schema, logger: { logQuery(query) { statements.push(query); } } }) as unknown as Database;
     const list = await listAdminProducts(loggedDb, productListQuerySchema.parse({}));
-    expect(list.total).toBe(6);
+    expect(list.total).toBe(4);
     expect(list.rows.every((row) => row.salePrice === "1250.01" && row.compatibilityCount === 1)).toBe(true);
     expect(statements).toHaveLength(2);
     statements.length = 0;
@@ -1509,14 +1515,15 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
       active: false,
       notes: null,
     });
-    const inactiveParentBox = await createLocation(db, {
+    // Legacy inconsistent rows bypass the now-stricter creation service deliberately.
+    const [inactiveParentBox] = await nodeDb.insert(locations).values({
       code: "QA-INACTIVE-BOX",
       name: "Caja con padre inactivo",
       type: "BOX",
       parentId: inactiveWarehouse.id,
       active: true,
       notes: null,
-    });
+    }).returning();
     const legacyRootBox = await createLocation(db, {
       code: "QA-ROOT-BOX",
       name: "Caja raíz activa",
@@ -1553,7 +1560,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
         parentId: UNPARENTED_BOXES_LOCATION_ID,
       }),
     ]));
-    expect(options.boxes.map(({ id }) => id)).not.toContain(inactiveParentBox.id);
+    expect(options.boxes.map(({ id }) => id)).not.toContain(inactiveParentBox!.id);
     expect(options.boxes.some(({ parentId }) => parentId === emptyWarehouse.id)).toBe(false);
     expect(options.locationAvailability).toMatchObject({
       total: 3,
@@ -1653,7 +1660,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     expect(await nodeDb.select().from(locations).where(eq(locations.code, "QA-B02"))).toHaveLength(0);
   });
 
-  it("deletes an empty box, blocks a stocked box and archives a box with history", async () => {
+  it("archives empty boxes reversibly, blocks stocked boxes and preserves history", async () => {
     const product = await createTestProduct();
     const warehouse = await createLocation(db, {
       code: "QA-DEL-WH",
@@ -1664,13 +1671,13 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
       notes: null,
     });
     const empty = await createLocation(db, { code: "QA-EMPTY", name: "Caja vacía", type: "BOX", parentId: warehouse.id, active: true, notes: null });
-    expect((await deleteBox(db, { id: empty.id, expectedUpdatedAt: empty.updatedAt })).mode).toBe("deleted");
-    expect(await nodeDb.select().from(locations).where(eq(locations.id, empty.id))).toHaveLength(0);
+    expect((await deleteBox(db, { id: empty.id, expectedUpdatedAt: empty.updatedAt })).mode).toBe("archived");
+    expect(await nodeDb.select().from(locations).where(eq(locations.id, empty.id))).toEqual([expect.objectContaining({ active: false })]);
     expect(
       await nodeDb
         .select()
         .from(auditLogs)
-        .where(and(eq(auditLogs.entityId, empty.id), eq(auditLogs.action, "LOCATION_DELETED"))),
+        .where(and(eq(auditLogs.entityId, empty.id), eq(auditLogs.action, "LOCATION_ARCHIVED"))),
     ).toHaveLength(1);
 
     const stocked = await createLocation(db, { code: "QA-STOCK", name: "Caja con stock", type: "BOX", parentId: warehouse.id, active: true, notes: null });
@@ -1792,7 +1799,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
 
     const [remainingBox] = await nodeDb.select().from(locations).where(eq(locations.id, box.id));
     const stock = await nodeDb.select().from(inventoryItems).where(eq(inventoryItems.locationId, box.id));
-    if (remainingBox) {
+    if (remainingBox?.active) {
       expect(stock).toHaveLength(1);
       expect(stock[0]?.quantity).toBe(6);
     } else {
@@ -1847,6 +1854,116 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     ).toHaveLength(0);
   });
 
+  it("centralizes product archives, preserves identity/history and restores privately", async () => {
+    const product = await createTestProduct();
+    const item = await createInventoryItem(db, { productId: product.id, locationId: null, quantity: 3, condition: "UNKNOWN", status: "AVAILABLE", acquiredAt: null, acquisitionSource: null, purchaseCost: null, notes: null, legacyBagNumber: null, legacyLocationCode: null });
+    const archived = await archiveProduct(db, { id: product.id, expectedUpdatedAt: product.updatedAt });
+    expect((await listAdminProducts(db, productListQuerySchema.parse({ q: product.sku }))).total).toBe(0);
+    expect(await searchInventoryModels(db, product.sku)).toHaveLength(0);
+    expect((await listInventoryFormOptions(db)).products.map((row) => row.id)).not.toContain(product.id);
+    expect((await listArchivedRecords(db, "productos", product.partNumber!.toLowerCase(), 1)).rows).toEqual([expect.objectContaining({ id: product.id, code: product.sku })]);
+    expect((await getArchiveCounts(db)).productos).toBe(1);
+    expect(await getPublicProductBySlug(db, product.slug)).toBeNull();
+    expect((await getPublicProducts(db, { page: 1, sort: "recientes" })).products).toHaveLength(0);
+    await expect(archiveProduct(db, { id: product.id, expectedUpdatedAt: archived.updatedAt })).rejects.toThrow(/archivado/u);
+    const restored = await restoreArchivedRecord(db, { categoria: "productos", id: product.id, expectedUpdatedAt: archived.updatedAt });
+    expect(restored).toMatchObject({ id: product.id, sku: product.sku, partNumber: product.partNumber, status: "DRAFT", isPublic: false });
+    expect((await listAdminProducts(db, productListQuerySchema.parse({ q: product.sku }))).total).toBe(1);
+    expect((await listArchivedRecords(db, "productos", "", 1)).total).toBe(0);
+    expect(await getPublicProductBySlug(db, product.slug)).toBeNull();
+    expect(await nodeDb.query.inventoryItems.findFirst({ where: eq(inventoryItems.id, item.id) })).toEqual(item);
+    expect(await nodeDb.select().from(inventoryMovements)).toHaveLength(1);
+    const fresh = await nodeDb.query.products.findFirst({ where: eq(products.id, product.id) });
+    await expect(restoreArchivedRecord(db, { categoria: "productos", id: product.id, expectedUpdatedAt: fresh!.updatedAt })).rejects.toThrow(/restaurado/u);
+    expect(await nodeDb.select().from(auditLogs).where(eq(auditLogs.action, "PRODUCT_RESTORED"))).toHaveLength(1);
+  });
+
+  it("restores legacy soft-deleted products only when catalog dependencies are active", async () => {
+    const product = await createTestProduct();
+    await nodeDb.update(products).set({ deletedAt: new Date() }).where(eq(products.id, product.id));
+    await nodeDb.update(brands).set({ active: false }).where(eq(brands.id, product.brandId));
+    const fresh = await nodeDb.query.products.findFirst({ where: eq(products.id, product.id) });
+    const input = { categoria: "productos" as const, id: product.id, expectedUpdatedAt: fresh!.updatedAt };
+    expect((await listArchivedRecords(db, "productos", product.sku, 1)).total).toBe(1);
+    await expect(restoreArchivedRecord(db, input)).rejects.toThrow(/Restaura primero/u);
+    await nodeDb.update(brands).set({ active: true }).where(eq(brands.id, product.brandId));
+    expect(await restoreArchivedRecord(db, input)).toMatchObject({ id: product.id, deletedAt: null, status: "DRAFT", isPublic: false });
+  });
+
+  it("archives and restores catalogs explicitly while retaining used-brand protections", async () => {
+    const product = await createTestProduct();
+    const { brand, componentType } = await catalogIds();
+    await expect(archiveBrandCatalogEntry(db, { id: brand.id, expectedUpdatedAt: brand.updatedAt })).rejects.toThrow(/utilizada/u);
+    await expect(archiveComponentTypeCatalogEntry(db, { id: componentType.id, expectedUpdatedAt: componentType.updatedAt })).rejects.toThrow(/utilizado/u);
+    expect(await nodeDb.query.products.findFirst({ where: eq(products.id, product.id) })).toEqual(product);
+    for (const category of ["marcas", "tipos"] as const) {
+      const create = category === "marcas" ? createBrandCatalogEntry : createComponentTypeCatalogEntry;
+      const archive = category === "marcas" ? archiveBrandCatalogEntry : archiveComponentTypeCatalogEntry;
+      const table = category === "marcas" ? brands : componentTypes;
+      const entry = (await create(db, { name: "Archivo explícito" })).entry;
+      const [row] = await nodeDb.select().from(table).where(eq(table.id, entry.id));
+      const archived = await archive(db, { id: entry.id, expectedUpdatedAt: row!.updatedAt });
+      const list = category === "marcas" ? listAdminBrands : listAdminComponentTypes;
+      expect(await list(db, "Archivo explícito")).toHaveLength(0);
+      const options = await listProductCatalogOptions(db);
+      expect((category === "marcas" ? options.brands : options.componentTypes).map((item) => item.id)).not.toContain(entry.id);
+      await expect(create(db, { name: "Archivo explícito" })).rejects.toThrow(/Archivados/u);
+      expect((await listArchivedRecords(db, category, "EXPLÍCITO", 1)).total).toBe(1);
+      const outcomes = await Promise.allSettled([1, 2].map(() => restoreArchivedRecord(db, { categoria: category, id: entry.id, expectedUpdatedAt: archived.updatedAt })));
+      expect(outcomes.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+      expect(await list(db, "Archivo explícito")).toHaveLength(1);
+    }
+  });
+
+  it("protects occupied containers and restores parents before boxes and bags", async () => {
+    const parent = await createLocation(db, { code: "ARC-PARENT", name: "Almacén archivo", type: "WAREHOUSE", parentId: null, active: true, notes: null });
+    const box = await createLocation(db, { code: "ARC-BOX", name: "Caja archivo", type: "BOX", parentId: parent.id, active: true, notes: null });
+    const bag = await createLocation(db, { code: "ARC-BAG", name: "Bolsa archivo", type: "BAG", parentId: box.id, active: true, notes: null });
+    await expect(setLocationArchived(db, { id: parent.id, expectedUpdatedAt: parent.updatedAt }, true)).rejects.toThrow(/hija/u);
+    const product = await createTestProduct();
+    const item = await createInventoryItem(db, { productId: product.id, locationId: bag.id, quantity: 2, condition: "UNKNOWN", status: "AVAILABLE", acquiredAt: null, acquisitionSource: null, purchaseCost: null, notes: null, legacyBagNumber: null, legacyLocationCode: null });
+    await expect(setLocationArchived(db, { id: bag.id, expectedUpdatedAt: bag.updatedAt }, true)).rejects.toThrow(/contiene 2/u);
+    await expect(updateLocation(db, { ...bag, active: false, expectedUpdatedAt: bag.updatedAt })).rejects.toThrow(/contiene 2/u);
+    await recordStockMovement(db, { id: item.id, type: "OUT", quantity: 2, resultingStatus: "SOLD", reason: "Salida de prueba" });
+    const archivedBag = await setLocationArchived(db, { id: bag.id, expectedUpdatedAt: bag.updatedAt }, true);
+    const archivedBox = await setLocationArchived(db, { id: box.id, expectedUpdatedAt: box.updatedAt }, true);
+    const archivedParent = await setLocationArchived(db, { id: parent.id, expectedUpdatedAt: parent.updatedAt }, true);
+    expect((await listAdminLocations(db)).map((row) => row.id)).not.toContain(box.id);
+    expect((await getArchiveCounts(db))).toMatchObject({ cajas: 1, ubicaciones: 2 });
+    await expect(restoreArchivedRecord(db, { categoria: "cajas", id: box.id, expectedUpdatedAt: archivedBox.updatedAt })).rejects.toThrow(/padre/u);
+    await expect(recordStockMovement(db, { id: item.id, type: "RETURN", quantity: 1, resultingStatus: "AVAILABLE", reason: "No reactivar stock" })).rejects.toThrow();
+    await restoreArchivedRecord(db, { categoria: "ubicaciones", id: parent.id, expectedUpdatedAt: archivedParent.updatedAt });
+    await restoreArchivedRecord(db, { categoria: "cajas", id: box.id, expectedUpdatedAt: archivedBox.updatedAt });
+    await restoreArchivedRecord(db, { categoria: "ubicaciones", id: bag.id, expectedUpdatedAt: archivedBag.updatedAt });
+    expect(await nodeDb.query.inventoryItems.findFirst({ where: eq(inventoryItems.id, item.id) })).toMatchObject({ quantity: 0, locationId: bag.id });
+    expect(await nodeDb.select().from(inventoryMovements)).toHaveLength(2);
+    expect((await listAdminLocations(db)).map((row) => row.id)).toEqual(expect.arrayContaining([parent.id, box.id, bag.id]));
+  });
+
+  it("serializes repeated product archive/restore operations without duplicate events", async () => {
+    const product = await createTestProduct();
+    const archived = await Promise.allSettled([1, 2].map(() => archiveProduct(db, { id: product.id, expectedUpdatedAt: product.updatedAt })));
+    expect(archived.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const row = await nodeDb.query.products.findFirst({ where: eq(products.id, product.id) });
+    const restored = await Promise.allSettled([1, 2].map(() => restoreArchivedRecord(db, { categoria: "productos", id: product.id, expectedUpdatedAt: row!.updatedAt })));
+    expect(restored.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(await nodeDb.query.products.findFirst({ where: eq(products.id, product.id) })).toMatchObject({ id: product.id, sku: product.sku, status: "DRAFT", isPublic: false });
+    for (const action of ["PRODUCT_ARCHIVED", "PRODUCT_RESTORED"]) {
+      expect(await nodeDb.select().from(auditLogs).where(and(eq(auditLogs.entityId, product.id), eq(auditLogs.action, action)))).toHaveLength(1);
+    }
+  });
+
+  it("paginates archives in SQL and keeps query count bounded", async () => {
+    await nodeDb.insert(brands).values(Array.from({ length: 25 }, (_, index) => ({ name: `Archivo ${String(index).padStart(2, "0")}`, normalizedName: `ARCHIVO ${index}`, code: `A${index}`, slug: `archivo-${index}`, active: false })));
+    const statements: string[] = [];
+    const loggedDb = drizzle(pool, { schema, logger: { logQuery(query) { statements.push(query); } } }) as unknown as Database;
+    const result = await listArchivedRecords(loggedDb, "marcas", "archivo", 2);
+    expect(result).toMatchObject({ total: 25, page: 2, pageCount: 2 });
+    expect(result.rows).toHaveLength(5);
+    expect(statements).toHaveLength(2);
+    expect((await listArchivedRecords(db, "marcas", "archivo", 999)).page).toBe(2);
+  });
+
   it("handles two concurrent deletes with one audit and one controlled rejection", async () => {
     const warehouse = await createLocation(db, { code: "QA-D2-WH", name: "Almacén doble borrado", type: "WAREHOUSE", parentId: null, active: true, notes: null });
     const box = await createLocation(db, { code: "QA-D2-BOX", name: "Caja doble borrado", type: "BOX", parentId: warehouse.id, active: true, notes: null });
@@ -1859,13 +1976,13 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
     const rejection = results.find((result) => result.status === "rejected");
     expect(rejection?.status === "rejected" ? rejection.reason : null).toMatchObject({
-      message: "La caja ya no existe.",
+      message: "La ubicación ya está archivada.",
     });
     expect(
       await nodeDb
         .select()
         .from(auditLogs)
-        .where(and(eq(auditLogs.entityId, box.id), eq(auditLogs.action, "LOCATION_DELETED"))),
+        .where(and(eq(auditLogs.entityId, box.id), eq(auditLogs.action, "LOCATION_ARCHIVED"))),
     ).toHaveLength(1);
   });
 

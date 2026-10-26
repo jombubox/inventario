@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useArchiveAction } from "@/features/archives/components/archive-feedback";
 
 import { FormFeedback } from "@/components/forms/form-feedback";
 import { SubmitButton } from "@/components/forms/submit-button";
@@ -64,7 +65,7 @@ export function CatalogEntryEditor({ entry, kind }: { entry: CatalogEntry; kind:
   const updateAction = kind === "brand" ? updateBrandAction : updateComponentTypeAction;
   const archiveAction = kind === "brand" ? archiveBrandAction : archiveComponentTypeAction;
   const [updateState, updateFormAction] = useActionState(updateAction, initialMutationState);
-  const [archiveState, archiveFormAction] = useActionState(archiveAction, initialMutationState);
+  const [archiveState, archiveFormAction] = useArchiveAction(archiveAction);
   const noun = kind === "brand" ? "marca" : "tipo de pieza";
   const usage = entry.productCount + (entry.compatibilityCount ?? 0);
 
@@ -114,7 +115,7 @@ export function CatalogEntryEditor({ entry, kind }: { entry: CatalogEntry; kind:
           action={archiveFormAction}
           className="mt-4 border-t border-border/60 pt-4"
           onSubmit={(event) => {
-            if (!window.confirm(`¿Desactivar ${kind === "brand" ? "la marca" : "el tipo de pieza"} ${entry.name}?`)) {
+            if (!window.confirm(`¿Archivar ${kind === "brand" ? "la marca" : "el tipo de pieza"} ${entry.name}? Dejará de aparecer en el listado principal. Podrás restaurarlo desde Archivados.`)) {
               event.preventDefault();
             }
           }}
@@ -124,10 +125,10 @@ export function CatalogEntryEditor({ entry, kind }: { entry: CatalogEntry; kind:
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-small text-muted-foreground">
               {usage > 0
-                ? `No se puede desactivar mientras tenga ${usage} uso(s).`
-                : `Puedes desactivar ${kind === "brand" ? "la marca" : "el tipo de pieza"} sin borrar su historial.`}
+                ? `No se puede archivar mientras tenga ${usage} uso(s).`
+                : `Puedes archivar ${kind === "brand" ? "la marca" : "el tipo de pieza"} sin borrar su historial.`}
             </p>
-            <Button type="submit" variant="destructive" size="sm">Desactivar {noun}</Button>
+            <Button type="submit" variant="destructive" size="sm">Archivar {noun}</Button>
           </div>
           <FormFeedback state={archiveState} />
         </form>

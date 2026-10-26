@@ -1,4 +1,4 @@
-import { and, asc, eq, ilike, isNull, or, sql } from "drizzle-orm";
+import { ne, and, asc, eq, ilike, isNull, or, sql } from "drizzle-orm";
 
 import type { Database } from "@/db/connection";
 import {
@@ -147,9 +147,12 @@ export async function searchCompatibleModels(
     })
     .from(productCompatibilities)
     .innerJoin(brands, eq(productCompatibilities.brandId, brands.id))
+    .innerJoin(products, eq(productCompatibilities.productId, products.id))
     .where(
       and(
         eq(brands.active, true),
+        ne(products.status, "ARCHIVED"),
+        isNull(products.deletedAt),
         brandId ? eq(brands.id, brandId) : undefined,
         or(
           ilike(productCompatibilities.model, pattern),
@@ -223,6 +226,7 @@ export async function searchInventoryModels(
     .where(
       and(
         isNull(products.deletedAt),
+        ne(products.status, "ARCHIVED"),
         or(
           ilike(products.sku, pattern),
           ilike(products.title, pattern),

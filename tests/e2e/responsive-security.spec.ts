@@ -12,11 +12,13 @@ const viewports = [
 ] as const;
 
 test("public and login shells remain usable at release viewports", async ({ page }, testInfo) => {
+  // Forty page visits now cover contact and product detail as well as the shells.
+  test.setTimeout(90_000);
   test.skip(testInfo.project.name.startsWith("mobile"), "The desktop project explicitly exercises all eight release viewports.");
 
   for (const viewport of viewports) {
     await page.setViewportSize(viewport);
-    for (const path of ["/", "/catalogo", "/login"]) {
+    for (const path of ["/", "/catalogo", "/contacto", "/catalogo/mainboard-bn94-07820f-samsung-un55nu7100", "/login"]) {
       await page.goto(path);
       await expect(page.locator("h1")).toBeVisible();
       const overflow = await page.evaluate(

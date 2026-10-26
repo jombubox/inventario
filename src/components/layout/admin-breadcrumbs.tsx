@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const segmentLabels: Record<string, string> = {
+  archivados: "Archivados",
   productos: "Productos",
   marcas: "Marcas",
   "tipos-de-pieza": "Tipos de pieza",

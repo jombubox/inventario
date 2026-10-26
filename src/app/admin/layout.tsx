@@ -9,6 +9,7 @@ import { AdminSidebar } from "@/components/layout/admin-sidebar";
 import { requireAdmin } from "@/features/auth/server/admin-auth";
 import { AdminQuickAddProvider } from "@/features/inventory/components/quick-add-inventory";
 import { listQuickAddOptions } from "@/features/inventory/data/quick-add-queries";
+import { ArchiveFeedback } from "@/features/archives/components/archive-feedback";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ export default async function AdminLayout({ children }: Readonly<{ children: Rea
           <AdminHeader />
           <AdminMobileNav />
           <AdminBreadcrumbs />
-          <main className="px-4 pb-6 pt-4 sm:px-7 sm:pb-8 lg:px-9 lg:pb-9">{children}</main>
+          <main className="px-4 pb-6 pt-4 sm:px-7 sm:pb-8 lg:px-9 lg:pb-9"><ArchiveFeedback>{children}</ArchiveFeedback></main>
         </div>
       </div>
     </AdminQuickAddProvider>
