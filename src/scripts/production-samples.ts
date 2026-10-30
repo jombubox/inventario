@@ -40,6 +40,7 @@ import { createProduct, updateProduct } from "@/features/products/server/product
 import { parseServerEnv, type ServerEnv } from "@/lib/env-schema";
 import { toBrandRecord, toComponentTypeRecord } from "@/validators/catalog";
 
+// Historical record markers: changing these can duplicate samples or break cleanup.
 const SAMPLE_PREFIX = "JombuBox Sample \u2014";
 const SAMPLE_LOCATION_MARKER = "JombuBox production sample location";
 
@@ -50,7 +51,7 @@ const SAMPLE_PRODUCTS = [
     componentType: { name: "Mainboard", code: "MB" },
     partNumber: "SAMPLE-MB-001",
     model: "SAMPLE55MB001",
-    description: "Mainboard Samsung de muestra para presentar el cat\u00e1logo inicial de JombuBox.",
+    description: "Mainboard Samsung de muestra para presentar el cat\u00e1logo inicial de Jombubox.",
     salePrice: "1299.00",
     purchaseCost: "620.00",
     stock: 10,
@@ -283,7 +284,7 @@ async function ensureSampleProducts(
   const expectedNames = new Set<string>(SAMPLE_PRODUCTS.map(({ title }) => title));
   const unexpected = existingSamples.filter(({ title }) => !expectedNames.has(title));
   if (unexpected.length > 0) {
-    throw new Error(`Unexpected JombuBox sample products exist: ${unexpected.map(({ title }) => title).join(", ")}`);
+    throw new Error(`Unexpected Jombubox sample products exist: ${unexpected.map(({ title }) => title).join(", ")}`);
   }
 
   const ensured: SampleProductRow[] = [];
@@ -307,7 +308,7 @@ async function ensureSampleProducts(
       compatibilities: [{
         brandId: brand.id,
         model: definition.model,
-        notes: "JombuBox production sample",
+        notes: "Jombubox production sample",
       }],
     };
     let product = await db.query.products.findFirst({
@@ -349,7 +350,7 @@ async function ensureSampleProducts(
         acquiredAt: null,
         acquisitionSource: "Production sample seed",
         purchaseCost: definition.purchaseCost,
-        notes: "JombuBox production sample",
+        notes: "Jombubox production sample",
         legacyBagNumber: null,
         legacyLocationCode: definition.location.name,
       });
@@ -361,7 +362,7 @@ async function ensureSampleProducts(
         acquiredAt: null,
         acquisitionSource: "Production sample seed",
         purchaseCost: definition.purchaseCost,
-        notes: "JombuBox production sample",
+        notes: "Jombubox production sample",
         legacyBagNumber: null,
         legacyLocationCode: definition.location.name,
       });

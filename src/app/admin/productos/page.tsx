@@ -65,7 +65,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
       </CardContent></Card>
 
       <Card><CardContent className="p-0">
-        {rows.length === 0 ? <div className="p-8"><EmptyState title="No encontramos productos con esa búsqueda." description="Ajusta los filtros o crea el primer producto de JombuBox." action={<Link href="/admin/productos" className="font-semibold text-link">Limpiar búsqueda y filtros</Link>} /></div> : (
+        {rows.length === 0 ? <div className="p-8"><EmptyState title="No encontramos productos con esa búsqueda." description="Ajusta los filtros o crea el primer producto de Jombubox." action={<Link href="/admin/productos" className="font-semibold text-link">Limpiar búsqueda y filtros</Link>} /></div> : (
           <ProductsTable products={rows} />
         )}
         <div className="flex flex-col gap-3 border-t border-border px-4 py-4 sm:flex-row sm:items-center sm:justify-between"><p className="text-small text-muted-foreground">{total.toLocaleString("es-MX")} producto(s) · página {query.page} de {pageCount}</p><div className="flex gap-2"><Link aria-disabled={query.page <= 1} href={pageHref(currentParams, Math.max(1, query.page - 1))} className="rounded-lg border border-border px-3 py-2 text-small font-semibold aria-disabled:pointer-events-none aria-disabled:opacity-40">Anterior</Link><Link aria-disabled={query.page >= pageCount} href={pageHref(currentParams, Math.min(pageCount, query.page + 1))} className="rounded-lg border border-border px-3 py-2 text-small font-semibold aria-disabled:pointer-events-none aria-disabled:opacity-40">Siguiente</Link></div></div>

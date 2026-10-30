@@ -87,8 +87,8 @@ export function buildInventoryTemplateFromCatalogs({
 }): Promise<ArrayBuffer> {
 
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "JombuBox";
-  workbook.company = "JombuBox";
+  workbook.creator = "Jombubox";
+  workbook.company = "Jombubox";
   workbook.subject = "Plantilla de importación de inventario";
   workbook.created = new Date();
   workbook.modified = new Date();
@@ -188,7 +188,7 @@ export function buildInventoryTemplateFromCatalogs({
   readme.getColumn(1).width = 26;
   readme.getColumn(2).width = 100;
   readme.mergeCells("A1:B1");
-  readme.getCell("A1").value = "JombuBox · Plantilla de inventario";
+  readme.getCell("A1").value = "Jombubox · Plantilla de inventario";
   readme.getCell("A1").fill = {
     type: "pattern",
     pattern: "solid",
@@ -202,7 +202,7 @@ export function buildInventoryTemplateFromCatalogs({
   styleHeader(readme.getRow(3));
   const instructions = [
     ["Uso", "Completa únicamente la hoja Inventario. No cambies los encabezados de la fila 1."],
-    ["SKU", "ExistingSKU solo identifica un producto que ya existe en JombuBox. Déjalo vacío para que el sistema genere el SKU."],
+    ["SKU", "ExistingSKU solo identifica un producto que ya existe en Jombubox. Déjalo vacío para que el sistema genere el SKU."],
     ["CRÍTICO", "No escribas códigos J1B# en ExistingSKU. Esos códigos legacy representan ubicación física, nunca el SKU de un producto."],
     ["Fechas", "Esta plantilla usa ISO YYYY-MM-DD. El importador legacy también reconoce DD/MM/YYYY con convención día/mes de México."],
     ["Cantidad", "Quantity debe ser un entero mayor que cero. Si se omite, el previsualizador aplicará el valor predeterminado y mostrará una advertencia."],

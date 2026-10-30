@@ -1,4 +1,4 @@
-# Imagen Open Graph de JombuBox
+# Imagen Open Graph de Jombubox
 
 La imagen social se genera con la convención de App Router en `src/app/opengraph-image.tsx` y `ImageResponse`.
 

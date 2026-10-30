@@ -1,4 +1,4 @@
-# JumboBox: logotipos y administración de archivados
+# Jombubox: logotipos y administración de archivados
 
 Candidate branch: `feat/logo-carousels-archives`. Local implementation only; no push, deployment, production mutation, production seed, R2 change or production migration.
 

@@ -111,7 +111,7 @@ async function main(): Promise<void> {
 
   try {
     await seedDatabase(drizzle(pool, { schema }));
-    console.info("JombuBox seed completed successfully.");
+    console.info("Jombubox seed completed successfully.");
   } finally {
     await pool.end();
   }

@@ -40,15 +40,15 @@ export async function generateMetadata({ searchParams }: CatalogPageProps): Prom
     alternates: { canonical: "/catalogo" },
     robots: filtered ? { index: false, follow: true } : { index: true, follow: true },
     openGraph: {
-      title: `${title} | JombuBox`,
-      description: "Catálogo técnico público de JombuBox.",
+      title: `${title} | Jombubox`,
+      description: "Catálogo técnico público de Jombubox.",
       url: "/catalogo",
-      images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "Catálogo JombuBox" }],
+      images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "Catálogo Jombubox" }],
     },
     twitter: {
       card: "summary_large_image",
-      title: `${title} | JombuBox`,
-      description: "Catálogo técnico público de JombuBox.",
+      title: `${title} | Jombubox`,
+      description: "Catálogo técnico público de Jombubox.",
       images: ["/opengraph-image"],
     },
   };

@@ -1,6 +1,6 @@
 # Quick Add UX review candidate
 
-Local candidate for October 9, 2026, based on the current JumboBox release. Production deployment, production data, production migrations, R2 objects/configuration, Vercel environment variables, Cloudflare Workers and DNS were not changed. Validation uses disposable PostgreSQL at `127.0.0.1:54330/jumbobox_test`, the existing local Neon WebSocket proxy, and fake R2 at `127.0.0.1:5555`. No new migration is needed.
+Local candidate for October 9, 2026, based on the current Jombubox release. Production deployment, production data, production migrations, R2 objects/configuration, Vercel environment variables, Cloudflare Workers and DNS were not changed. Validation uses disposable PostgreSQL at `127.0.0.1:54330/jumbobox_test`, the existing local Neon WebSocket proxy, and fake R2 at `127.0.0.1:5555`. No new migration is needed.
 
 1. **Previous condition default:** `NEW` (Nuevo) in Quick Add, standalone creation and creation validators. Internal service callers could leave it unclassified.
 2. **New condition default:** `USED` (Usado) in initial/remounted wizard state, standalone creation, validators, Quick Add service and product creation service. Explicit Nuevo remains valid. Edit preserves saved values, including null; imports can explicitly retain null. Existing stored records are not backfilled.

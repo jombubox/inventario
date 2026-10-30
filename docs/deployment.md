@@ -25,7 +25,7 @@ pnpm build
 pnpm cf:build
 ```
 
-Neon debe aceptar fetch y WebSockets; JombuBox usa `drizzle-orm/neon-serverless` con fetch para queries simples y clientes WebSocket de un solo uso para operaciones críticas con transacciones interactivas. `NEON_LOCAL_WS_PROXY` solo existe en el arnés local y nunca se configura en producción.
+Neon debe aceptar fetch y WebSockets; Jombubox usa `drizzle-orm/neon-serverless` con fetch para queries simples y clientes WebSocket de un solo uso para operaciones críticas con transacciones interactivas. `NEON_LOCAL_WS_PROXY` solo existe en el arnés local y nunca se configura en producción.
 
 ## Preview y producción
 

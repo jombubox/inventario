@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { templateInventoryHeaders } from "@/features/imports/domain/import-types";
 import { buildInventoryTemplateFromCatalogs } from "@/features/imports/server/template-workbook";
 
-describe("JombuBox inventory template", () => {
+describe("Jombubox inventory template", () => {
   it("contains the three required sheets, exact headers and guarded catalogs", async () => {
     const buffer = await buildInventoryTemplateFromCatalogs({
       brandRows: [{ name: "=DANGEROUS()" }, { name: "Samsung" }],

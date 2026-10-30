@@ -1,6 +1,6 @@
-# JombuBox
+# Jombubox
 
-JombuBox es el MVP operativo para catalogar refacciones electrónicas, controlar existencias físicas e importar el inventario legacy, con un catálogo público que nunca expone datos internos. La Fase 5/5 cierra seguridad, exportación XLSX, observabilidad, rendimiento, QA, respaldos y operación en Cloudflare Workers.
+Jombubox es el MVP operativo para catalogar refacciones electrónicas, controlar existencias físicas e importar el inventario legacy, con un catálogo público que nunca expone datos internos. La Fase 5/5 cierra seguridad, exportación XLSX, observabilidad, rendimiento, QA, respaldos y operación en Cloudflare Workers.
 
 ## Requisitos
 

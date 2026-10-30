@@ -8,7 +8,7 @@ La confirmación exige una casilla explícita. El servidor vuelve a leer el arch
 
 ## Mapping legacy
 
-| Encabezado Humeberto | Destino JombuBox |
+| Encabezado Humeberto | Destino Jombubox |
 |---|---|
 | N° Bolsa | `legacyBagNumber` |
 | Marca | `Brand` |
@@ -41,9 +41,9 @@ Cada fila física recibe una huella SHA-256 de su identidad lógica. Se marcan d
 
 Las identidades de producto se comparan por ExistingSKU, después marca + tipo + parte normalizada y finalmente modelo como coincidencia posible. Las colisiones ambiguas nunca crean productos silenciosamente.
 
-## Plantilla JombuBox
+## Plantilla Jombubox
 
-`GET /api/imports/template` genera `JombuBox_Inventario_Template.xlsx` con catálogos actuales y tres hojas:
+`GET /api/imports/template` genera `Jombubox_Inventario_Template.xlsx` con catálogos actuales y tres hojas:
 
 - `Inventario`: 20 encabezados exactos, autofiltro, fila congelada, formatos y validaciones hasta la fila 2,001.
 - `Catalogos`: marcas, tipos, condiciones, estados, moneda, booleanos y ubicaciones activas con breadcrumb.
@@ -53,7 +53,7 @@ Los valores de base que comienzan con `=`, `+`, `-` o `@` se neutralizan antes d
 
 Campos operativos principales:
 
-- `ExistingSKU`: enlaza de forma explícita un producto JombuBox existente; no acepta J1B#.
+- `ExistingSKU`: enlaza de forma explícita un producto Jombubox existente; no acepta J1B#.
 - `Brand`, `ComponentType`: deben resolver un catálogo o alias activo.
 - `CompatibleModel`: identifica compatibilidad y puede aportar identidad cuando no hay parte.
 - `PartNumber`: número de parte técnico, no código de caja.

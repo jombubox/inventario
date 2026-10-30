@@ -12,7 +12,7 @@ export function Brand({ admin = false, className }: BrandProps) {
     <span className={cn("inline-flex items-center gap-2.5", className)}>
       <Image
         src="/logo.svg"
-        alt="JombuBox"
+        alt="Jombubox"
         width={5517}
         height={1184}
         className={cn("brand-logo h-auto", admin ? "w-28 sm:w-36" : "w-36 sm:w-40")}

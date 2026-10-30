@@ -74,11 +74,11 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 
   const description =
     product.description?.slice(0, 155) ??
-    `${product.componentType.name} ${product.brand.name}${product.partNumber ? ` ${product.partNumber}` : ""}. Consulta disponibilidad en JombuBox.`;
+    `${product.componentType.name} ${product.brand.name}${product.partNumber ? ` ${product.partNumber}` : ""}. Consulta disponibilidad en Jombubox.`;
   const fallbackImage = absoluteSiteUrl("/opengraph-image") ?? "/opengraph-image";
   const socialImage = product.primaryImage
     ? { url: product.primaryImage.url, alt: product.primaryImage.alt }
-    : { url: fallbackImage, alt: "JombuBox", width: 1200, height: 630 };
+    : { url: fallbackImage, alt: "Jombubox", width: 1200, height: 630 };
 
   return {
     title: product.title,
@@ -87,14 +87,14 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
     robots: { index: true, follow: true },
     openGraph: {
       type: "website",
-      title: `${product.title} | JombuBox`,
+      title: `${product.title} | Jombubox`,
       description,
       url: publicProductPath(product.slug),
       images: [socialImage],
     },
     twitter: {
       card: "summary_large_image",
-      title: `${product.title} | JombuBox`,
+      title: `${product.title} | Jombubox`,
       description,
       images: [socialImage.url],
     },
@@ -145,7 +145,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
             <dl className="mt-7 grid grid-cols-2 gap-3 rounded-2xl border border-border bg-card p-5">
               <div>
-                <dt className="text-label uppercase tracking-wide text-muted-foreground">SKU <span className="normal-case">JombuBox</span></dt>
+                <dt className="text-label uppercase tracking-wide text-muted-foreground">SKU <span className="normal-case">Jombubox</span></dt>
                 <dd className="mt-1 break-all font-mono text-sm font-semibold text-navy">{product.sku}</dd>
               </div>
               <div>

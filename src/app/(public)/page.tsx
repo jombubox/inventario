@@ -19,17 +19,17 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Refacciones electrónicas con identificación técnica",
   description:
-    "Consulta el catálogo público de refacciones y componentes electrónicos JombuBox por SKU, número de parte, marca, tipo o modelo compatible.",
+    "Consulta el catálogo público de refacciones y componentes electrónicos Jombubox por SKU, número de parte, marca, tipo o modelo compatible.",
   alternates: { canonical: "/" },
   openGraph: {
-    title: "JombuBox · Refacciones electrónicas",
+    title: "Jombubox · Refacciones electrónicas",
     description: "Catálogo técnico de componentes identificados y existencias verificadas.",
     url: "/",
-    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "JombuBox" }],
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "Jombubox" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "JombuBox · Refacciones electrónicas",
+    title: "Jombubox · Refacciones electrónicas",
     description: "Catálogo técnico de componentes identificados y existencias verificadas.",
     images: ["/opengraph-image"],
   },
@@ -51,7 +51,7 @@ export default async function HomePage() {
         <div className="mx-auto grid w-full max-w-7xl gap-10 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)] lg:items-end lg:px-10 lg:py-24">
           <div className="max-w-3xl">
             <p className="text-label uppercase tracking-[0.16em] text-primary">
-              Catálogo técnico <span className="normal-case">JombuBox</span>
+              Catálogo técnico <span className="normal-case">Jombubox</span>
             </p>
             <h1 className="mt-4 text-h1 text-navy sm:max-w-2xl">
               Refacciones electrónicas, identificadas con precisión.

@@ -1,4 +1,4 @@
-# Modelo de datos de JombuBox
+# Modelo de datos de Jombubox
 
 Este documento describe el núcleo de persistencia de la Fase 1. El schema Drizzle es la fuente de verdad y vive en `src/db/schema`; la migración SQL generada está en `drizzle/`.
 

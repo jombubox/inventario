@@ -66,7 +66,7 @@ test("the administrator exports inventory and completes the legacy import workfl
   await login(page);
   const exportResponse = await page.request.get("/api/exports/inventory");
   expect(exportResponse.status()).toBe(200);
-  expect(exportResponse.headers()["content-disposition"]).toContain("JombuBox_Inventario_");
+  expect(exportResponse.headers()["content-disposition"]).toContain("Jombubox_Inventario_");
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Inventario");

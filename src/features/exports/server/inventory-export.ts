@@ -71,7 +71,7 @@ export function inventoryExportFilename(now = new Date()): string {
     month: "2-digit",
     day: "2-digit",
   }).format(now);
-  return `JombuBox_Inventario_${date}.xlsx`;
+  return `Jombubox_Inventario_${date}.xlsx`;
 }
 
 export async function buildInventoryExport(db: Database, now = new Date()) {
@@ -165,8 +165,8 @@ export async function buildInventoryExport(db: Database, now = new Date()) {
   ]);
 
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "JombuBox";
-  workbook.company = "JombuBox";
+  workbook.creator = "Jombubox";
+  workbook.company = "Jombubox";
   workbook.subject = "Export operativo de inventario";
   workbook.created = now;
   workbook.modified = now;
@@ -291,7 +291,7 @@ export async function buildInventoryExport(db: Database, now = new Date()) {
   readme.getColumn(1).width = 28;
   readme.getColumn(2).width = 105;
   readme.mergeCells("A1:B1");
-  readme.getCell("A1").value = "JombuBox · Export operativo de inventario";
+  readme.getCell("A1").value = "Jombubox · Export operativo de inventario";
   readme.getCell("A1").fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
   readme.getCell("A1").font = { bold: true, color: { argb: WHITE }, size: 18 };
   readme.getCell("A1").alignment = { vertical: "middle" };

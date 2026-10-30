@@ -10,7 +10,7 @@ export function PublicFooter() {
         <div>
           <Brand className="origin-left scale-90" />
           <p className="mt-2 text-small text-muted-foreground">Catálogo público de inventario técnico.</p>
-          <p className="mt-2 text-small text-muted-foreground">© {new Date().getFullYear()} {contact.businessName}. Todos los derechos reservados.</p>
+          <p className="mt-2 text-small text-muted-foreground">© 2026 Jombubox. Todos los derechos reservados.</p>
         </div>
         <nav aria-label="Contacto" className="flex flex-col items-start gap-1 text-small sm:items-end">
           <Link href="/contacto" className="inline-flex min-h-11 items-center rounded-lg px-2 font-semibold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Contáctanos</Link>

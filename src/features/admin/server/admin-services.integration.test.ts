@@ -1120,7 +1120,7 @@ describe.skipIf(!safeLocalDatabase).sequential("administrative services on Postg
     expect(inventorySheet.getCell("U2").value).toBe("'@SUM(A1:A2)");
     expect(inventorySheet.getCell("H2").value).toBe(2);
     expect(inventorySheet.getCell("M2").value).toBeInstanceOf(Date);
-    expect(result.filename).toBe("JombuBox_Inventario_2026-08-12.xlsx");
+    expect(result.filename).toBe("Jombubox_Inventario_2026-08-12.xlsx");
   });
 
   it("enforces operational rate limits atomically", async () => {

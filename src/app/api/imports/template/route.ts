@@ -15,7 +15,7 @@ export async function GET(request: Request) {
       headers: {
         ...requestIdHeaders(requestId),
         "Cache-Control": "private, no-store",
-        "Content-Disposition": 'attachment; filename="JombuBox_Inventario_Template.xlsx"',
+        "Content-Disposition": 'attachment; filename="Jombubox_Inventario_Template.xlsx"',
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "X-Content-Type-Options": "nosniff",
       },

@@ -78,7 +78,7 @@ Tras mutaciones de producto, inventario, imagen o importación, `revalidatePubli
 - `metadataBase` usa `NEXT_PUBLIC_SITE_URL`; localhost solo es fallback de desarrollo.
 - Home, catálogo y producto tienen título, descripción, canonical, Open Graph y Twitter card.
 - Búsquedas/filtros se marcan `noindex,follow` y canonicalizan a `/catalogo`.
-- El producto usa su imagen primaria o `/opengraph-image`, generado por App Router con el logo oficial de JombuBox.
+- El producto usa su imagen primaria o `/opengraph-image`, generado por App Router con el logo oficial de Jombubox.
 - JSON-LD `Product` usa datos reales; `Offer` solo existe si hay `salePrice` y mapea la disponibilidad pública.
 - `sitemap.xml` enumera home, catálogo y productos públicos con `updatedAt`.
 - `robots.txt` permite el catálogo y bloquea admin, login y APIs.

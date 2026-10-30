@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Iniciar sesión",
-  description: "Acceso administrativo seguro a JombuBox.",
+  description: "Acceso administrativo seguro a Jombubox.",
   robots: { index: false, follow: false },
 };
 
@@ -32,7 +32,7 @@ export default async function LoginPage() {
         <Card className="border-border shadow-2xl shadow-black/25">
           <CardContent className="p-6 sm:p-8">
             <p className="text-label uppercase tracking-[0.16em] text-primary">Acceso interno</p>
-            <h1 className="mt-2 text-h2 text-navy">Bienvenido a JombuBox</h1>
+            <h1 className="mt-2 text-h2 text-navy">Bienvenido a Jombubox</h1>
             <p className="mt-2 text-small text-muted-foreground">
               Inicia sesión para gestionar productos, inventario y ubicaciones.
             </p>

@@ -20,7 +20,7 @@ async function newProduct(page: Page): Promise<Locator> {
   return dialog;
 }
 async function snapshot(page: Page, testInfo: TestInfo, name: string) {
-  await expect(page.getByText("Preparando JombuBox…", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Preparando Jombubox…", { exact: true })).toHaveCount(0);
   await page.locator("img").evaluateAll(async (images) => {
     await Promise.all(images.filter((image) => {
       const rect = image.getBoundingClientRect();

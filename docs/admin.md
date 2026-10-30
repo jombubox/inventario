@@ -4,7 +4,7 @@ Este documento describe la administración cerrada del MVP. Las reglas del model
 
 ## Autenticación y sesiones
 
-JombuBox tiene un único administrador definido por `ADMIN_EMAIL` y `ADMIN_PASSWORD`. La comparación ocurre exclusivamente dentro de la Server Action de login. No existe registro público ni credencial administrativa en PostgreSQL.
+Jombubox tiene un único administrador definido por `ADMIN_EMAIL` y `ADMIN_PASSWORD`. La comparación ocurre exclusivamente dentro de la Server Action de login. No existe registro público ni credencial administrativa en PostgreSQL.
 
 Al autenticar, el servidor emite una sesión HMAC-SHA256 firmada con `AUTH_SECRET`. El payload contiene únicamente `{ admin: true, exp }`; no contiene ID, perfil, correo ni contraseña. La cookie expira a las 12 horas, es `HttpOnly`, `SameSite=Lax`, `Path=/` y `Secure` en producción. Cambiar `AUTH_SECRET` invalida las sesiones existentes. Logout expira la cookie.
 

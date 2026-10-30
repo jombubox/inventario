@@ -11,13 +11,13 @@ export function AdminHeader() {
       <div className="flex min-h-18 items-center justify-between gap-4 px-5 py-3 sm:px-7 lg:px-9">
         <Link
           href="/admin"
-          aria-label="JombuBox, tablero principal"
+          aria-label="Jombubox, tablero principal"
           className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:hidden"
         >
           <Brand admin />
         </Link>
         <div className="hidden min-w-0 md:block">
-          <p className="truncate text-small font-semibold text-navy">JombuBox</p>
+          <p className="truncate text-small font-semibold text-navy">Jombubox</p>
           <p className="truncate text-small text-muted-foreground">Gestión de inventario</p>
         </div>
         <div className="flex items-center gap-2">

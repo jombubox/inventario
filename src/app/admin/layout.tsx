@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Gestión de inventario",
-  description: "Gestión de inventario de JombuBox.",
+  description: "Gestión de inventario de Jombubox.",
   robots: { index: false, follow: false },
 };
 

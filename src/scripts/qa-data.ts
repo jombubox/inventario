@@ -6,6 +6,7 @@ import { deflateSync } from "node:zlib";
 config({ path: ".env.local" });
 config({ path: ".env" });
 
+// Historical fixture identity: keep stable for existing-record checks and cleanup.
 const QA_PREFIX = "JombuBox QA \u2014";
 const QA_LOCATION_CODES = ["QA-A-01", "QA-B-02", "QA-C-03"] as const;
 
@@ -125,6 +126,11 @@ const GLYPHS: Record<string, string[]> = {
   U: ["10001", "10001", "10001", "10001", "10001", "10001", "01110"],
   X: ["10001", "10001", "01010", "00100", "01010", "10001", "10001"],
   Y: ["10001", "10001", "01010", "00100", "00100", "00100", "00100"],
+  b: ["10000", "10000", "10110", "11001", "10001", "10001", "11110"],
+  o: ["00000", "00000", "01110", "10001", "10001", "10001", "01110"],
+  m: ["00000", "00000", "11010", "10101", "10101", "10101", "10101"],
+  u: ["00000", "00000", "10001", "10001", "10001", "10011", "01101"],
+  x: ["00000", "00000", "10001", "01010", "00100", "01010", "10001"],
 };
 
 function makeQaPng(
@@ -152,11 +158,11 @@ function makeQaPng(
     }
   }
   const drawText = (text: string, centerY: number, scale: number) => {
-    const normalized = text.toUpperCase();
+    const normalized = text;
     const totalWidth = normalized.length * 6 * scale - scale;
     let startX = Math.floor((width - totalWidth) / 2);
     for (const character of normalized) {
-      const glyph = GLYPHS[character] ?? GLYPHS[" "]!;
+      const glyph = GLYPHS[character] ?? GLYPHS[character.toUpperCase()] ?? GLYPHS[" "]!;
       glyph.forEach((row, rowIndex) => {
         [...row].forEach((value, columnIndex) => {
           if (value !== "1") return;
@@ -170,7 +176,7 @@ function makeQaPng(
       startX += 6 * scale;
     }
   };
-  drawText("JOMBUBOX QA", 260, 10);
+  drawText("Jombubox QA", 260, 10);
   drawText(label, 390, 7);
   drawText(`IMAGE ${imageNumber} / 2`, 500, 7);
 
@@ -226,7 +232,7 @@ async function main() {
       await db.delete(schema.products).where(eq(schema.products.id, product.id));
     }
     await db.delete(schema.locations).where(inArray(schema.locations.code, [...QA_LOCATION_CODES]));
-    console.info("JombuBox QA data removed.");
+    console.info("Jombubox QA data removed.");
     return;
   }
 
@@ -250,7 +256,7 @@ async function main() {
         type: "BOX",
         parentId: null,
         active: true,
-        notes: "JombuBox QA fixture",
+        notes: "Jombubox QA fixture",
       });
     }
     locationByCode.set(definition.code, location);
@@ -278,7 +284,7 @@ async function main() {
       currency: "MXN",
       status: "ACTIVE" as const,
       isPublic: true,
-      compatibilities: [{ brandId: brand.id, model: fixture.model, notes: "JombuBox QA fixture" }],
+      compatibilities: [{ brandId: brand.id, model: fixture.model, notes: "Jombubox QA fixture" }],
     };
     let product = await db.query.products.findFirst({ where: and(eq(schema.products.title, fixture.title), isNull(schema.products.deletedAt)) });
     if (!product) product = await productService.createProduct(db, productInput);
@@ -297,7 +303,7 @@ async function main() {
         acquiredAt: new Date("2026-09-01T00:00:00.000Z"),
         acquisitionSource: "QA manual testing",
         purchaseCost: fixture.cost,
-        notes: "JombuBox QA fixture",
+        notes: "Jombubox QA fixture",
         legacyBagNumber: null,
         legacyLocationCode: fixture.locationCode.replace("QA-", "Caja ").replaceAll("-", "-"),
       });

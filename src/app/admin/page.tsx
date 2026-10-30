@@ -30,7 +30,7 @@ export default async function AdminPage() {
       <PageHeader
         eyebrow="Resumen operativo"
         title="Panel de control"
-        description="Estado actual del catálogo y del inventario físico de JombuBox."
+        description="Estado actual del catálogo y del inventario físico de Jombubox."
         actions={(
           <AdminQuickAddButton />
         )}

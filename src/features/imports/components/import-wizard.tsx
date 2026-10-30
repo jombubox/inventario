@@ -177,7 +177,7 @@ export function ImportWizard() {
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }));
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `JombuBox_Import_Errores_${preview.jobId}.csv`;
+    anchor.download = `Jombubox_Import_Errores_${preview.jobId}.csv`;
     anchor.click();
     URL.revokeObjectURL(url);
   }

@@ -2,7 +2,7 @@ import { publicProductPath } from "@/features/products/domain/public-product";
 import type { PublicAvailability } from "@/features/catalog/domain/catalog";
 
 export const contact = {
-  businessName: "JombuBox",
+  businessName: "Jombubox",
   displayPhone: "+52 1 81 4391 1759",
   whatsappPhone: "5218143911759",
   // Business-provided production origin. Never derive a shared quotation from

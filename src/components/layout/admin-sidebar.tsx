@@ -18,7 +18,7 @@ export function AdminSidebar() {
       <div className="flex h-18 items-center border-b border-border px-6">
         <Link
           href="/admin"
-          aria-label="JombuBox, tablero principal"
+          aria-label="Jombubox, tablero principal"
           className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <Brand admin />

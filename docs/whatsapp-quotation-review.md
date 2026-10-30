@@ -9,11 +9,11 @@ Implementation date: October 22, 2026 (America/Mexico_City).
 - Exact destination: **https://wa.me/5218143911759**.
 - WhatsApp's [international-number guidance](https://faq.whatsapp.com/640432094208718/?locale=kk_KZ) specifies the additional `1` after Mexico's `52`. Its [Click to Chat guidance](https://faq.whatsapp.com/5913398998672934) describes international digits and URL-encoded message text.
 - A read-only HTTP check returned **302**, preserving the supplied number in `https://api.whatsapp.com/send/?phone=5218143911759&text&type=phone_number&app_absent=0`.
-- **The intended business account has not been verified.** A redirect does not prove registration or account identity. Before release, open the exact destination on a real phone with WhatsApp installed and confirm it belongs to JumboBox. No message was sent, and the number was never changed to another representation.
+- **The intended business account has not been verified.** A redirect does not prove registration or account identity. Before release, open the exact destination on a real phone with WhatsApp installed and confirm it belongs to Jombubox. No message was sent, and the number was never changed to another representation.
 
 ## 2. Central contact configuration
 
-`src/config/contact.ts` contains the display number, WhatsApp identifier, business name, production origin and message helpers. Components do not repeat the phone number. The existing JombuBox logo and site identity remain intact; the requested JumboBox name appears in the new messages and contact metadata.
+`src/config/contact.ts` contains the display number, WhatsApp identifier, business name, production origin and message helpers. Components do not repeat the phone number. The existing Jombubox logo and site identity remain intact; the requested Jombubox name appears in the new messages and contact metadata.
 
 The business-provided production origin is explicitly configured as `https://inventario-five-mu.vercel.app`. Quotation URLs use this origin rather than a request host, local metadata base or Vercel preview host. If the business later changes its production domain, update this configuration alongside the site's normal canonical configuration. No new environment variable is required.
 
@@ -30,7 +30,7 @@ The exact public product DTO supplies the title, generated SKU, optional part nu
 ```text
 Hola, buen día. 👋
 
-Estoy interesado en cotizar un producto de JumboBox.
+Estoy interesado en cotizar un producto de Jombubox.
 
 Producto: {exact public title}
 SKU: {exact generated SKU}
@@ -68,7 +68,7 @@ Only the business-provided contact details are shown. No address, hours, email, 
 
 All generic entry points use:
 
-> Hola, buen día. Me comunico desde la página de JumboBox y me gustaría recibir información sobre sus productos. ¡Gracias!
+> Hola, buen día. Me comunico desde la página de Jombubox y me gustaría recibir información sobre sus productos. ¡Gracias!
 
 ## 11–14. Homepage, footer and optional actions
 
@@ -85,7 +85,7 @@ The mobile menu uses native disclosure semantics and supports Escape. Browser ch
 
 ## 16. SEO
 
-The contact page uses Next.js metadata with the absolute title **Contáctanos | JumboBox**, a Spanish description, canonical `/contacto`, Open Graph and Twitter information using the existing social image. The page is included in the normal sitemap. Existing product canonical metadata and JSON-LD URL generation are unchanged.
+The contact page uses Next.js metadata with the absolute title **Contáctanos | Jombubox**, a Spanish description, canonical `/contacto`, Open Graph and Twitter information using the existing social image. The page is included in the normal sitemap. Existing product canonical metadata and JSON-LD URL generation are unchanged.
 
 ## 17. Visual review
 

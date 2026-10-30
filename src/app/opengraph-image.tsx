@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-export const alt = "JombuBox · Catálogo técnico de refacciones electrónicas";
+export const alt = "Jombubox · Catálogo técnico de refacciones electrónicas";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -72,7 +72,7 @@ export default function OpenGraphImage() {
         >
           {/* ImageResponse renders its own image tree and cannot use next/image. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={logoSrc} alt="JombuBox" width={700} height={150} />
+          <img src={logoSrc} alt="Jombubox" width={700} height={150} />
           <div
             style={{
               display: "flex",

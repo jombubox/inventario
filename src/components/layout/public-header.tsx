@@ -11,7 +11,7 @@ export function PublicHeader() {
       <div className="mx-auto flex h-18 w-full max-w-7xl items-center justify-between px-5 sm:px-8 lg:px-10">
         <Link
           href="/"
-          aria-label="JombuBox, página de inicio"
+          aria-label="Jombubox, página de inicio"
           className="rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background"
         >
           <Brand />

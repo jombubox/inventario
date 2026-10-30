@@ -9,7 +9,7 @@ const localDb = databaseUrl ? new URL(databaseUrl) : null;
 test.skip(!localDb || !["127.0.0.1", "localhost"].includes(localDb.hostname) || localDb.pathname !== "/jumbobox_test" || Boolean(process.env.PLAYWRIGHT_BASE_URL), "Uses only local disposable PostgreSQL and fake R2.");
 
 const productPath = "/catalogo/mainboard-bn94-07820f-samsung-un55nu7100";
-const generic = "Hola, buen día. Me comunico desde la página de JombuBox y me gustaría recibir información sobre sus productos. ¡Gracias!";
+const generic = "Hola, buen día. Me comunico desde la página de Jombubox y me gustaría recibir información sobre sus productos. ¡Gracias!";
 
 async function linkMessage(link: Locator) {
   const href = await link.getAttribute("href");
@@ -65,7 +65,7 @@ test("navigation, homepage and footer use generic contact; keyboard activation p
   await navigation.getByRole("link", { name: "Contáctanos", exact: true }).click();
   await expect(page).toHaveURL(/\/contacto$/);
   if (mobile) await expect(page.locator("header details")).not.toHaveAttribute("open", "");
-  await expect(page).toHaveTitle("Contáctanos | JombuBox");
+  await expect(page).toHaveTitle("Contáctanos | Jombubox");
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", /\/contacto$/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Contáctanos");
   const contactLink = page.getByRole("link", { name: /^Enviar mensaje por WhatsApp/ });
