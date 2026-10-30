@@ -1,0 +1,88 @@
+.viewport {
+  --logo-gap: 1.5rem;
+  overflow: hidden;
+  background: #fff;
+  border-block: 1px solid #e9edf4;
+  border-radius: 0.5rem;
+}
+
+.track {
+  display: flex;
+  width: max-content;
+  animation: circulate var(--marquee-duration) linear infinite;
+}
+
+.group {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--logo-gap);
+  margin: 0;
+  padding: 0 var(--logo-gap) 0 0;
+  list-style: none;
+}
+
+.logo {
+  display: flex;
+  flex: 0 0 9rem;
+  align-items: center;
+  justify-content: center;
+  width: 9rem;
+  height: 5.5rem;
+  padding-inline: 1rem;
+}
+
+.viewport[data-paused="true"] .track {
+  animation-play-state: paused;
+}
+
+@media (hover: hover) {
+  .viewport:hover .track {
+    animation-play-state: paused;
+  }
+}
+
+@media (min-width: 640px) {
+  .viewport {
+    --logo-gap: 3rem;
+  }
+
+  .logo {
+    flex-basis: 11rem;
+    width: 11rem;
+    height: 6rem;
+  }
+}
+
+/* Equal groups include the trailing gap, so the reset has identical spacing. */
+@keyframes circulate {
+  to { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .track {
+    width: 100%;
+    animation: none;
+    transform: none;
+  }
+
+  .group {
+    flex: 1;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+  }
+
+  .logo {
+    flex: 0 1 9rem;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .duplicate,
+  .logo[data-duplicate],
+  .pause {
+    display: none;
+  }
+}

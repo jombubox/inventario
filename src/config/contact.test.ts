@@ -25,7 +25,7 @@ describe("WhatsApp contact links", () => {
     expect(url.origin).toBe("https://wa.me");
     expect(url.pathname).toBe("/5218143911759");
     expect([...url.searchParams.keys()]).toEqual(["text"]);
-    expect(url.searchParams.get("text")).toBe("Hola, buen día. Me comunico desde la página de JumboBox y me gustaría recibir información sobre sus productos. ¡Gracias!");
+    expect(url.searchParams.get("text")).toBe("Hola, buen día. Me comunico desde la página de JombuBox y me gustaría recibir información sobre sus productos. ¡Gracias!");
     expect(genericContactMessage).not.toMatch(/SKU:|Producto:|catalogo\//);
   });
 
@@ -44,6 +44,7 @@ describe("WhatsApp contact links", () => {
 
   it("includes only the exact public identity, canonical URL and quotation question", () => {
     const message = buildProductQuotationMessage(product);
+    expect(message).toContain("Estoy interesado en cotizar un producto de JombuBox.");
     expect(message).toContain(`Producto: ${product.title}\nSKU: ${product.sku}\nNúmero de parte: ${product.partNumber}`);
     expect(message).toContain(`Enlace del producto:\n${quotationProductUrl(product.slug)}`);
     expect(message).toContain("¿Me pueden confirmar el precio, la disponibilidad y las opciones de envío?");

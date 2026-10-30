@@ -120,7 +120,7 @@ export function ProductImageManager({
                   <Button size="sm" variant="ghost" aria-label="Mover foto a la izquierda" disabled={locked || index === 0} onClick={() => void move(image.id, -1)}>←</Button>
                   <Button size="sm" variant="ghost" aria-label="Mover foto a la derecha" disabled={locked || index === ordered.length - 1} onClick={() => void move(image.id, 1)}>→</Button>
                   <Button size="sm" variant="destructive" aria-label="Eliminar foto" disabled={locked} onClick={() => {
-                    if (window.confirm("¿Eliminar esta imagen de R2 y JumboBox?")) void mutate(`delete-${image.id}`, async () => {
+                    if (window.confirm("¿Eliminar esta imagen de R2 y JombuBox?")) void mutate(`delete-${image.id}`, async () => {
                       await jsonRequest(`/api/products/images/${image.id}`, { method: "DELETE" });
                       setFiles((current) => current.filter((file) => photoUploadId(file) !== image.id));
                     });

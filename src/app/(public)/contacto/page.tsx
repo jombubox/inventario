@@ -5,7 +5,7 @@ import { buttonStyles } from "@/components/ui/button";
 import { ChatIcon, WhatsAppLink } from "@/components/ui/whatsapp-link";
 import { contact } from "@/config/contact";
 
-const title = "Contáctanos | JumboBox";
+const title = `Contáctanos | ${contact.businessName}`;
 const description = "Solicita cotizaciones de refacciones electrónicas por WhatsApp. Consulta disponibilidad, precio, envío o ayuda para identificar tu pieza.";
 
 export const metadata: Metadata = {

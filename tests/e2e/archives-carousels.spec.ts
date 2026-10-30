@@ -12,7 +12,7 @@ async function login(page: Page) {
   await expect(page).toHaveURL(/\/admin$/u);
 }
 
-test("logo carousels preserve artwork, support navigation and fit all themes and sizes", async ({ page, context }, testInfo) => {
+test("logo marquees preserve artwork and show every logo without motion in all themes and sizes", async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   await page.emulateMedia({ reducedMotion: "reduce" });
   for (const size of [{ width: 1440, height: 900 }, { width: 900, height: 900 }, { width: 393, height: 727 }]) {
@@ -29,32 +29,85 @@ test("logo carousels preserve artwork, support navigation and fit all themes and
         await list.scrollIntoViewIfNeeded();
         await list.locator("img").evaluateAll(async (images) => { await Promise.all(images.map((image) => (image as HTMLImageElement).decode())); });
         expect(await list.locator("img").evaluateAll((images) => images.every((image) => (image as HTMLImageElement).naturalWidth > 0))).toBe(true);
-        const next = section.getByRole("button", { name: /Siguiente/u });
-        if (await next.isEnabled()) {
-          await next.click();
-          await expect.poll(() => list.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
-          await list.focus(); await page.keyboard.press("Home");
-          await expect.poll(() => list.evaluate((element) => element.scrollLeft)).toBe(0);
-          await page.keyboard.press("ArrowRight");
-          await expect.poll(() => list.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
-          await page.keyboard.press("Home");
-        }
-      }
-      if (size.width === 393 && testInfo.project.name.startsWith("mobile")) {
-        const list = electronics.getByRole("list");
-        await list.scrollIntoViewIfNeeded();
-        const bounds = (await list.boundingBox())!;
-        const client = await context.newCDPSession(page);
-        await client.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: bounds.x + 300, y: bounds.y + 45 }] });
-        for (const x of [260, 210, 160, 100, 50]) await client.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: bounds.x + x, y: bounds.y + 45 }] });
-        await client.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-        await expect.poll(() => list.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
-        await client.detach();
+        await expect(section.getByRole("button")).toHaveCount(0);
+        const track = list.locator("..");
+        await expect(track).toHaveCSS("animation-name", "none");
+        expect(await list.locator("li:not([data-duplicate])").evaluateAll((items) => items.every((item) => {
+          const bounds = item.getBoundingClientRect();
+          const viewport = item.closest("[data-paused]")!.getBoundingClientRect();
+          return bounds.width > 0 && bounds.left >= viewport.left && bounds.right <= viewport.right && bounds.bottom <= viewport.bottom;
+        }))).toBe(true);
       }
       expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
       await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({ caret: "initial", path: testInfo.outputPath(`home-${size.width}-${theme}.png`), fullPage: true });
     }
+  }
+});
+
+test("logo marquees loop seamlessly, pause accessibly and never overflow", async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  for (const size of [{ width: 1440, height: 900 }, { width: 900, height: 900 }, { width: 393, height: 727 }]) {
+    await page.setViewportSize(size);
+    for (const theme of ["light", "dark"]) {
+      await page.addInitScript((value) => localStorage.setItem("jombubox-theme", value), theme);
+      await page.goto("/");
+      for (const title of ["Marcas de electrónicos", "Paqueterías"]) {
+        const section = page.getByRole("region", { name: title, exact: true });
+        const viewport = section.locator("[data-paused]");
+        const track = section.getByRole("list").locator("..");
+        await viewport.scrollIntoViewIfNeeded();
+        await page.mouse.move(0, 0);
+        await expect(section.getByRole("button", { name: /Anterior|Siguiente|Previous|Next/u })).toHaveCount(0);
+        await expect(section.getByRole("tab")).toHaveCount(0);
+        await expect(section.getByRole("button")).toHaveCount(1);
+        await expect(track).toHaveCSS("animation-timing-function", "linear");
+        await expect(track).toHaveCSS("animation-iteration-count", "infinite");
+        const start = await track.evaluate((element) => getComputedStyle(element).transform);
+        await expect.poll(() => track.evaluate((element) => getComputedStyle(element).transform)).not.toBe(start);
+
+        // Sample both sides of the loop boundary without waiting two minutes.
+        const seam = await track.evaluate((element) => {
+          const animation = element.getAnimations()[0]!;
+          const originalTime = animation.currentTime;
+          const duration = Number(animation.effect!.getTiming().duration);
+          const groups = element.querySelectorAll("ul");
+          const width = groups[0]!.getBoundingClientRect().width;
+          animation.currentTime = duration - 1;
+          const before = groups[1]!.querySelector("li")!.getBoundingClientRect().left;
+          animation.currentTime = 0;
+          const after = groups[0]!.querySelector("li")!.getBoundingClientRect().left;
+          animation.currentTime = originalTime;
+          return { delta: Math.abs(after - before), width, cloneWidth: groups[1]!.getBoundingClientRect().width, viewportWidth: element.parentElement!.clientWidth };
+        });
+        expect(seam.delta).toBeLessThan(1);
+        expect(seam.width).toBeCloseTo(seam.cloneWidth, 2);
+        expect(seam.width).toBeGreaterThanOrEqual(seam.viewportWidth);
+
+        const pause = section.getByRole("button", { name: /Pausar movimiento/u });
+        if (testInfo.project.name.startsWith("mobile")) await pause.tap();
+        else await pause.click();
+        await expect(track).toHaveCSS("animation-play-state", "paused");
+        const stopped = await track.evaluate((element) => getComputedStyle(element).transform);
+        await page.waitForTimeout(150);
+        expect(await track.evaluate((element) => getComputedStyle(element).transform)).toBe(stopped);
+        const resume = section.getByRole("button", { name: /Reanudar movimiento/u });
+        await resume.focus();
+        await page.keyboard.press("Enter");
+        await page.mouse.move(0, 0);
+        await expect(track).toHaveCSS("animation-play-state", "running");
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+      await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+      await page.screenshot({ path: testInfo.outputPath(`marquees-${size.width}-${theme}.png`), fullPage: true });
+    }
+  }
+  // Also respond to an OS preference change while the page is open.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  for (const section of await page.getByRole("region").filter({ has: page.locator("[data-paused]") }).all()) {
+    await expect(section.getByRole("list").locator("..")).toHaveCSS("animation-name", "none");
+    await expect(section.getByRole("button")).toHaveCount(0);
   }
 });
 

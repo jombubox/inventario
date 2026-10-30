@@ -51,7 +51,7 @@ export default async function HomePage() {
         <div className="mx-auto grid w-full max-w-7xl gap-10 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)] lg:items-end lg:px-10 lg:py-24">
           <div className="max-w-3xl">
             <p className="text-label uppercase tracking-[0.16em] text-primary">
-              Catálogo técnico JombuBox
+              Catálogo técnico <span className="normal-case">JombuBox</span>
             </p>
             <h1 className="mt-4 text-h1 text-navy sm:max-w-2xl">
               Refacciones electrónicas, identificadas con precisión.

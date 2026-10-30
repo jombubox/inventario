@@ -145,7 +145,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
             <dl className="mt-7 grid grid-cols-2 gap-3 rounded-2xl border border-border bg-card p-5">
               <div>
-                <dt className="text-label uppercase tracking-wide text-muted-foreground">SKU JombuBox</dt>
+                <dt className="text-label uppercase tracking-wide text-muted-foreground">SKU <span className="normal-case">JombuBox</span></dt>
                 <dd className="mt-1 break-all font-mono text-sm font-semibold text-navy">{product.sku}</dd>
               </div>
               <div>
