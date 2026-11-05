@@ -75,7 +75,7 @@ Mutations enforce signed admin authentication, same-origin checks, strict Zod sc
 Run the local harness with explicit disposable resources. It never falls back to `.env.local` database credentials:
 
 ```powershell
-$env:TEST_DATABASE_URL = 'postgresql://postgres:postgres@127.0.0.1:54331/jumbobox_test'
+$env:TEST_DATABASE_URL = 'postgresql://postgres:postgres@127.0.0.1:54332/jumbobox_test'
 pnpm sales:verify migrate
 pnpm sales:verify test
 pnpm sales:verify e2e
@@ -86,5 +86,7 @@ pnpm audit --prod --audit-level high
 ```
 
 PostgreSQL must be a disposable local `jumbobox_test`. E2E resets it and uses the existing local fake R2 and Neon WebSocket proxy. Stop a stale proxy pointing to a different PostgreSQL port before changing ports. The new integration files are also included in `test:integration` and the existing CI `pnpm test` discovers them.
+
+For the retained local review database in this workspace, first run `docker start jombubox-sales-review18`. Its PostgreSQL version is 18.6 and its loopback port is 54332. The isolated review checkout is `C:\Users\yo\Desktop\work\JumboBox-sales-review`. Validation results and changed paths are in [the validation receipt](sales-validation.md).
 
 See [production release plan](sales-production-release.md) for migration fingerprints, safety gates, backup validation, execution, deployment and recovery. No production mutation or deployment is authorized by these documents.

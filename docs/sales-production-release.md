@@ -26,6 +26,8 @@ File hashes and timestamps are read directly from the reviewed files/journal by 
 - Evidence is local and ignored under `.vercel/sales-readiness*.json` and `.vercel/sales-legacy-drift.json`. These snapshots are **not backups** and become stale as real operations continue.
 - No Neon management connection is currently confirmed. No backup/protected branch was created, and no restore was falsely claimed.
 
+A later read-only inspection during validation found concurrent application activity: one new published product, one inventory entry/movement and six images, taking the observed totals to 75 products, 80 entries, 81 AVAILABLE units and 80 movements. It did not match the sales test fixture markers. All task-driven writes used isolated local databases; no writes were issued to this configured Neon database. The latest complete legacy schema fingerprint (columns, constraints, indexes, enums, custom triggers/functions) matches the PostgreSQL 18.6 rehearsal. The original live **data** fingerprints are now stale and must be refreshed under the coordinated administrative write pause; do not treat the first snapshot as a release baseline or restore point.
+
 ## Finish prerequisites before approval
 
 1. Restore authorized access to the existing Vercel team/project and connect Neon. Do not relink/create a new production project to work around the 403.
