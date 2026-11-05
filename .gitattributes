@@ -1,3 +1,3 @@
-# The existing files and configured Neon journal were verified with LF bytes.
-# Prevent Windows autocrlf from changing historical or new migration checksums.
+# Preserve verified journal bytes across platforms (0007 was applied with CRLF).
 drizzle/*.sql text eol=lf
+drizzle/0007_shiny_sunfire.sql text eol=crlf

@@ -11,6 +11,8 @@ Apply in this order through the existing Drizzle migration workflow:
 
 The journal and snapshots are generated with `drizzle-kit generate`; the history guard is a custom Drizzle migration. No legacy ALTER/UPDATE/DELETE, data backfill, migration baseline, enum extension, production seed or stock update is required. The old application is compatible with these unused additive tables. The new application must be deployed **after** the migrations. Application rollback leaves the additive database schema intact.
 
+Migration hashes are sensitive to line endings. The verified existing journal used CRLF bytes for `0007` and LF for the other files. `.gitattributes` preserves those exact formats, including LF for the new migrations, across Windows/Linux checkouts; no historical SQL statement or journal entry is rewritten.
+
 File hashes and timestamps are read directly from the reviewed files/journal by `src/scripts/sales-release.ts`; its manifest hash binds the entire exact migration set. The script refuses unexpected pending legacy migrations or any changed/missing history hashes, refuses production without complete release evidence and separate exact approval, and runs no seed.
 
 ## Observed access and configured database (not verified Production mapping)
