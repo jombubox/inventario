@@ -1,13 +1,14 @@
 export type AdminNavigationItem = {
   label: string;
   href: string;
-  icon: "home" | "inventory" | "products" | "brands" | "types" | "locations" | "import" | "movements" | "audit" | "archive";
+  icon: "home" | "sales" | "inventory" | "products" | "brands" | "types" | "locations" | "import" | "movements" | "audit" | "archive";
   section: "workspace" | "catalog" | "organization" | "other";
 };
 
 export const adminNavigation: readonly AdminNavigationItem[] = [
   { label: "Tablero principal", icon: "home", section: "workspace", href: "/admin" },
   { label: "Inventario", icon: "inventory", section: "workspace", href: "/admin/inventario" },
+  { label: "Ventas", icon: "sales", section: "workspace", href: "/admin/ventas" },
   { label: "Productos", icon: "products", section: "catalog", href: "/admin/productos" },
   { label: "Marcas", icon: "brands", section: "catalog", href: "/admin/marcas" },
   { label: "Tipos de pieza", icon: "types", section: "catalog", href: "/admin/tipos-de-pieza" },

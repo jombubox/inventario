@@ -64,6 +64,20 @@
       "when": 1791335485657,
       "tag": "0008_product_warranty",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793898819911,
+      "tag": "0009_sales_management",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793899388294,
+      "tag": "0010_sales_history_guards",
+      "breakpoints": true
     }
   ]
 }

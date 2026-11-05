@@ -3,6 +3,9 @@ node_modules
 .open-next
 .wrangler
 .git
+.vercel
+test-results
+playwright-report
 .env*
 !.env.example
 drizzle

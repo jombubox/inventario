@@ -1,0 +1,13 @@
+@media print {
+  @page { size: A4; margin: 15mm; }
+  body { background: white !important; color: black !important; }
+  body * { visibility: hidden; }
+  #sales-receipt, #sales-receipt * { visibility: visible; }
+  #sales-receipt { position: absolute; left: 0; top: 0; width: 100%; border: 0; border-radius: 0; padding: 0; background: white !important; color: black !important; box-shadow: none; }
+  #sales-receipt * { color: black !important; }
+  #sales-receipt table { table-layout: fixed; font-size: 10pt; }
+  #sales-receipt th:first-child { width: 40%; }
+  #sales-receipt td { overflow-wrap: anywhere; }
+  #sales-receipt tr { break-inside: avoid; }
+  #sales-receipt thead { display: table-header-group; }
+}

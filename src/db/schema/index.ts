@@ -6,3 +6,4 @@ export * from "@/db/schema/locations";
 export * from "@/db/schema/operations";
 export * from "@/db/schema/products";
 export * from "@/db/schema/relations";
+export * from "@/db/schema/sales";

@@ -1,0 +1,4 @@
+# Preserve the exact reviewed sales migration checksums across Windows and Linux.
+# Historical migrations keep their existing checkout behavior and journal hashes.
+drizzle/0009_sales_management.sql text eol=lf
+drizzle/0010_sales_history_guards.sql text eol=lf

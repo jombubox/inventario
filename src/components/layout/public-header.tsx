@@ -30,14 +30,6 @@ export function PublicHeader() {
             >
               Contáctanos
             </Link>
-            <Link
-              href="/admin"
-              aria-label="Gestionar inventario"
-              className="inline-flex min-h-11 items-center rounded-lg px-3 text-small font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <span className="lg:hidden">Inventario</span>
-              <span className="hidden lg:inline">Gestionar inventario</span>
-            </Link>
             <span className="hidden lg:inline-flex"><WhatsAppLink>WhatsApp</WhatsAppLink></span>
           </nav>
           <ThemeToggle />

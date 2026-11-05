@@ -5,11 +5,12 @@ import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/cn";
 
-type AdminIcon = "home" | "inventory" | "products" | "brands" | "types" | "locations" | "import" | "movements" | "audit" | "archive";
+type AdminIcon = "home" | "sales" | "inventory" | "products" | "brands" | "types" | "locations" | "import" | "movements" | "audit" | "archive";
 
 function NavIcon({ icon }: { icon: AdminIcon }) {
   const paths = {
     home: <><path d="m3 10 9-7 9 7" /><path d="M5 9v11h14V9" /><path d="M9 20v-6h6v6" /></>,
+    sales: <><path d="M4 5h16v14H4zM8 9h8M8 13h5" /></>,
     inventory: <><path d="M4 7h16v13H4z" /><path d="M7 4h10l3 3H4z" /><path d="M9 11h6" /></>,
     products: <><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z" /><path d="m4 7.5 8 4.5 8-4.5M12 12v9" /></>,
     brands: <><path d="M4 6h16v12H4z" /><path d="M7 10h10M7 14h6" /></>,

@@ -12,7 +12,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:integration": "vitest run src/features/admin/server/admin-services.integration.test.ts src/features/catalog/data/public-catalog-queries.integration.test.ts src/db/product-condition-migration.integration.test.ts src/db/product-warranty-migration.integration.test.ts",
+    "test:integration": "vitest run src/features/admin/server/admin-services.integration.test.ts src/features/catalog/data/public-catalog-queries.integration.test.ts src/db/product-condition-migration.integration.test.ts src/db/product-warranty-migration.integration.test.ts src/features/sales/server/sales.integration.test.ts src/db/sales-migration.integration.test.ts",
     "test:e2e:seed": "tsx src/scripts/seed-catalog-e2e.ts",
     "test:e2e": "pnpm test:e2e:seed && playwright test",
     "test:watch": "vitest",
@@ -31,7 +31,9 @@
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "deploy:staging": "opennextjs-cloudflare build --env staging && opennextjs-cloudflare deploy --env staging",
     "upload": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
-    "cf:typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
+    "cf:typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
+    "sales:verify": "node src/scripts/sales-verify.mjs",
+    "sales:release": "tsx src/scripts/sales-release.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1116.0",

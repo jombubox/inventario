@@ -1,0 +1,35 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { z } from "zod";
+import { Card } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
+import { buttonStyles } from "@/components/ui/button";
+import { getDb } from "@/db";
+import { requireAdmin } from "@/features/auth/server/admin-auth";
+import { getSale } from "@/features/sales/data/sales-queries";
+import { money, saleLabel } from "@/features/sales/domain/sales";
+import { formatDateTime, formatInventoryCondition } from "@/lib/format";
+import { MoneyBreakdown } from "@/features/sales/components/sales-fields";
+import { SaleControls } from "@/features/sales/components/sale-controls";
+
+function FulfillmentChanges({ details }: { details: Record<string, unknown> }) {
+  if (!details.beforeFields || typeof details.beforeFields !== "object" || !details.afterFields || typeof details.afterFields !== "object") return null;
+  const before = details.beforeFields as Record<string, unknown>; const after = details.afterFields as Record<string, unknown>;
+  return <dl className="mt-2 space-y-1">{[["carrier", "Paquetería"], ["tracking", "Guía"], ["estimatedDate", "Fecha estimada"], ["notes", "Notas"]].filter(([key]) => before[key!] !== after[key!]).map(([key, label]) => <div key={key} className="break-words"><dt className="font-medium">{label}</dt><dd>{String(before[key!] || "Sin datos")} → {String(after[key!] || "Sin datos")}</dd></div>)}</dl>;
+}
+
+export default async function SalePage({ params }: { params: Promise<{ id: string }> }) {
+  await requireAdmin(); const { id } = await params; if (!z.uuid().safeParse(id).success) notFound();
+  const d = await getSale(getDb(), id); if (!d) notFound(); const { sale: s } = d;
+  return <div className="mx-auto w-full max-w-6xl space-y-6">
+    <PageHeader eyebrow="Ventas" title={s.folio} description={`Registrada el ${formatDateTime(s.createdAt)}`} actions={s.completedAt ? <Link className={buttonStyles({ variant: "outline" })} href={`/admin/ventas/${id}/recibo`}>Ver recibo</Link> : undefined} />
+    <div className="flex flex-wrap gap-3 text-small font-semibold"><span className="rounded-lg bg-muted p-3">Venta: {saleLabel(s.status)}</span><span className="rounded-lg bg-muted p-3">Pago: {saleLabel(d.paymentStatus)}</span><span className="rounded-lg bg-muted p-3">Entrega: {saleLabel(s.deliveryStatus)}</span></div>
+    <SaleControls detail={d} />
+    <div className="grid gap-5 md:grid-cols-2"><Card className="space-y-2 break-words p-5"><h2 className="text-h3">Cliente</h2><p>{s.customer.name || "Venta de mostrador"}</p><p>{s.customer.phone || "Sin celular"}</p><p>{s.customer.email}</p><p>{s.customer.company}</p><p>{s.customer.rfc ? `RFC: ${s.customer.rfc}` : ""}</p><p className="whitespace-pre-wrap text-small text-muted-foreground">{s.customer.notes}</p></Card>
+      <Card className="space-y-2 break-words p-5"><h2 className="text-h3">Entrega</h2><p>{saleLabel(s.delivery.method)}</p>{s.delivery.method === "SHIPPING" && <><p>{s.delivery.recipient} · {s.delivery.phone}</p><p>{s.delivery.street} {s.delivery.exterior} {s.delivery.interior}, {s.delivery.neighborhood}</p><p>CP {s.delivery.postalCode}, {s.delivery.city}, {s.delivery.state}, {s.delivery.country}</p><p>{s.delivery.references}</p></>}<p>Paquetería: {s.delivery.carrier || "Pendiente"}</p><p>Guía: {s.delivery.tracking || "Pendiente"}</p><p>Entrega estimada: {s.delivery.estimatedDate || "Sin fecha"}</p><p className="whitespace-pre-wrap text-small">{s.delivery.notes}</p></Card></div>
+    <Card className="space-y-5 p-5"><h2 className="text-h3">Productos y orígenes de stock</h2>{d.lines.map(i => <div key={i.id} className="space-y-2 rounded-lg border border-border p-4"><p className="break-words font-semibold">{i.snapshot.title} · {i.snapshot.sku}</p><p className="text-small">{i.snapshot.brand} · Parte {i.snapshot.partNumber || "—"} · {i.snapshot.condition === "NEW" ? "Nuevo" : i.snapshot.condition === "USED" ? "Usado" : "Sin condición comercial"}</p><p className="text-small">Garantía: {i.snapshot.warranty || "No especificada"}</p><p>{i.quantity} × {money(i.unitPriceCents)} · Descuento: {money(i.discountCents)} · Neto: {money(i.quantity * i.unitPriceCents - i.discountCents)}</p>{d.allocations.filter(a => a.saleItemId === i.id).map(a => <p key={a.id} className="break-words text-small text-muted-foreground">{a.quantity} unidad(es) · {a.source.inventoryCode} · {a.source.location} · Bolsa {a.source.bag || "—"} · {formatInventoryCondition(a.source.condition)} · Devueltas: {a.returnedQuantity}{a.movementId ? ` · Movimiento ${a.movementId}` : " · Sin salida (borrador)"}</p>)}</div>)}<MoneyBreakdown totals={s} creditedCents={s.creditedCents} /><p className="whitespace-pre-wrap text-small">{s.notes}</p></Card>
+    <Card className="space-y-4 p-5"><h2 className="text-h3">Pagos y saldo</h2><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{[["Pagos recibidos", d.paidCents], ["Reembolsos registrados", d.refundedCents], ["Saldo pendiente", d.outstandingCents], ["Saldo a favor / por reembolsar", d.refundDueCents]].map(([label, v]) => <div key={label} className="rounded-lg bg-muted p-3"><p className="text-small">{label}</p><p className="text-h3">{money(Number(v))}</p></div>)}</div>{d.payments.length === 0 && <p>Sin pagos registrados.</p>}{d.payments.map(p => <div key={p.id} className="break-words border-t border-border pt-3 text-small"><p className="font-semibold">{saleLabel(p.kind)} · {money(p.amountCents)} · {saleLabel(p.method)}</p><p>{formatDateTime(p.occurredAt)} · {p.reference || "Sin referencia"} · Admin</p><p>{p.notes}</p></div>)}</Card>
+    <Card className="space-y-4 p-5"><h2 className="text-h3">Cancelaciones y devoluciones</h2>{s.cancelledAt && <p>Cancelada el {formatDateTime(s.cancelledAt)} · {s.cancellationReason}</p>}{d.returns.length === 0 && <p>No hay devoluciones.</p>}{d.returns.map(r => <div key={r.id} className="space-y-1 border-t border-border pt-3 text-small"><p className="font-semibold">{formatDateTime(r.createdAt)} · Abono {money(r.creditCents)}</p><p>{r.reason} · Condición: {r.condition}</p>{d.returnItems.filter(i => i.returnId === r.id).map(i => <p key={i.id}>{d.allocations.find(a => a.id === i.allocationId)?.source.inventoryCode} · {i.quantity} unidad(es) · {saleLabel(i.disposition)}{i.movementId ? ` · Movimiento ${i.movementId}` : ""}</p>)}</div>)}</Card>
+    <Card className="space-y-4 p-5"><h2 className="text-h3">Historial de auditoría</h2>{s.completedAt && <p className="text-small">Completada: {formatDateTime(s.completedAt)}</p>}<ol className="space-y-3">{d.events.map(e => <li key={e.id} className="border-l-2 border-border pl-4 text-small"><p className="font-semibold">{saleLabel(e.type)}</p><p className="text-muted-foreground">{formatDateTime(e.createdAt)} · Admin</p>{typeof e.details.amountCents === "number" && <p>{money(e.details.amountCents)}</p>}{typeof e.details.after === "string" && <p>{saleLabel(e.details.before as string)} → {saleLabel(e.details.after)}</p>}<FulfillmentChanges details={e.details} /></li>)}</ol></Card>
+  </div>;
+}

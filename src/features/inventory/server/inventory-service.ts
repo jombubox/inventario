@@ -273,6 +273,7 @@ export async function recordStockMovement(
 export async function recordStockMovementInTransaction(
   tx: InventoryTransaction,
   input: StockMovementMutationInput,
+  context?: { saleId: string; folio: string; allocationId: string; productId: string; actor: "ADMIN" },
 ) {
   const increasing = input.type === "IN" || input.type === "RETURN";
 
@@ -326,7 +327,7 @@ export async function recordStockMovementInTransaction(
     throw new InvalidOperationError("No fue posible registrar el movimiento de stock.");
   }
 
-  await tx.insert(inventoryMovements).values({
+  const [movement] = await tx.insert(inventoryMovements).values({
     inventoryItemId: updated.id,
     type: input.type,
     quantity: input.quantity,
@@ -335,12 +336,13 @@ export async function recordStockMovementInTransaction(
     userId: null,
     reason: input.reason,
     metadata: {
+      ...context,
       direction: increasing ? "IN" : "OUT",
       fromQuantity: before.quantity,
       toQuantity: updated.quantity,
       resultingStatus: updated.status,
     },
-  });
+  }).returning({ id: inventoryMovements.id });
   const action = {
     IN: "INVENTORY_IN",
     OUT: "INVENTORY_OUT",
@@ -355,5 +357,5 @@ export async function recordStockMovementInTransaction(
     after: { quantity: updated.quantity, status: updated.status },
     metadata: { movementType: input.type, quantity: input.quantity, reason: input.reason },
   });
-  return updated;
+  return { ...updated, movementId: movement!.id };
 }

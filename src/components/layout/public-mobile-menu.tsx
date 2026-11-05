@@ -25,7 +25,6 @@ export function PublicMobileMenu() {
         <Link href="/catalogo" className="rounded-xl p-3 font-semibold hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Catálogo</Link>
         <Link href="/contacto" className="rounded-xl p-3 font-semibold hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Contáctanos</Link>
         <WhatsAppLink className="w-full">WhatsApp</WhatsAppLink>
-        <Link href="/admin" className="rounded-xl p-3 text-small text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Gestionar inventario</Link>
       </nav>
     </details>
   );
